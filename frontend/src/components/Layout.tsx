@@ -106,7 +106,7 @@ export default function Layout() {
       >
         <div className="flex items-center gap-2 px-5 py-5">
           <span className="text-2xl">🚛</span>
-          <span className="text-xl font-bold tracking-wide">TrucksOn</span>
+          <span className="text-xl font-bold tracking-wide">Truxon</span>
         </div>
         <nav className="mt-2 space-y-1 px-3">
           {items.map((item) => (

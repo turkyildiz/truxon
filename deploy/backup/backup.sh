@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# TrucksOn nightly backup — runs on the UGREEN NAS, pulling FROM Supabase.
+# Truxon nightly backup — runs on the UGREEN NAS, pulling FROM Supabase.
 # Produces encrypted database dumps + document-storage archives, pruned
 # after RETENTION_DAYS. Pair with NAS-level immutable snapshots of
 # $BACKUP_DIR for the ransomware-proof copy (3-2-1-1-0 rule: Supabase's

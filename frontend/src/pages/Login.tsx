@@ -31,7 +31,7 @@ export default function Login() {
       <form onSubmit={onSubmit} className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl">
         <div className="mb-6 text-center">
           <div className="text-4xl">🚛</div>
-          <h1 className="mt-2 text-2xl font-bold text-navy-800">TrucksOn</h1>
+          <h1 className="mt-2 text-2xl font-bold text-navy-800">Truxon</h1>
           <p className="text-sm text-slate-500">Transportation Management System</p>
         </div>
         <div className="space-y-4">

@@ -5,7 +5,7 @@ import { getInvoiceFull } from './data'
 
 const NAVY = '#1e3a5f'
 
-export async function downloadInvoicePdf(invoiceId: number, companyName = 'TrucksOn Logistics'): Promise<void> {
+export async function downloadInvoicePdf(invoiceId: number, companyName = 'Truxon Logistics'): Promise<void> {
   const inv = await getInvoiceFull(invoiceId)
   const doc = new jsPDF({ unit: 'pt', format: 'letter' })
 

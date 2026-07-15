@@ -1,4 +1,4 @@
-# TrucksOn TMS
+# Truxon TMS
 
 Web-based Transportation Management System for small-to-mid-sized trucking companies.
 Spec: [docs/TrucksOn_TMS_Requirements_MVP_v1.0.pdf](docs/TrucksOn_TMS_Requirements_MVP_v1.0.pdf)
