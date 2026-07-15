@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import './index.css'
 import { AuthProvider, useAuth } from './auth'
 import Layout from './components/Layout'
+import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Loads from './pages/Loads'
@@ -17,6 +18,7 @@ import Maintenance from './pages/Maintenance'
 import Reports from './pages/Reports'
 import Invoices from './pages/Invoices'
 import Users from './pages/Users'
+import Settings from './pages/Settings'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 15_000 } },
@@ -35,6 +37,7 @@ createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <BrowserRouter>
           <Routes>
+            <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route
               element={
@@ -43,7 +46,7 @@ createRoot(document.getElementById('root')!).render(
                 </Protected>
               }
             >
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/loads" element={<Loads />} />
               <Route path="/loads/:id" element={<LoadDetail />} />
               <Route path="/dispatch" element={<Dispatch />} />
@@ -55,6 +58,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/reports" element={<Reports />} />
               <Route path="/invoices" element={<Invoices />} />
               <Route path="/users" element={<Users />} />
+              <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

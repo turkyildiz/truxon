@@ -1,19 +1,25 @@
 /** Client-side invoice PDF generation with jsPDF. */
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { getInvoiceFull } from './data'
+import { getCompanySettings, getInvoiceFull } from './data'
 
 const NAVY = '#1e3a5f'
 
-export async function downloadInvoicePdf(invoiceId: number, companyName = 'Truxon Logistics'): Promise<void> {
-  const inv = await getInvoiceFull(invoiceId)
+export async function downloadInvoicePdf(invoiceId: number): Promise<void> {
+  const [inv, company] = await Promise.all([getInvoiceFull(invoiceId), getCompanySettings()])
   const doc = new jsPDF({ unit: 'pt', format: 'letter' })
 
   doc.setTextColor(NAVY)
   doc.setFontSize(22).setFont('helvetica', 'bold')
-  doc.text(companyName, 54, 60) // logo placeholder — swap for addImage() later
+  doc.text(company.company_name, 54, 60)
+  doc.setFontSize(8).setFont('helvetica', 'normal').setTextColor('#555555')
+  const companyLine = [company.address.replace(/\n/g, ', '), company.phone, company.mc_number && `MC# ${company.mc_number}`]
+    .filter(Boolean)
+    .join('  ·  ')
+  if (companyLine) doc.text(companyLine, 54, 72)
+  doc.setTextColor(NAVY).setFont('helvetica', 'bold')
   doc.setFontSize(14)
-  doc.text(`INVOICE ${inv.invoice_number}`, 54, 84)
+  doc.text(`INVOICE ${inv.invoice_number}`, 54, 92)
 
   doc.setTextColor('#000000').setFontSize(10).setFont('helvetica', 'normal')
   const lines = [
@@ -23,7 +29,7 @@ export async function downloadInvoicePdf(invoiceId: number, companyName = 'Truxo
     ...(inv.due_date ? [`Due: ${new Date(inv.due_date).toLocaleDateString()}`] : []),
     `Terms: ${inv.customer.payment_terms}`,
   ]
-  lines.forEach((line, i) => doc.text(line, 54, 110 + i * 14))
+  lines.forEach((line, i) => doc.text(line, 54, 118 + i * 14))
 
   const money = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
   const body = inv.loads.map((l: { load_number: string; pickup_address: string; delivery_address: string; miles: number; rate: number }) => [
@@ -36,7 +42,7 @@ export async function downloadInvoicePdf(invoiceId: number, companyName = 'Truxo
   ])
 
   autoTable(doc, {
-    startY: 120 + lines.length * 14,
+    startY: 128 + lines.length * 14,
     head: [['Load #', 'Pickup', 'Delivery', 'Miles', 'Rate/Mile', 'Amount']],
     body,
     foot: [['', '', '', '', 'TOTAL', money(inv.total)]],

@@ -128,12 +128,16 @@ export interface LoadFilters {
   q?: string
   status?: string
   customer_id?: string | number
+  date_from?: string
+  date_to?: string
 }
 
 export async function listLoads(filters: LoadFilters = {}): Promise<Load[]> {
   let query = supabase.from('loads').select(LOAD_SELECT).order('created_at', { ascending: false }).limit(200)
   if (filters.status) query = query.eq('status', filters.status)
   if (filters.customer_id) query = query.eq('customer_id', filters.customer_id)
+  if (filters.date_from) query = query.gte('pickup_time', filters.date_from)
+  if (filters.date_to) query = query.lte('pickup_time', filters.date_to + 'T23:59:59')
   if (filters.q) {
     query = query.or(`load_number.ilike.%${filters.q}%,pickup_address.ilike.%${filters.q}%,delivery_address.ilike.%${filters.q}%`)
   }
@@ -324,6 +328,26 @@ export async function createUser(payload: Row): Promise<void> {
 
 export async function updateUser(id: string, payload: Row): Promise<void> {
   await invokeAdminUsers({ method: 'PATCH', body: { id, ...payload } })
+}
+
+// ---------- Company settings ----------
+
+export interface CompanySettings {
+  id: number
+  company_name: string
+  address: string
+  phone: string
+  email: string
+  mc_number: string
+  logo_path: string
+}
+
+export async function getCompanySettings(): Promise<CompanySettings> {
+  return unwrap(await supabase.from('company_settings').select('*').eq('id', 1).single())
+}
+
+export async function updateCompanySettings(payload: Partial<CompanySettings>): Promise<CompanySettings> {
+  return unwrap(await supabase.from('company_settings').update(payload).eq('id', 1).select().single())
 }
 
 // ---------- Dispatch helpers (edge functions) ----------

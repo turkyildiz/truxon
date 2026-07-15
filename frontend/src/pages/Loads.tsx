@@ -10,11 +10,13 @@ export default function Loads() {
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('')
   const [customerId, setCustomerId] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   const { data: customers = [] } = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
   const { data: loads = [], isLoading } = useQuery({
-    queryKey: ['loads', q, status, customerId],
-    queryFn: () => listLoads({ q, status, customer_id: customerId }),
+    queryKey: ['loads', q, status, customerId, dateFrom, dateTo],
+    queryFn: () => listLoads({ q, status, customer_id: customerId, date_from: dateFrom, date_to: dateTo }),
   })
 
   return (
@@ -37,6 +39,11 @@ export default function Loads() {
             </option>
           ))}
         </Select>
+        <div className="flex items-center gap-2">
+          <Input type="date" title="Pickup from" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="!w-40" />
+          <span className="text-slate-400">–</span>
+          <Input type="date" title="Pickup to" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="!w-40" />
+        </div>
       </div>
 
       {isLoading ? (

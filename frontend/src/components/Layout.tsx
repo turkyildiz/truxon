@@ -1,11 +1,69 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { ROLE_MODULES, useAuth } from '../auth'
 import { globalSearch } from '../data'
+import { errorMessage, supabase } from '../supabase'
 import type { SearchResults } from '../types'
+import { Button, Field, Input, Modal } from './ui'
+
+function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (password !== confirm) {
+      setError('Passwords do not match')
+      return
+    }
+    setBusy(true)
+    setError('')
+    const { error: err } = await supabase.auth.updateUser({ password })
+    setBusy(false)
+    if (err) setError(errorMessage(err))
+    else {
+      setDone(true)
+      setPassword('')
+      setConfirm('')
+      setTimeout(() => {
+        setDone(false)
+        onClose()
+      }, 1500)
+    }
+  }
+
+  return (
+    <Modal title="Change Password" open={open} onClose={onClose}>
+      {done ? (
+        <p className="py-4 text-center font-medium text-green-600">✓ Password updated</p>
+      ) : (
+        <form onSubmit={onSubmit} className="space-y-4">
+          <Field label="New Password (min 8 characters)">
+            <Input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
+          </Field>
+          <Field label="Confirm New Password">
+            <Input type="password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" />
+          </Field>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy || !password}>
+              {busy ? 'Saving…' : 'Update Password'}
+            </Button>
+          </div>
+        </form>
+      )}
+    </Modal>
+  )
+}
 
 const NAV_ITEMS: { key: string; to: string; label: string; icon: string }[] = [
-  { key: 'dashboard', to: '/', label: 'Dashboard', icon: '📊' },
+  { key: 'dashboard', to: '/dashboard', label: 'Dashboard', icon: '📊' },
   { key: 'loads', to: '/loads', label: 'Loads', icon: '📦' },
   { key: 'dispatch', to: '/dispatch', label: 'Dispatch', icon: '🚚' },
   { key: 'customers', to: '/customers', label: 'Customers', icon: '🏢' },
@@ -16,6 +74,7 @@ const NAV_ITEMS: { key: string; to: string; label: string; icon: string }[] = [
   { key: 'reports', to: '/reports', label: 'Accounting', icon: '🧾' },
   { key: 'invoices', to: '/invoices', label: 'Invoices', icon: '💵' },
   { key: 'users', to: '/users', label: 'Users', icon: '👤' },
+  { key: 'settings', to: '/settings', label: 'Settings', icon: '⚙️' },
 ]
 
 function GlobalSearch() {
@@ -95,6 +154,7 @@ function GlobalSearch() {
 export default function Layout() {
   const { user, logout } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [pwOpen, setPwOpen] = useState(false)
   const allowed = ROLE_MODULES[user?.role ?? 'driver'] ?? []
   const items = NAV_ITEMS.filter((i) => allowed.includes(i.key))
 
@@ -113,7 +173,6 @@ export default function Layout() {
             <NavLink
               key={item.key}
               to={item.to}
-              end={item.to === '/'}
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -140,6 +199,13 @@ export default function Layout() {
               <div className="text-sm font-medium">{user?.full_name || user?.username}</div>
               <div className="text-xs capitalize text-slate-500">{user?.role}</div>
             </div>
+            <button
+              onClick={() => setPwOpen(true)}
+              title="Change password"
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+            >
+              🔑
+            </button>
             <button onClick={logout} className="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
               Sign out
             </button>
@@ -148,6 +214,7 @@ export default function Layout() {
         <main className="flex-1 p-4 lg:p-6">
           <Outlet />
         </main>
+        <ChangePasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
       </div>
     </div>
   )
