@@ -1,42 +1,52 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { api } from './api'
-import type { User } from './types'
+import { supabase } from './supabase'
+import type { Profile } from './types'
 
 interface AuthState {
-  user: User | null
+  user: Profile | null
   loading: boolean
-  login: (username: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<void>
   logout: () => void
 }
 
 const AuthContext = createContext<AuthState>(null!)
 
+async function fetchProfile(userId: string): Promise<Profile | null> {
+  const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+  return data
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!localStorage.getItem('token')) {
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (data.session) setUser(await fetchProfile(data.session.user.id))
       setLoading(false)
-      return
-    }
-    api
-      .get<User>('/auth/me')
-      .then((res) => setUser(res.data))
-      .catch(() => localStorage.removeItem('token'))
-      .finally(() => setLoading(false))
+    })
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') setUser(null)
+      // SIGNED_IN is handled by login() so the UI waits for the profile.
+      if (event === 'TOKEN_REFRESHED' && !session) setUser(null)
+    })
+    return () => sub.subscription.unsubscribe()
   }, [])
 
-  async function login(username: string, password: string) {
-    const form = new URLSearchParams({ username, password })
-    const res = await api.post('/auth/login', form)
-    localStorage.setItem('token', res.data.access_token)
-    const me = await api.get<User>('/auth/me')
-    setUser(me.data)
+  async function login(email: string, password: string) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+    const profile = await fetchProfile(data.user.id)
+    if (!profile || !profile.is_active) {
+      await supabase.auth.signOut()
+      throw new Error('Account is disabled')
+    }
+    setUser(profile)
   }
 
   function logout() {
-    localStorage.removeItem('token')
+    supabase.auth.signOut()
     setUser(null)
   }
 

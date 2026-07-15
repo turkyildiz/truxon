@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
-import { errorMessage } from '../api'
 import { useAuth } from '../auth'
 import { Button, Field, Input } from '../components/ui'
+import { errorMessage } from '../supabase'
 
 export default function Login() {
   const { user, login } = useAuth()
-  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -18,7 +18,7 @@ export default function Login() {
     setBusy(true)
     setError('')
     try {
-      await login(username, password)
+      await login(email, password)
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -35,14 +35,14 @@ export default function Login() {
           <p className="text-sm text-slate-500">Transportation Management System</p>
         </div>
         <div className="space-y-4">
-          <Field label="Username">
-            <Input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus autoComplete="username" />
+          <Field label="Email">
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus autoComplete="username" />
           </Field>
           <Field label="Password">
             <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
           </Field>
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button type="submit" disabled={busy || !username || !password} className="w-full">
+          <Button type="submit" disabled={busy || !email || !password} className="w-full">
             {busy ? 'Signing in…' : 'Sign in'}
           </Button>
         </div>

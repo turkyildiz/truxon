@@ -1,17 +1,18 @@
 /**
  * Generic list + create/edit-modal page used by Customers, Drivers, Trucks,
- * Trailers, Maintenance, and Users. Configure columns and form fields; it
- * handles fetching, searching, and saving.
+ * Trailers, Maintenance, and Users. Pages supply data functions (list /
+ * create / update) and field configs; this handles fetching, searching,
+ * and saving.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { api, errorMessage } from '../api'
+import { errorMessage } from '../supabase'
 import { Button, Card, Field, Input, Modal, Select, Table, Textarea } from './ui'
 
 export interface FieldDef {
   name: string
   label: string
-  type?: 'text' | 'number' | 'date' | 'datetime-local' | 'select' | 'textarea' | 'checkbox' | 'password'
+  type?: 'text' | 'number' | 'date' | 'datetime-local' | 'select' | 'textarea' | 'checkbox' | 'password' | 'email'
   options?: { value: string; label: string }[]
   required?: boolean
   step?: string
@@ -24,30 +25,32 @@ export interface ColumnDef<T> {
   render: (item: T) => ReactNode
 }
 
-interface Props<T extends { id: number }> {
+interface Props<T extends { id: number | string }> {
   title: string
-  endpoint: string
+  queryKey: string
+  list: (q: string) => Promise<T[]>
+  create: (payload: Record<string, unknown>) => Promise<unknown>
+  update: (id: T['id'], payload: Record<string, unknown>) => Promise<unknown>
   columns: ColumnDef<T>[]
   fields: FieldDef[]
   toForm: (item: T) => Record<string, unknown>
   defaults: Record<string, unknown>
   searchable?: boolean
-  queryParams?: Record<string, string>
   addLabel?: string
-  extraActions?: (item: T) => ReactNode
 }
 
-export default function ResourcePage<T extends { id: number }>({
+export default function ResourcePage<T extends { id: number | string }>({
   title,
-  endpoint,
+  queryKey,
+  list,
+  create,
+  update,
   columns,
   fields,
   toForm,
   defaults,
   searchable = true,
-  queryParams = {},
   addLabel,
-  extraActions,
 }: Props<T>) {
   const qc = useQueryClient()
   const [q, setQ] = useState('')
@@ -57,18 +60,20 @@ export default function ResourcePage<T extends { id: number }>({
   const [error, setError] = useState('')
 
   const { data: items = [], isLoading } = useQuery({
-    queryKey: [endpoint, q, queryParams],
-    queryFn: () => api.get<T[]>(endpoint, { params: { ...(q ? { q } : {}), ...queryParams } }).then((r) => r.data),
+    queryKey: [queryKey, q],
+    queryFn: () => list(q),
   })
 
   const save = useMutation({
     mutationFn: (payload: Record<string, unknown>) => {
-      // Empty strings for optional fields become null so the API accepts them.
-      const cleaned = Object.fromEntries(Object.entries(payload).map(([k, v]) => [k, v === '' ? null : v]))
-      return editing ? api.patch(`${endpoint}/${editing.id}`, cleaned) : api.post(endpoint, cleaned)
+      // Empty strings for optional fields become null so Postgres accepts them.
+      const cleaned = Object.fromEntries(
+        Object.entries(payload).map(([k, v]) => [k, v === '' ? null : v]),
+      )
+      return editing ? update(editing.id, cleaned) : create(cleaned)
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [endpoint] })
+      qc.invalidateQueries({ queryKey: [queryKey] })
       close()
     },
     onError: (err) => setError(errorMessage(err)),
@@ -99,7 +104,7 @@ export default function ResourcePage<T extends { id: number }>({
     save.mutate(payload)
   }
 
-  const visibleFields = fields.filter((f) => !editing || !f.createOnly || form[f.name] !== undefined)
+  const visibleFields = fields.filter((f) => !editing || !f.createOnly)
 
   return (
     <Card
@@ -125,7 +130,6 @@ export default function ResourcePage<T extends { id: number }>({
                 </td>
               ))}
               <td className="px-3 py-3 text-right whitespace-nowrap">
-                {extraActions?.(item)}
                 <button onClick={() => openEdit(item)} className="text-sm font-medium text-navy-600 hover:underline">
                   Edit
                 </button>
@@ -163,7 +167,7 @@ export default function ResourcePage<T extends { id: number }>({
                     type={f.type ?? 'text'}
                     step={f.step}
                     required={f.required}
-                    value={String(form[f.name] ??  '')}
+                    value={String(form[f.name] ?? '')}
                     onChange={(e) => setForm({ ...form, [f.name]: e.target.value })}
                   />
                 )}

@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api } from '../api'
 import { Badge, Button, Card, formatDateTime, Input, money, Select } from '../components/ui'
-import { LOAD_STATUSES, type Customer, type Load } from '../types'
+import { listCustomers, listLoads } from '../data'
+import { LOAD_STATUSES } from '../types'
 
 export default function Loads() {
   const navigate = useNavigate()
@@ -11,30 +11,14 @@ export default function Loads() {
   const [status, setStatus] = useState('')
   const [customerId, setCustomerId] = useState('')
 
-  const { data: customers = [] } = useQuery({
-    queryKey: ['/customers'],
-    queryFn: () => api.get<Customer[]>('/customers').then((r) => r.data),
-  })
-
+  const { data: customers = [] } = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
   const { data: loads = [], isLoading } = useQuery({
-    queryKey: ['/loads', q, status, customerId],
-    queryFn: () =>
-      api
-        .get<Load[]>('/loads', {
-          params: {
-            ...(q ? { q } : {}),
-            ...(status ? { status } : {}),
-            ...(customerId ? { customer_id: customerId } : {}),
-          },
-        })
-        .then((r) => r.data),
+    queryKey: ['loads', q, status, customerId],
+    queryFn: () => listLoads({ q, status, customer_id: customerId }),
   })
 
   return (
-    <Card
-      title="Loads"
-      actions={<Button onClick={() => navigate('/dispatch')}>+ New Load</Button>}
-    >
+    <Card title="Loads" actions={<Button onClick={() => navigate('/dispatch')}>+ New Load</Button>}>
       <div className="mb-4 flex flex-wrap gap-3">
         <Input placeholder="Search load #, address…" value={q} onChange={(e) => setQ(e.target.value)} className="w-full sm:w-64" />
         <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full sm:w-44">
@@ -90,7 +74,7 @@ export default function Loads() {
                   </td>
                   <td className="px-3 py-3">{load.driver_name ?? '—'}</td>
                   <td className="px-3 py-3">{money(load.rate)}</td>
-                  <td className="px-3 py-3">{load.rate_per_mile ? `$${load.rate_per_mile}` : '—'}</td>
+                  <td className="px-3 py-3">{load.rate_per_mile != null ? `$${load.rate_per_mile.toFixed(2)}` : '—'}</td>
                   <td className="px-3 py-3">
                     <Badge status={load.status} />
                   </td>

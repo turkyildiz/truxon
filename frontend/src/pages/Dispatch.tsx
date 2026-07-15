@@ -1,23 +1,9 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useCallback, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, errorMessage } from '../api'
 import { Button, Card, Field, Input, Select, Textarea } from '../components/ui'
-import type { Customer, Driver, Equipment } from '../types'
-
-interface ExtractResult {
-  raw_text: string
-  fields: {
-    customer_name?: string | null
-    pickup_address?: string | null
-    pickup_time?: string | null
-    delivery_address?: string | null
-    delivery_time?: string | null
-    rate?: number | null
-    special_terms?: string | null
-  } | null
-  error: string | null
-}
+import { calculateDistance, createLoad, extractPdf, listCustomers, listDrivers, trailersApi, trucksApi } from '../data'
+import { errorMessage } from '../supabase'
 
 const EMPTY_FORM = {
   customer_id: '',
@@ -41,17 +27,13 @@ export default function Dispatch() {
   const [aiNote, setAiNote] = useState('')
   const [dragOver, setDragOver] = useState(false)
 
-  const { data: customers = [] } = useQuery({ queryKey: ['/customers'], queryFn: () => api.get<Customer[]>('/customers').then((r) => r.data) })
-  const { data: drivers = [] } = useQuery({ queryKey: ['/drivers'], queryFn: () => api.get<Driver[]>('/drivers').then((r) => r.data) })
-  const { data: trucks = [] } = useQuery({ queryKey: ['/trucks'], queryFn: () => api.get<Equipment[]>('/trucks').then((r) => r.data) })
-  const { data: trailers = [] } = useQuery({ queryKey: ['/trailers'], queryFn: () => api.get<Equipment[]>('/trailers').then((r) => r.data) })
+  const { data: customers = [] } = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
+  const { data: drivers = [] } = useQuery({ queryKey: ['drivers', ''], queryFn: () => listDrivers() })
+  const { data: trucks = [] } = useQuery({ queryKey: ['trucks', ''], queryFn: () => trucksApi.list() })
+  const { data: trailers = [] } = useQuery({ queryKey: ['trailers', ''], queryFn: () => trailersApi.list() })
 
   const extract = useMutation({
-    mutationFn: (file: File) => {
-      const fd = new FormData()
-      fd.append('file', file)
-      return api.post<ExtractResult>('/dispatch/extract-pdf', fd).then((r) => r.data)
-    },
+    mutationFn: extractPdf,
     onSuccess: (result) => {
       if (result.error && !result.fields) {
         setAiNote(result.error)
@@ -59,7 +41,9 @@ export default function Dispatch() {
       }
       const f = result.fields ?? {}
       // Try to match the extracted customer name against existing customers.
-      const match = f.customer_name ? customers.find((c) => c.company_name.toLowerCase().includes(String(f.customer_name).toLowerCase().slice(0, 12))) : undefined
+      const match = f.customer_name
+        ? customers.find((c) => c.company_name.toLowerCase().includes(String(f.customer_name).toLowerCase().slice(0, 12)))
+        : undefined
       setForm((prev) => ({
         ...prev,
         customer_id: match ? String(match.id) : prev.customer_id,
@@ -76,7 +60,7 @@ export default function Dispatch() {
   })
 
   const distance = useMutation({
-    mutationFn: () => api.post<{ miles: number | null; available: boolean }>('/dispatch/distance', { origin: form.pickup_address, destination: form.delivery_address }).then((r) => r.data),
+    mutationFn: () => calculateDistance(form.pickup_address, form.delivery_address),
     onSuccess: (d) => {
       if (d.miles != null) setForm((prev) => ({ ...prev, miles: String(d.miles) }))
       else setAiNote('Distance service unavailable (no Google Maps API key) — enter miles manually.')
@@ -86,7 +70,7 @@ export default function Dispatch() {
   const create = useMutation({
     mutationFn: () => {
       const payload = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v === '' ? null : v]))
-      return api.post('/loads', payload).then((r) => r.data)
+      return createLoad(payload)
     },
     onSuccess: (load) => navigate(`/loads/${load.id}`),
     onError: (err) => setError(errorMessage(err)),
@@ -165,7 +149,13 @@ export default function Dispatch() {
             <Field label="Delivery Address">
               <div className="space-y-2">
                 <Textarea value={form.delivery_address} onChange={(e) => setForm({ ...form, delivery_address: e.target.value })} />
-                <Button type="button" variant="secondary" className="!py-1.5 text-xs" disabled={!form.pickup_address || !form.delivery_address || distance.isPending} onClick={() => distance.mutate()}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="!py-1.5 text-xs"
+                  disabled={!form.pickup_address || !form.delivery_address || distance.isPending}
+                  onClick={() => distance.mutate()}
+                >
                   {distance.isPending ? 'Calculating…' : '📍 Calculate miles'}
                 </Button>
               </div>

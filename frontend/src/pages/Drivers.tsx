@@ -1,12 +1,16 @@
 import ResourcePage from '../components/ResourcePage'
 import { Badge, formatDate } from '../components/ui'
+import { createDriver, listDrivers, updateDriver } from '../data'
 import type { Driver } from '../types'
 
 export default function Drivers() {
   return (
     <ResourcePage<Driver>
       title="Drivers"
-      endpoint="/drivers"
+      queryKey="drivers"
+      list={listDrivers}
+      create={createDriver}
+      update={updateDriver}
       columns={[
         { header: 'Name', render: (d) => <span className="font-medium">{d.full_name}</span> },
         { header: 'License #', render: (d) => d.license_number || '—' },
@@ -19,7 +23,7 @@ export default function Drivers() {
           },
         },
         { header: 'Hired', render: (d) => formatDate(d.hire_date) },
-        { header: 'Pay/Mile', render: (d) => `$${parseFloat(d.pay_per_mile).toFixed(2)}` },
+        { header: 'Pay/Mile', render: (d) => `$${Number(d.pay_per_mile).toFixed(2)}` },
         { header: 'Status', render: (d) => <Badge status={d.status} /> },
       ]}
       fields={[

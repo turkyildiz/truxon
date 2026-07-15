@@ -6,22 +6,7 @@ on:
   pull_request:
 
 jobs:
-  backend-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - name: Install dependencies
-        run: pip install -r backend/requirements.txt
-      - name: Run API smoke tests
-        working-directory: backend
-        run: python smoke_test.py
-
-  frontend-build:
+  frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,3 +21,19 @@ jobs:
       - name: Typecheck and build
         working-directory: frontend
         run: npm run build
+
+  # Legacy FastAPI implementation (backend/) — kept green until removed.
+  backend-legacy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Run API smoke tests
+        working-directory: backend
+        run: python smoke_test.py

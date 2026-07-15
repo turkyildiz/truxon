@@ -1,5 +1,6 @@
 import ResourcePage from '../components/ResourcePage'
 import { Badge, formatDate, money } from '../components/ui'
+import { trailersApi, trucksApi } from '../data'
 import type { Equipment } from '../types'
 
 const STATUS_OPTIONS = [
@@ -9,11 +10,14 @@ const STATUS_OPTIONS = [
   { value: 'retired', label: 'Retired' },
 ]
 
-function EquipmentPage({ title, endpoint }: { title: string; endpoint: string }) {
+function EquipmentPage({ title, api, queryKey }: { title: string; api: typeof trucksApi; queryKey: string }) {
   return (
     <ResourcePage<Equipment>
       title={title}
-      endpoint={endpoint}
+      queryKey={queryKey}
+      list={api.list}
+      create={api.create}
+      update={api.update}
       columns={[
         { header: 'Unit #', render: (t) => <span className="font-medium">{t.unit_number}</span> },
         { header: 'Make / Model / Year', render: (t) => [t.make, t.model, t.year].filter(Boolean).join(' ') || '—' },
@@ -49,5 +53,5 @@ function EquipmentPage({ title, endpoint }: { title: string; endpoint: string })
   )
 }
 
-export const Trucks = () => <EquipmentPage title="Trucks" endpoint="/trucks" />
-export const Trailers = () => <EquipmentPage title="Trailers" endpoint="/trailers" />
+export const Trucks = () => <EquipmentPage title="Trucks" api={trucksApi} queryKey="trucks" />
+export const Trailers = () => <EquipmentPage title="Trailers" api={trailersApi} queryKey="trailers" />

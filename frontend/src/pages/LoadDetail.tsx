@@ -1,9 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { api, errorMessage } from '../api'
 import { Badge, Button, Card, Field, formatDateTime, Input, money, Select, Textarea } from '../components/ui'
-import { LOAD_STATUSES, type Activity, type Customer, type DocumentMeta, type Driver, type Equipment, type Load } from '../types'
+import {
+  addNote,
+  changeLoadStatus,
+  downloadDocument,
+  getLoad,
+  listActivity,
+  listCustomers,
+  listDocuments,
+  listDrivers,
+  trailersApi,
+  trucksApi,
+  updateLoad,
+  uploadDocument,
+} from '../data'
+import { errorMessage } from '../supabase'
+import { LOAD_STATUSES, type Load } from '../types'
 
 function StatusStepper({ load, onAdvance, busy }: { load: Load; onAdvance: (status: string) => void; busy: boolean }) {
   const currentIdx = LOAD_STATUSES.indexOf(load.status)
@@ -44,30 +58,23 @@ export default function LoadDetail() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [editForm, setEditForm] = useState<Record<string, string> | null>(null)
 
-  const { data: load } = useQuery({
-    queryKey: ['/loads', id],
-    queryFn: () => api.get<Load>(`/loads/${id}`).then((r) => r.data),
-  })
-  const { data: docs = [] } = useQuery({
-    queryKey: ['docs', id],
-    queryFn: () => api.get<DocumentMeta[]>(`/documents/load/${id}`).then((r) => r.data),
-  })
-  const { data: activity = [] } = useQuery({
-    queryKey: ['activity', id],
-    queryFn: () => api.get<Activity[]>(`/activity/load/${id}`).then((r) => r.data),
-  })
-  const { data: drivers = [] } = useQuery({ queryKey: ['/drivers'], queryFn: () => api.get<Driver[]>('/drivers').then((r) => r.data) })
-  const { data: trucks = [] } = useQuery({ queryKey: ['/trucks'], queryFn: () => api.get<Equipment[]>('/trucks').then((r) => r.data) })
-  const { data: trailers = [] } = useQuery({ queryKey: ['/trailers'], queryFn: () => api.get<Equipment[]>('/trailers').then((r) => r.data) })
-  const { data: customers = [] } = useQuery({ queryKey: ['/customers'], queryFn: () => api.get<Customer[]>('/customers').then((r) => r.data) })
+  const { data: load } = useQuery({ queryKey: ['load', id], queryFn: () => getLoad(id!) })
+  const { data: docs = [] } = useQuery({ queryKey: ['docs', id], queryFn: () => listDocuments('load', id!) })
+  const { data: activity = [] } = useQuery({ queryKey: ['activity', id], queryFn: () => listActivity('load', id!) })
+  const { data: drivers = [] } = useQuery({ queryKey: ['drivers', ''], queryFn: () => listDrivers() })
+  const { data: trucks = [] } = useQuery({ queryKey: ['trucks', ''], queryFn: () => trucksApi.list() })
+  const { data: trailers = [] } = useQuery({ queryKey: ['trailers', ''], queryFn: () => trailersApi.list() })
+  const { data: customers = [] } = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
 
   const refresh = () => {
-    qc.invalidateQueries({ queryKey: ['/loads', id] })
+    qc.invalidateQueries({ queryKey: ['load', id] })
     qc.invalidateQueries({ queryKey: ['activity', id] })
+    qc.invalidateQueries({ queryKey: ['trucks'] })
+    qc.invalidateQueries({ queryKey: ['trailers'] })
   }
 
   const advance = useMutation({
-    mutationFn: (status: string) => api.post(`/loads/${id}/status`, { status }),
+    mutationFn: (status: string) => changeLoadStatus(id!, status as Load['status']),
     onSuccess: () => {
       setError('')
       refresh()
@@ -76,7 +83,7 @@ export default function LoadDetail() {
   })
 
   const saveEdit = useMutation({
-    mutationFn: (payload: Record<string, unknown>) => api.patch(`/loads/${id}`, payload),
+    mutationFn: (payload: Record<string, unknown>) => updateLoad(id!, payload),
     onSuccess: () => {
       setEditForm(null)
       setError('')
@@ -85,8 +92,8 @@ export default function LoadDetail() {
     onError: (err) => setError(errorMessage(err)),
   })
 
-  const addNote = useMutation({
-    mutationFn: () => api.post(`/activity/load/${id}/notes`, { detail: note }),
+  const noteMutation = useMutation({
+    mutationFn: () => addNote('load', id!, note),
     onSuccess: () => {
       setNote('')
       qc.invalidateQueries({ queryKey: ['activity', id] })
@@ -94,27 +101,13 @@ export default function LoadDetail() {
   })
 
   const upload = useMutation({
-    mutationFn: (file: File) => {
-      const fd = new FormData()
-      fd.append('file', file)
-      return api.post(`/documents/load/${id}?doc_type=${encodeURIComponent(docType)}`, fd)
-    },
+    mutationFn: (file: File) => uploadDocument('load', id!, file, docType),
     onSuccess: () => {
       if (fileRef.current) fileRef.current.value = ''
       qc.invalidateQueries({ queryKey: ['docs', id] })
     },
     onError: (err) => setError(errorMessage(err)),
   })
-
-  async function openDoc(docId: number, filename: string) {
-    const res = await api.get(`/documents/file/${docId}`, { responseType: 'blob' })
-    const url = URL.createObjectURL(res.data)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-  }
 
   if (!load) return <p className="py-8 text-center text-slate-500">Loading…</p>
 
@@ -131,8 +124,8 @@ export default function LoadDetail() {
       driver_id: load.driver_id ? String(load.driver_id) : '',
       truck_id: load.truck_id ? String(load.truck_id) : '',
       trailer_id: load.trailer_id ? String(load.trailer_id) : '',
-      rate: load.rate,
-      miles: load.miles,
+      rate: String(load.rate),
+      miles: String(load.miles),
       special_terms: load.special_terms,
       notes: load.notes,
     })
@@ -201,26 +194,28 @@ export default function LoadDetail() {
                 ))}
               </Select>
             </Field>
-            <Field label="Truck">
-              <Select value={editForm.truck_id} onChange={(e) => setEditForm({ ...editForm, truck_id: e.target.value })}>
-                <option value="">—</option>
-                {trucks.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.unit_number} ({t.status.replace('_', ' ')})
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Trailer">
-              <Select value={editForm.trailer_id} onChange={(e) => setEditForm({ ...editForm, trailer_id: e.target.value })}>
-                <option value="">—</option>
-                {trailers.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.unit_number} ({t.status.replace('_', ' ')})
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Truck">
+                <Select value={editForm.truck_id} onChange={(e) => setEditForm({ ...editForm, truck_id: e.target.value })}>
+                  <option value="">—</option>
+                  {trucks.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.unit_number} ({t.status.replace('_', ' ')})
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Trailer">
+                <Select value={editForm.trailer_id} onChange={(e) => setEditForm({ ...editForm, trailer_id: e.target.value })}>
+                  <option value="">—</option>
+                  {trailers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.unit_number} ({t.status.replace('_', ' ')})
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
             <Field label="Rate ($)">
               <Input type="number" step="0.01" value={editForm.rate} onChange={(e) => setEditForm({ ...editForm, rate: e.target.value })} />
             </Field>
@@ -284,7 +279,8 @@ export default function LoadDetail() {
               <div>
                 <dt className="text-xs font-semibold uppercase text-slate-500">Miles / RPM</dt>
                 <dd>
-                  {parseFloat(load.miles).toLocaleString()} mi {load.rate_per_mile && <span className="text-slate-500">(${load.rate_per_mile}/mi)</span>}
+                  {Number(load.miles).toLocaleString()} mi{' '}
+                  {load.rate_per_mile != null && <span className="text-slate-500">(${load.rate_per_mile.toFixed(2)}/mi)</span>}
                 </dd>
               </div>
             </dl>
@@ -317,7 +313,7 @@ export default function LoadDetail() {
               {docs.map((d) => (
                 <li key={d.id} className="flex items-center justify-between py-2">
                   <div>
-                    <button onClick={() => openDoc(d.id, d.filename)} className="font-medium text-navy-600 hover:underline">
+                    <button onClick={() => downloadDocument(d)} className="font-medium text-navy-600 hover:underline">
                       {d.filename}
                     </button>
                     <span className="ml-2 text-xs text-slate-400">
@@ -334,8 +330,13 @@ export default function LoadDetail() {
 
         <Card title="Notes & Activity">
           <div className="mb-3 flex gap-2">
-            <Input placeholder="Add a note…" value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && note && addNote.mutate()} />
-            <Button onClick={() => addNote.mutate()} disabled={!note || addNote.isPending}>
+            <Input
+              placeholder="Add a note…"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && note && noteMutation.mutate()}
+            />
+            <Button onClick={() => noteMutation.mutate()} disabled={!note || noteMutation.isPending}>
               Add
             </Button>
           </div>

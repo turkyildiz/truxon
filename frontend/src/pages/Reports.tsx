@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { api } from '../api'
 import { Button, Card, money, Table } from '../components/ui'
-import type { WeeklyReport, WeeklyRow } from '../types'
+import { weeklyReport } from '../data'
+import type { WeeklyRow } from '../types'
 
 function shiftWeek(dateStr: string, weeks: number): string {
   const d = new Date(dateStr + 'T00:00:00')
@@ -25,10 +25,10 @@ function ReportTable({ title, rows, isDriver }: { title: string; rows: WeeklyRow
             <tr key={r.key_id}>
               <td className="px-3 py-3 font-medium">{r.name}</td>
               <td className="px-3 py-3">{r.loads}</td>
-              <td className="px-3 py-3">{parseFloat(r.miles).toLocaleString()}</td>
+              <td className="px-3 py-3">{Number(r.miles).toLocaleString()}</td>
               <td className="px-3 py-3">{money(r.revenue)}</td>
-              <td className="px-3 py-3">{r.avg_rate_per_mile ? `$${r.avg_rate_per_mile}` : '—'}</td>
-              {isDriver && <td className="px-3 py-3 font-semibold text-navy-700">{money(r.driver_pay)}</td>}
+              <td className="px-3 py-3">{r.avg_rate_per_mile != null ? `$${Number(r.avg_rate_per_mile).toFixed(2)}` : '—'}</td>
+              {isDriver && <td className="px-3 py-3 font-semibold text-navy-700">{money(r.driver_pay ?? null)}</td>}
             </tr>
           ))}
         </Table>
@@ -41,8 +41,8 @@ export default function Reports() {
   const [weekOf, setWeekOf] = useState(todayISO())
 
   const { data, isLoading } = useQuery({
-    queryKey: ['/reports/weekly', weekOf],
-    queryFn: () => api.get<WeeklyReport>('/reports/weekly', { params: { week_of: weekOf } }).then((r) => r.data),
+    queryKey: ['weekly-report', weekOf],
+    queryFn: () => weeklyReport(weekOf),
   })
 
   return (
@@ -78,7 +78,7 @@ export default function Reports() {
             </Card>
             <Card>
               <div className="text-xs font-semibold uppercase text-slate-500">Total Miles</div>
-              <div className="mt-1 text-2xl font-bold">{parseFloat(data.totals.miles).toLocaleString()}</div>
+              <div className="mt-1 text-2xl font-bold">{Number(data.totals.miles).toLocaleString()}</div>
             </Card>
             <Card>
               <div className="text-xs font-semibold uppercase text-slate-500">Total Revenue</div>
@@ -86,7 +86,9 @@ export default function Reports() {
             </Card>
             <Card>
               <div className="text-xs font-semibold uppercase text-slate-500">Avg Revenue / Mile</div>
-              <div className="mt-1 text-2xl font-bold">{data.totals.avg_rate_per_mile ? `$${data.totals.avg_rate_per_mile}` : '—'}</div>
+              <div className="mt-1 text-2xl font-bold">
+                {data.totals.avg_rate_per_mile != null ? `$${Number(data.totals.avg_rate_per_mile).toFixed(2)}` : '—'}
+              </div>
             </Card>
           </div>
           <ReportTable title="By Truck" rows={data.by_truck} />

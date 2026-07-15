@@ -1,9 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { api } from '../api'
 import { Badge, Button, Card, formatDate, formatDateTime, money } from '../components/ui'
-import type { DashboardSummary } from '../types'
+import { dashboardSummary } from '../data'
 
 const STATUS_CHART_COLORS: Record<string, string> = {
   pending: '#94a3b8',
@@ -26,8 +25,8 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 export default function Dashboard() {
   const navigate = useNavigate()
   const { data, isLoading } = useQuery({
-    queryKey: ['/dashboard'],
-    queryFn: () => api.get<DashboardSummary>('/dashboard').then((r) => r.data),
+    queryKey: ['dashboard'],
+    queryFn: dashboardSummary,
     refetchInterval: 60_000,
   })
 
@@ -51,9 +50,9 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
         <Stat label="Week Revenue" value={money(data.week_revenue)} accent />
-        <Stat label="Week Miles" value={parseFloat(data.week_miles).toLocaleString()} />
+        <Stat label="Week Miles" value={Number(data.week_miles).toLocaleString()} />
         <Stat label="Week Loads" value={String(data.week_loads)} />
-        <Stat label="Avg Rate/Mile" value={data.week_avg_rate_per_mile ? `$${data.week_avg_rate_per_mile}` : '—'} />
+        <Stat label="Avg Rate/Mile" value={data.week_avg_rate_per_mile != null ? `$${Number(data.week_avg_rate_per_mile).toFixed(2)}` : '—'} />
         <Stat label="Trucks Available" value={String(data.available_trucks)} />
         <Stat label="Active Drivers" value={String(data.active_drivers)} />
       </div>

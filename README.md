@@ -3,74 +3,94 @@
 Web-based Transportation Management System for small-to-mid-sized trucking companies.
 Spec: [docs/TrucksOn_TMS_Requirements_MVP_v1.0.pdf](docs/TrucksOn_TMS_Requirements_MVP_v1.0.pdf)
 
-**Stack:** FastAPI + SQLAlchemy + PostgreSQL · React + TypeScript + Tailwind · Docker
+**Architecture: Supabase-native.** The React app talks directly to Supabase —
+Postgres (with the business rules in SQL functions/triggers + RLS), Auth,
+Storage for documents, and edge functions for the AI/maps/admin work. There is
+no application server to host. The UGREEN NAS's only job is pulling encrypted
+backups.
+
+```
+frontend/            React + TypeScript + Tailwind (tablet-first UI)
+supabase/migrations/ Schema, workflow RPCs, RLS policies, storage bucket
+supabase/functions/  extract-pdf (AI), distance (Google Maps), admin-users
+deploy/backup/       NAS backup + restore-test scripts
+backend/             LEGACY — original FastAPI implementation, kept for reference
+docs/                Requirements spec
+```
 
 ## Modules
 
-Customers · Drivers · Trucks · Trailers · Maintenance · **Loads** (6-status workflow:
-pending → assigned → in transit → delivered → completed → billed) · Dispatch (manual +
-AI PDF extraction) · Weekly accounting (Mon–Sun, per truck/driver with driver pay) ·
-Invoicing (PDF export) · Dashboard · Global search · Documents & audit log on every record ·
-RBAC (admin / dispatcher / driver / accountant / maintenance).
+Customers · Drivers · Trucks · Trailers · Maintenance · **Loads** (6-status
+workflow enforced in Postgres: pending → assigned → in transit → delivered →
+completed → billed) · Dispatch (manual + AI PDF extraction) · Weekly accounting
+(Mon–Sun, per truck/driver with driver pay) · Invoicing (client-side PDF) ·
+Dashboard · Global search · Documents & audit log on every record · RBAC via
+RLS (admin / dispatcher / driver / accountant / maintenance).
 
-## Local development
+## One-time Supabase setup
 
-```bash
-# Backend (SQLite fallback — no Postgres needed for dev)
-cd backend
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/uvicorn app.main:app --reload --port 8000
-# First run creates an admin/admin account — change it immediately.
+1. Create a project at [supabase.com](https://supabase.com) (free tier is fine to start).
+2. Link and push the database schema and edge functions:
 
-# Frontend (separate terminal; proxies /api to :8000)
-cd frontend
-npm install
-npm run dev            # http://localhost:5173
+   ```bash
+   supabase login                      # or: export SUPABASE_ACCESS_TOKEN=...
+   supabase link --project-ref <YOUR_PROJECT_REF>
+   supabase db push                    # applies supabase/migrations/*
+   supabase functions deploy extract-pdf distance admin-users
+   supabase secrets set LLM_API_KEY=... GOOGLE_MAPS_API_KEY=...   # optional
+   ```
 
-# Backend API test suite
-cd backend && .venv/bin/python smoke_test.py
-```
+3. Create the first admin: Dashboard → Authentication → Add user
+   (email + password, check "auto-confirm"), then in the SQL editor:
 
-API docs (Swagger): http://localhost:8000/docs
+   ```sql
+   update public.profiles set role = 'admin' where username = '<their username>';
+   ```
 
-## Production deployment (UGREEN NAS / any Docker host)
+   Every further user is created from the app's **Users** page.
 
-```bash
-cp .env.example .env       # fill in DB_PASSWORD, SECRET_KEY (openssl rand -hex 32), etc.
-docker compose up -d --build
-# App: http://<nas-ip>:8080  — log in with INITIAL_ADMIN_PASSWORD from .env
-```
+4. Configure the frontend:
 
-Optional integrations (set in `.env`, features degrade gracefully without them):
+   ```bash
+   cd frontend
+   cp .env.example .env.local          # fill in Project URL + anon key
+   npm install && npm run dev          # http://localhost:5173
+   ```
 
-| Variable | Enables |
-|---|---|
-| `GOOGLE_MAPS_API_KEY` | Automatic mileage calculation |
-| `LLM_API_KEY` (OpenRouter/Groq) | AI extraction from rate-confirmation PDFs |
+## Deploying the frontend
 
-### Security checklist (per spec §16)
+`npm run build` produces a static `dist/` — host it anywhere (Vercel, Netlify,
+Cloudflare Pages, or any static host). Add the deployed URL to Supabase →
+Authentication → URL Configuration.
 
-- Do **not** port-forward the NAS to the internet; use VPN (WireGuard/Tailscale) for remote access.
-- Change the initial admin password on first login; create per-person accounts with least-privilege roles.
-- Keep the Docker host and images updated (`docker compose pull && docker compose up -d`).
-
-### Backups (3-2-1-1-0)
+## Backups (3-2-1-1-0, pulled to the UGREEN NAS)
 
 ```bash
-# Nightly cron on the NAS:
-BACKUP_PASSPHRASE=... deploy/backup/backup.sh /volume1/backups/truckson
+# Nightly cron on the NAS (put secrets in /etc/truckson-backup.env, chmod 600):
+. /etc/truckson-backup.env && deploy/backup/backup.sh /volume1/backups/truckson
 # Weekly restore verification:
-BACKUP_PASSPHRASE=... deploy/backup/restore_test.sh /volume1/backups/truckson
+. /etc/truckson-backup.env && deploy/backup/restore_test.sh /volume1/backups/truckson
 ```
 
-Point the NAS's **immutable snapshot** feature at the backup folder (30-day retention)
-for the ransomware-proof copy, and sync it to encrypted cloud storage for offsite.
+- Encrypted `pg_dump` of the database + tar of the documents bucket, 30-day retention.
+- Point the NAS's **immutable snapshot** feature at the backup folder — that's
+  the copy ransomware can't touch.
+- Supabase Pro additionally keeps its own daily backups server-side.
 
-## Repository layout
+## Security notes
 
+- Public sign-up is disabled; only admins create accounts (service-role key
+  never leaves the `admin-users` edge function).
+- Every table has row-level security; the load workflow and invoicing rules
+  are enforced by SECURITY DEFINER functions, not client code.
+- Deactivating a user bans the auth account and revokes sessions.
+
+## Development
+
+```bash
+cd frontend && npm run dev     # UI against your Supabase project
+npx tsc -b && npm run build    # typecheck + production build (CI runs both)
 ```
-backend/    FastAPI app: app/{models,schemas.py,api,services,core}, alembic migrations
-frontend/   React app: src/{pages,components,api.ts,auth.tsx}
-deploy/     backup + restore-test scripts
-docs/       requirements spec
-```
+
+Schema changes: add a new file under `supabase/migrations/` (never edit an
+applied one) and run `supabase db push`.

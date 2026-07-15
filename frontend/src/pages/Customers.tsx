@@ -1,12 +1,16 @@
 import ResourcePage from '../components/ResourcePage'
 import { Badge } from '../components/ui'
+import { createCustomer, listCustomers, updateCustomer } from '../data'
 import type { Customer } from '../types'
 
 export default function Customers() {
   return (
     <ResourcePage<Customer>
       title="Customers"
-      endpoint="/customers"
+      queryKey="customers"
+      list={listCustomers}
+      create={createCustomer}
+      update={updateCustomer}
       columns={[
         { header: 'Company', render: (c) => <span className="font-medium">{c.company_name}</span> },
         { header: 'Contact', render: (c) => c.contact_person || '—' },

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { api } from '../api'
 import { ROLE_MODULES, useAuth } from '../auth'
+import { globalSearch } from '../data'
+import type { SearchResults } from '../types'
 
 const NAV_ITEMS: { key: string; to: string; label: string; icon: string }[] = [
   { key: 'dashboard', to: '/', label: 'Dashboard', icon: '📊' },
@@ -17,13 +18,6 @@ const NAV_ITEMS: { key: string; to: string; label: string; icon: string }[] = [
   { key: 'users', to: '/users', label: 'Users', icon: '👤' },
 ]
 
-interface SearchResults {
-  loads: { id: number; label: string }[]
-  customers: { id: number; label: string }[]
-  drivers: { id: number; label: string }[]
-  trucks: { id: number; label: string }[]
-}
-
 function GlobalSearch() {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<SearchResults | null>(null)
@@ -36,7 +30,7 @@ function GlobalSearch() {
       return
     }
     const t = setTimeout(() => {
-      api.get<SearchResults>('/search', { params: { q } }).then((r) => setResults(r.data)).catch(() => {})
+      globalSearch(q).then(setResults).catch(() => {})
     }, 250)
     return () => clearTimeout(t)
   }, [q])

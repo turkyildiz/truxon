@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { api, errorMessage } from '../api'
 import { Badge, Button, Card, Field, formatDate, Modal, money, Select, Table } from '../components/ui'
-import type { Customer, Invoice, Load } from '../types'
+import { createInvoice, listCustomers, listInvoices, listLoads, setInvoiceStatus } from '../data'
+import { downloadInvoicePdf } from '../invoicePdf'
+import { errorMessage } from '../supabase'
 
 export default function Invoices() {
   const qc = useQueryClient()
@@ -11,33 +12,27 @@ export default function Invoices() {
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [error, setError] = useState('')
 
-  const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['/invoices'],
-    queryFn: () => api.get<Invoice[]>('/invoices').then((r) => r.data),
-  })
-  const { data: customers = [] } = useQuery({
-    queryKey: ['/customers'],
-    queryFn: () => api.get<Customer[]>('/customers').then((r) => r.data),
-  })
+  const { data: invoices = [], isLoading } = useQuery({ queryKey: ['invoices'], queryFn: listInvoices })
+  const { data: customers = [] } = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
   const { data: billableLoads = [] } = useQuery({
-    queryKey: ['/loads', 'completed', customerId],
-    queryFn: () => api.get<Load[]>('/loads', { params: { status: 'completed', ...(customerId ? { customer_id: customerId } : {}) } }).then((r) => r.data),
+    queryKey: ['loads', 'completed', customerId],
+    queryFn: () => listLoads({ status: 'completed', customer_id: customerId }),
     enabled: creating && !!customerId,
   })
 
   const create = useMutation({
-    mutationFn: () => api.post('/invoices', { customer_id: Number(customerId), load_ids: [...selected] }),
+    mutationFn: () => createInvoice(Number(customerId), [...selected]),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['/invoices'] })
-      qc.invalidateQueries({ queryKey: ['/loads'] })
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+      qc.invalidateQueries({ queryKey: ['loads'] })
       close()
     },
     onError: (err) => setError(errorMessage(err)),
   })
 
-  const setStatus = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: string }) => api.post(`/invoices/${id}/status`, null, { params: { status } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['/invoices'] }),
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) => setInvoiceStatus(id, status),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['invoices'] }),
   })
 
   function close() {
@@ -47,16 +42,6 @@ export default function Invoices() {
     setError('')
   }
 
-  async function openPdf(id: number, number: string) {
-    const res = await api.get(`/invoices/${id}/pdf`, { responseType: 'blob' })
-    const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${number}.pdf`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   function toggle(id: number) {
     const next = new Set(selected)
     if (next.has(id)) next.delete(id)
@@ -64,7 +49,7 @@ export default function Invoices() {
     setSelected(next)
   }
 
-  const total = billableLoads.filter((l) => selected.has(l.id)).reduce((sum, l) => sum + parseFloat(l.rate), 0)
+  const total = billableLoads.filter((l) => selected.has(l.id)).reduce((sum, l) => sum + Number(l.rate), 0)
 
   return (
     <Card title="Invoices" actions={<Button onClick={() => setCreating(true)}>+ Generate Invoice</Button>}>
@@ -85,16 +70,22 @@ export default function Invoices() {
                 <Badge status={inv.status} />
               </td>
               <td className="px-3 py-3 text-right whitespace-nowrap">
-                <button onClick={() => openPdf(inv.id, inv.invoice_number)} className="mr-3 text-sm font-medium text-navy-600 hover:underline">
+                <button onClick={() => downloadInvoicePdf(inv.id)} className="mr-3 text-sm font-medium text-navy-600 hover:underline">
                   PDF
                 </button>
                 {inv.status === 'draft' && (
-                  <button onClick={() => setStatus.mutate({ id: inv.id, status: 'sent' })} className="mr-3 text-sm font-medium text-blue-600 hover:underline">
+                  <button
+                    onClick={() => statusMutation.mutate({ id: inv.id, status: 'sent' })}
+                    className="mr-3 text-sm font-medium text-blue-600 hover:underline"
+                  >
                     Mark Sent
                   </button>
                 )}
                 {inv.status === 'sent' && (
-                  <button onClick={() => setStatus.mutate({ id: inv.id, status: 'paid' })} className="mr-3 text-sm font-medium text-green-600 hover:underline">
+                  <button
+                    onClick={() => statusMutation.mutate({ id: inv.id, status: 'paid' })}
+                    className="mr-3 text-sm font-medium text-green-600 hover:underline"
+                  >
                     Mark Paid
                   </button>
                 )}

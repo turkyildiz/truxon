@@ -1,0 +1,32 @@
+# Supabase project configuration (used by the CLI).
+project_id = "truxon"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+
+[db]
+port = 54322
+major_version = 15
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173"]
+# Staff accounts are created by admins via the admin-users edge function;
+# public self-signup stays off.
+enable_signup = false
+
+[auth.email]
+enable_signup = false
+enable_confirmations = false
+
+[functions.extract-pdf]
+verify_jwt = true
+
+[functions.distance]
+verify_jwt = true
+
+[functions.admin-users]
+verify_jwt = true

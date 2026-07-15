@@ -1,23 +1,20 @@
 import { useQuery } from '@tanstack/react-query'
-import { api } from '../api'
 import ResourcePage from '../components/ResourcePage'
 import { formatDate, money } from '../components/ui'
-import type { Equipment, MaintenanceRecord } from '../types'
+import { createMaintenance, listMaintenance, trailersApi, trucksApi, updateMaintenance } from '../data'
+import type { MaintenanceRecord } from '../types'
 
 export default function Maintenance() {
-  const { data: trucks = [] } = useQuery({
-    queryKey: ['/trucks'],
-    queryFn: () => api.get<Equipment[]>('/trucks').then((r) => r.data),
-  })
-  const { data: trailers = [] } = useQuery({
-    queryKey: ['/trailers'],
-    queryFn: () => api.get<Equipment[]>('/trailers').then((r) => r.data),
-  })
+  const { data: trucks = [] } = useQuery({ queryKey: ['trucks', ''], queryFn: () => trucksApi.list() })
+  const { data: trailers = [] } = useQuery({ queryKey: ['trailers', ''], queryFn: () => trailersApi.list() })
 
   return (
     <ResourcePage<MaintenanceRecord>
       title="Maintenance"
-      endpoint="/maintenance"
+      queryKey="maintenance"
+      list={() => listMaintenance()}
+      create={(payload) => createMaintenance(normalize(payload))}
+      update={(id, payload) => updateMaintenance(Number(id), normalize(payload))}
       searchable={false}
       addLabel="+ Log Repair"
       columns={[
@@ -68,4 +65,14 @@ export default function Maintenance() {
       })}
     />
   )
+}
+
+/** Only the id matching equipment_type should be sent; the other must be null. */
+function normalize(payload: Record<string, unknown>): Record<string, unknown> {
+  const isTruck = payload.equipment_type === 'truck'
+  return {
+    ...payload,
+    truck_id: isTruck && payload.truck_id ? Number(payload.truck_id) : null,
+    trailer_id: !isTruck && payload.trailer_id ? Number(payload.trailer_id) : null,
+  }
 }
