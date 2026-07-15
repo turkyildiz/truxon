@@ -57,11 +57,19 @@ RLS (admin / dispatcher / driver / accountant / maintenance).
    npm install && npm run dev          # http://localhost:5173
    ```
 
-## Deploying the frontend
+## Deploying the frontend (Vercel)
 
-`npm run build` produces a static `dist/` — host it anywhere (Vercel, Netlify,
-Cloudflare Pages, or any static host). Add the deployed URL to Supabase →
-Authentication → URL Configuration.
+One-time setup at [vercel.com](https://vercel.com):
+
+1. **Add New → Project** → import the `turkyildiz/truxon` GitHub repo.
+2. Set **Root Directory** to `frontend` (framework auto-detects as Vite;
+   `frontend/vercel.json` already handles the SPA routing rewrites).
+3. Add environment variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+   (same values as `.env.local`).
+4. Deploy. Every push to `main` now auto-deploys; PRs get preview URLs.
+
+Then add the Vercel URL to Supabase → Authentication → URL Configuration
+(Site URL + redirect URLs).
 
 ## Backups (3-2-1-1-0, pulled to the UGREEN NAS)
 
