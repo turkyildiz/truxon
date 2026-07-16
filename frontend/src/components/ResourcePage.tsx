@@ -42,6 +42,11 @@ interface Props<T extends { id: number | string }> {
   /** When set, each row gets a "Docs" action opening the entity-generic
    * documents + notes panel (spec: every major record carries both). */
   docs?: { entityType: string; docTypes: string[]; label: (item: T) => string }
+  /** Externally-supplied form values (e.g. AI-extracted from a PDF): when
+   * set, the create modal opens prefilled; the page then clears it via
+   * onPrefillConsumed. */
+  prefill?: Record<string, unknown> | null
+  onPrefillConsumed?: () => void
 }
 
 export default function ResourcePage<T extends { id: number | string }>({
@@ -57,6 +62,8 @@ export default function ResourcePage<T extends { id: number | string }>({
   searchable = true,
   addLabel,
   docs,
+  prefill,
+  onPrefillConsumed,
 }: Props<T>) {
   const qc = useQueryClient()
   const [params] = useSearchParams()
@@ -73,6 +80,17 @@ export default function ResourcePage<T extends { id: number | string }>({
   useEffect(() => {
     if (urlQ) setQ(urlQ)
   }, [urlQ])
+
+  useEffect(() => {
+    if (prefill) {
+      setForm({ ...defaults, ...prefill })
+      setEditing(null)
+      setCreating(true)
+      setError('')
+      onPrefillConsumed?.()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire per prefill object only
+  }, [prefill])
 
   const listQ = useQuery({
     queryKey: [queryKey, q],

@@ -27,6 +27,20 @@ Respond with ONLY a JSON object (no markdown fences) with these keys:
 Two-digit years are 20xx. Use null for anything genuinely absent.`
 }
 
+function customerPrompt(carrierName: string): string {
+  return `You extract the BROKER/CUSTOMER company profile from a trucking document (rate confirmation, carrier setup packet, invoice…) addressed to the carrier "${carrierName}".
+Respond with ONLY a JSON object (no markdown fences) with these keys:
+- company_name: the broker or shipper company that issued the document. Never "${carrierName}" — that is the carrier receiving it.
+- contact_person: the primary contact/broker rep name. null if none.
+- phone: their phone number. null if none.
+- email: their email address. null if none.
+- billing_address: the remit-to / bill-to mailing address for invoices if given, otherwise the company's main address. null if none.
+- payment_terms: payment terms as stated (e.g. "Net 30", "28 days", "30 days after POD"). null if none.
+- mc_number: the BROKER's MC number if shown (not the carrier's). null if none.
+- notes: short string (max 300 chars) with billing quirks worth remembering — invoicing portals, required paperwork, quick-pay options. null if nothing notable.
+Use null for anything genuinely absent.`
+}
+
 const TEXT_HEAD = 7000
 const TEXT_TAIL = 4000
 
@@ -163,7 +177,10 @@ Deno.serve(async (req) => {
   }
 
   const { data: settings } = await caller.client.from('company_settings').select('company_name').eq('id', 1).maybeSingle()
-  const prompt = extractionPrompt(settings?.company_name || 'the carrier')
+  const carrier = settings?.company_name || 'the carrier'
+  // mode=customer extracts the broker's company profile (Customers quick-add)
+  // instead of load details.
+  const prompt = form.get('mode') === 'customer' ? customerPrompt(carrier) : extractionPrompt(carrier)
 
   try {
     let fields: Record<string, unknown>

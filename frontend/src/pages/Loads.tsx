@@ -14,7 +14,8 @@ export default function Loads() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
-  const { data: customers = [] } = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
+  // Include inactive customers — old loads still need to be filterable by them.
+  const { data: customers = [] } = useQuery({ queryKey: ['customers-all', ''], queryFn: () => listCustomers(undefined, { includeInactive: true }) })
   const { data: drivers = [] } = useQuery({ queryKey: ['drivers', ''], queryFn: () => listDrivers() })
   const loadsQ = useQuery({
     queryKey: ['loads', q, status, customerId, driverId, dateFrom, dateTo],

@@ -23,8 +23,9 @@ type Row = Record<string, unknown>
 
 // ---------- Customers ----------
 
-export async function listCustomers(q?: string): Promise<Customer[]> {
-  let query = supabase.from('customers').select('*').eq('is_active', true).order('company_name')
+export async function listCustomers(q?: string, opts: { includeInactive?: boolean } = {}): Promise<Customer[]> {
+  let query = supabase.from('customers').select('*').order('company_name')
+  if (!opts.includeInactive) query = query.eq('is_active', true)
   if (q) query = query.or(`company_name.ilike.%${q}%,contact_person.ilike.%${q}%`)
   return unwrap(await query)
 }
@@ -389,6 +390,32 @@ export async function extractPdf(file: File, pageImages: Blob[] = []): Promise<E
   form.append('file', file)
   pageImages.forEach((img, i) => form.append(`page${i}`, new File([img], `page${i}.jpg`, { type: 'image/jpeg' })))
   return invokeFunction<ExtractResult>('extract-pdf', { body: form })
+}
+
+/** Customer-profile extraction (Customers quick-add) — same function and
+ * rate limit as load extraction, different prompt. */
+export interface CustomerExtract {
+  raw_text: string
+  fields: {
+    company_name?: string | null
+    contact_person?: string | null
+    phone?: string | null
+    email?: string | null
+    billing_address?: string | null
+    payment_terms?: string | null
+    mc_number?: string | null
+    notes?: string | null
+  } | null
+  needs_images?: boolean
+  error: string | null
+}
+
+export async function extractCustomerPdf(file: File, pageImages: Blob[] = []): Promise<CustomerExtract> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('mode', 'customer')
+  pageImages.forEach((img, i) => form.append(`page${i}`, new File([img], `page${i}.jpg`, { type: 'image/jpeg' })))
+  return invokeFunction<CustomerExtract>('extract-pdf', { body: form })
 }
 
 export async function calculateDistance(origin: string, destination: string): Promise<{ miles: number | null; available: boolean }> {
