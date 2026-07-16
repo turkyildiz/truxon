@@ -1,4 +1,4 @@
--- TrucksOn TMS — private storage bucket for uploaded documents
+-- Truxon TMS — private storage bucket for uploaded documents
 -- (BOLs, PODs, licenses, receipts). Object paths follow
 -- <entity_type>/<entity_id>/<uuid>_<filename>; metadata lives in
 -- public.documents.

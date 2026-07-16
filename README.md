@@ -1,7 +1,7 @@
 # Truxon TMS
 
 Web-based Transportation Management System for small-to-mid-sized trucking companies.
-Spec: [docs/TrucksOn_TMS_Requirements_MVP_v1.0.pdf](docs/TrucksOn_TMS_Requirements_MVP_v1.0.pdf)
+Spec: [docs/Truxon_TMS_Requirements_MVP_v1.0.pdf](docs/Truxon_TMS_Requirements_MVP_v1.0.pdf)
 
 **Architecture: Supabase-native.** The React app talks directly to Supabase —
 Postgres (with the business rules in SQL functions/triggers + RLS), Auth,
@@ -73,17 +73,22 @@ Then add the Vercel URL to Supabase → Authentication → URL Configuration
 
 ## Backups (3-2-1-1-0, pulled to the UGREEN NAS)
 
-```bash
-# Nightly cron on the NAS (put secrets in /etc/truckson-backup.env, chmod 600):
-. /etc/truckson-backup.env && deploy/backup/backup.sh /volume1/backups/truckson
-# Weekly restore verification:
-. /etc/truckson-backup.env && deploy/backup/restore_test.sh /volume1/backups/truckson
-```
+Live setup: a Docker Compose project `truxon-backup` runs on the NAS (UGOS
+Docker app, at `docker/truxon-backup/`). It pulls from Supabase every night at
+02:00 — an encrypted `pg_dump` of the database plus an encrypted tar of the
+documents bucket — into `docker/truxon-backup/backups/`, with 30-day retention.
+The container's compose embeds the backup scripts; the standalone copies in
+[`deploy/backup/`](deploy/backup/) are the same logic kept for reference/portability.
 
-- Encrypted `pg_dump` of the database + tar of the documents bucket, 30-day retention.
-- Point the NAS's **immutable snapshot** feature at the backup folder — that's
-  the copy ransomware can't touch.
-- Supabase Pro additionally keeps its own daily backups server-side.
+Protection layers:
+- **Cloud** — Supabase keeps its own daily server-side backups.
+- **On-prem** — the nightly encrypted dumps on the NAS (gpg AES256; keep the
+  passphrase in a password manager — without it the backups can't be restored).
+- **Immutable** — UGOS Snapshot is enabled on the `docker` shared folder (daily,
+  30-day retention): the copy ransomware can't alter.
+- **Verified** — decrypt + restore the newest dump into a throwaway Postgres and
+  check row counts (the "0 errors" step); the reference script is
+  [`deploy/backup/restore_test.sh`](deploy/backup/restore_test.sh).
 
 ## Security notes
 
@@ -92,6 +97,11 @@ Then add the Vercel URL to Supabase → Authentication → URL Configuration
 - Every table has row-level security; the load workflow and invoicing rules
   are enforced by SECURITY DEFINER functions, not client code.
 - Deactivating a user bans the auth account and revokes sessions.
+- The AI PDF-extraction edge function is auth- and role-gated, size-capped
+  (15 MB), and rate-limited to 30 extractions/user/hour (`check_rate_limit`).
+- Single-tenant by design (one carrier). Multi-company/multi-tenant is a
+  deliberate future scope item — it would add `company_id` + tenant-scoped RLS
+  across all tables, not a change to make until a second company onboards.
 
 ## Development
 

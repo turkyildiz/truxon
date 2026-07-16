@@ -1,4 +1,4 @@
--- TrucksOn TMS — workflow RPCs and reporting functions.
+-- Truxon TMS — workflow RPCs and reporting functions.
 -- All are SECURITY INVOKER (default): RLS on the underlying tables decides
 -- who may call them, except where noted.
 

@@ -23,7 +23,7 @@ export function json(body: unknown, status = 200): Response {
   })
 }
 
-/** Resolve the calling user and their TrucksOn role from the request JWT. */
+/** Resolve the calling user and their Truxon role from the request JWT. */
 export async function getCaller(req: Request): Promise<Caller | Response> {
   const client = createClient(
     Deno.env.get('SUPABASE_URL')!,

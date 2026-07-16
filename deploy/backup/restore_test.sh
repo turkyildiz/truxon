@@ -7,7 +7,7 @@
 # Usage:  ./restore_test.sh [backup_dir]
 set -euo pipefail
 
-BACKUP_DIR="${1:-/volume1/backups/truckson}"
+BACKUP_DIR="${1:-/volume1/backups/truxon}"
 LATEST="$(ls -1t "$BACKUP_DIR"/db_*.dump.gpg 2>/dev/null | head -1)"
 
 if [[ -z "$LATEST" ]]; then
@@ -16,7 +16,7 @@ if [[ -z "$LATEST" ]]; then
 fi
 echo "Testing restore of: $LATEST"
 
-CONTAINER="truckson-restore-test-$$"
+CONTAINER="truxon-restore-test-$$"
 docker run -d --name "$CONTAINER" -e POSTGRES_PASSWORD=test -e POSTGRES_DB=restore_test postgres:16-alpine >/dev/null
 trap 'docker rm -f "$CONTAINER" >/dev/null' EXIT
 

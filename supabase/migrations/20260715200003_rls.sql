@@ -1,4 +1,4 @@
--- TrucksOn TMS — row-level security.
+-- Truxon TMS — row-level security.
 -- Mirrors the RBAC matrix: admin everywhere; dispatcher = operations;
 -- accountant = money + read ops; maintenance = fleet + repairs only.
 

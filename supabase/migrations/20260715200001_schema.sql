@@ -1,4 +1,4 @@
--- TrucksOn TMS — core schema
+-- Truxon TMS — core schema
 -- Business rules live in the database so any client (web, future mobile)
 -- gets identical behavior.
 

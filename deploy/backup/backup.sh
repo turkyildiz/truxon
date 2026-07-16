@@ -5,7 +5,7 @@
 # $BACKUP_DIR for the ransomware-proof copy (3-2-1-1-0 rule: Supabase's
 # own backups + these local copies + immutable snapshot + restore test).
 #
-# Required environment (put in /etc/truckson-backup.env, chmod 600):
+# Required environment (put in /etc/truxon-backup.env, chmod 600):
 #   SUPABASE_DB_URL      postgresql://postgres:...@db.<ref>.supabase.co:5432/postgres
 #   SUPABASE_URL         https://<ref>.supabase.co
 #   SUPABASE_SERVICE_ROLE_KEY  (Storage read access)
@@ -14,7 +14,7 @@
 # Usage:  ./backup.sh [backup_dir]
 set -euo pipefail
 
-BACKUP_DIR="${1:-/volume1/backups/truckson}"
+BACKUP_DIR="${1:-/volume1/backups/truxon}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

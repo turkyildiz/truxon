@@ -29,6 +29,16 @@ Deno.serve(async (req) => {
     return json({ error: 'Not enough permissions' }, 403)
   }
 
+  // Cap AI extractions per user (30/hour) to prevent runaway LLM spend.
+  const { data: allowed } = await caller.client.rpc('check_rate_limit', {
+    p_action: 'extract_pdf',
+    p_max: 30,
+    p_window: '01:00:00',
+  })
+  if (allowed === false) {
+    return json({ error: 'Rate limit reached (30 extractions/hour). Try again later.' }, 429)
+  }
+
   const form = await req.formData()
   const file = form.get('file')
   if (!(file instanceof File)) return json({ error: 'Upload a PDF file as "file"' }, 422)
