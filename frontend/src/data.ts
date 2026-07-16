@@ -413,6 +413,7 @@ export interface ExtractResult {
   fields: {
     customer_name?: string | null
     reference_number?: string | null
+    equipment_type?: string | null
     pickup_number?: string | null
     delivery_number?: string | null
     pickup_address?: string | null

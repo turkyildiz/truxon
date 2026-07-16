@@ -15,6 +15,11 @@ export interface Customer {
   contact_person: string
   phone: string
   email: string
+  fax: string
+  toll_free: string
+  secondary_contact: string
+  secondary_phone: string
+  secondary_email: string
   billing_address: string
   payment_terms: string
   notes: string
@@ -24,11 +29,18 @@ export interface Customer {
 export interface Driver {
   id: number
   full_name: string
+  phone: string
+  email: string
+  address: string
+  city: string
+  state: string
   license_number: string
   license_expiration: string | null
   date_of_birth: string | null
   hire_date: string | null
   pay_per_mile: number
+  pay_per_empty_mile: number
+  notes: string
   status: 'active' | 'inactive' | 'terminated'
 }
 
@@ -39,9 +51,12 @@ export interface Equipment {
   model: string
   year: number | null
   vin: string
+  plate_number: string
+  plate_expiry: string | null
   in_service_date: string | null
   out_of_service_date: string | null
   monthly_cost: number
+  notes: string
   status: 'available' | 'in_use' | 'maintenance' | 'retired'
 }
 
@@ -67,6 +82,8 @@ export interface Load {
   reference_number: string
   pickup_number: string
   delivery_number: string
+  equipment_type: string
+  empty_miles: number
   customer_id: number
   customer_name: string | null
   status: LoadStatus

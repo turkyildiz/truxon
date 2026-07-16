@@ -112,6 +112,8 @@ export default function LoadDetail() {
     setEditForm({
       customer_id: String(load.customer_id),
       reference_number: load.reference_number,
+      equipment_type: load.equipment_type,
+      empty_miles: String(load.empty_miles || ''),
       driver_id: load.driver_id ? String(load.driver_id) : '',
       truck_id: load.truck_id ? String(load.truck_id) : '',
       trailer_id: load.trailer_id ? String(load.trailer_id) : '',
@@ -223,8 +225,16 @@ export default function LoadDetail() {
             <Field label="Rate ($)">
               <Input type="number" step="0.01" value={editForm.rate} onChange={(e) => setEditForm({ ...editForm, rate: e.target.value })} />
             </Field>
-            <Field label="Miles">
-              <Input type="number" step="0.1" value={editForm.miles} onChange={(e) => setEditForm({ ...editForm, miles: e.target.value })} />
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Miles">
+                <Input type="number" step="0.1" value={editForm.miles} onChange={(e) => setEditForm({ ...editForm, miles: e.target.value })} />
+              </Field>
+              <Field label="Empty Miles">
+                <Input type="number" step="0.1" value={editForm.empty_miles} onChange={(e) => setEditForm({ ...editForm, empty_miles: e.target.value })} />
+              </Field>
+            </div>
+            <Field label="Equipment Type">
+              <Input value={editForm.equipment_type} onChange={(e) => setEditForm({ ...editForm, equipment_type: e.target.value })} />
             </Field>
             <Field label="Special Terms" className="sm:col-span-2">
               <Textarea value={editForm.special_terms} onChange={(e) => setEditForm({ ...editForm, special_terms: e.target.value })} />
@@ -293,6 +303,7 @@ export default function LoadDetail() {
                 <dd>
                   {load.truck_unit ?? '—'} / {load.trailer_unit ?? '—'}
                 </dd>
+                {load.equipment_type && <dd className="text-slate-500">{load.equipment_type}</dd>}
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase text-slate-500">Rate</dt>
@@ -303,6 +314,7 @@ export default function LoadDetail() {
                 <dd>
                   {Number(load.miles).toLocaleString()} mi{' '}
                   {load.rate_per_mile != null && <span className="text-slate-500">(${load.rate_per_mile.toFixed(2)}/mi)</span>}
+                  {Number(load.empty_miles) > 0 && <span className="text-slate-500"> · {Number(load.empty_miles).toLocaleString()} empty</span>}
                 </dd>
               </div>
             </dl>

@@ -23,6 +23,7 @@ Respond with ONLY a JSON object (no markdown fences) with these keys:
 - delivery_address: final delivery — same format as pickup_address
 - delivery_time: delivery date/time, same rules as pickup_time (use the appointment time if one is set)
 - rate: TOTAL carrier pay in dollars as a plain number — the all-in amount ("Total", "Total Cost", "Cost", line haul + fuel surcharge + accessorials). Not a per-mile rate.
+- equipment_type: required equipment as stated (e.g. "53' Van", "Reefer", "Flatbed", "Power Only"). null if not stated.
 - special_terms: short string (max 300 chars) with what a dispatcher must know: required equipment, temperature, tracking demands, unusual penalties. null if nothing notable.
 - stops: ordered array of EVERY stop on the load (multi-stop loads have more than two). Each element: {"type": "pickup"|"delivery", "facility": company/location name or null, "address": street/city/state/zip or null, "datetime": "YYYY-MM-DDTHH:MM" or null (same rules as pickup_time), "reference": that stop's PU#/delivery#/PO or null}.
 Two-digit years are 20xx. Use null for anything genuinely absent.`

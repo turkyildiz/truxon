@@ -9,11 +9,13 @@ import { errorMessage } from '../supabase'
 const EMPTY_FORM = {
   customer_id: '',
   reference_number: '',
+  equipment_type: '',
   driver_id: '',
   truck_id: '',
   trailer_id: '',
   rate: '',
   miles: '',
+  empty_miles: '',
   special_terms: '',
   notes: '',
 }
@@ -84,6 +86,7 @@ export default function Dispatch() {
         ...form,
         customer_id: match ? String(match.id) : form.customer_id,
         reference_number: f.reference_number ?? form.reference_number,
+        equipment_type: f.equipment_type ?? form.equipment_type,
         rate: f.rate != null ? String(f.rate) : form.rate,
         special_terms: f.special_terms ?? form.special_terms,
       }
@@ -273,6 +276,9 @@ export default function Dispatch() {
               <Field label="Miles" className="flex-1">
                 <Input type="number" step="0.1" value={form.miles} onChange={(e) => setForm({ ...form, miles: e.target.value })} />
               </Field>
+              <Field label="Empty Mi." className="w-24">
+                <Input type="number" step="0.1" value={form.empty_miles} onChange={(e) => setForm({ ...form, empty_miles: e.target.value })} />
+              </Field>
               {rpm && <div className="pb-3 text-sm font-semibold text-navy-700">${rpm}/mi</div>}
             </div>
             <div className="flex items-end gap-3 pb-1">
@@ -290,6 +296,9 @@ export default function Dispatch() {
 
             <StopsEditor stops={stops} onChange={setStops} onRouteBlur={maybeAutoMiles} />
 
+            <Field label="Equipment Type">
+              <Input placeholder="53' Van, Reefer, Flatbed…" value={form.equipment_type} onChange={(e) => setForm({ ...form, equipment_type: e.target.value })} />
+            </Field>
             <Field label="Driver">
               <Select value={form.driver_id} onChange={(e) => setForm({ ...form, driver_id: e.target.value })}>
                 <option value="">Assign later</option>

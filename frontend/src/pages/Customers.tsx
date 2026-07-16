@@ -75,17 +75,27 @@ export default function Customers() {
           { name: 'contact_person', label: 'Contact Person' },
           { name: 'phone', label: 'Phone' },
           { name: 'email', label: 'Email' },
+          { name: 'fax', label: 'Fax' },
+          { name: 'toll_free', label: 'Toll Free' },
+          { name: 'secondary_contact', label: 'Secondary Contact' },
+          { name: 'secondary_phone', label: 'Secondary Phone' },
+          { name: 'secondary_email', label: 'Secondary Email' },
           { name: 'payment_terms', label: 'Payment Terms' },
           { name: 'is_active', label: 'Active', type: 'checkbox' },
           { name: 'billing_address', label: 'Billing Address', type: 'textarea', full: true },
           { name: 'notes', label: 'Notes', type: 'textarea', full: true },
         ]}
-        defaults={{ company_name: '', contact_person: '', phone: '', email: '', payment_terms: 'Net 30', billing_address: '', notes: '', is_active: true }}
+        defaults={{ company_name: '', contact_person: '', phone: '', email: '', fax: '', toll_free: '', secondary_contact: '', secondary_phone: '', secondary_email: '', payment_terms: 'Net 30', billing_address: '', notes: '', is_active: true }}
         toForm={(c) => ({
           company_name: c.company_name,
           contact_person: c.contact_person,
           phone: c.phone,
           email: c.email,
+          fax: c.fax,
+          toll_free: c.toll_free,
+          secondary_contact: c.secondary_contact,
+          secondary_phone: c.secondary_phone,
+          secondary_email: c.secondary_email,
           payment_terms: c.payment_terms,
           billing_address: c.billing_address,
           notes: c.notes,
