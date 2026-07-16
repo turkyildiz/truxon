@@ -1,0 +1,148 @@
+{
+  "tables": {
+    "profiles": {
+      "ok": true,
+      "status": 200,
+      "rowsReturned": 0,
+      "exactCount": 0,
+      "sampleKeys": []
+    },
+    "customers": {
+      "ok": true,
+      "status": 200,
+      "rowsReturned": 0,
+      "exactCount": 0,
+      "sampleKeys": []
+    },
+    "drivers": {
+      "ok": true,
+      "status": 200,
+      "rowsReturned": 0,
+      "exactCount": 0,
+      "sampleKeys": []
+    },
+    "trucks": {
+      "ok": true,
+      "status": 200,
+      "rowsReturned": 0,
+      "exactCount": 0,
+      "sampleKeys": []
+    },
+    "trailers": {
+      "ok": true,
+      "status": 200,
+      "rowsReturned": 0,
+      "exactCount": 0,
+      "sampleKeys": []
+    },
+    "loads": {
+      "ok": true,
+      "status": 200,
+      "rowsReturned": 0,
+      "exactCount": 0,
+      "sampleKeys": []
+    },
+    "load_stops": {
+      "ok": true,
+      "status": 200,
+      "rowsReturned": 0,
+      "exactCount": 0,
+      "sampleKeys": []
+    },
+    "invoices": {
+      "ok": true,
+      "status": 200,
+      "rowsReturned": 0,
+      "exactCount": 0,
+      "sampleKeys": []
+    },
+    "documents": {
+      "ok": true,
+      "status": 200,
+      "rowsReturned": 0,
+      "exactCount": 0,
+      "sampleKeys": []
+    },
+    "drive_files": {
+      "ok": true,
+      "status": 200,
+      "rowsReturned": 0,
+      "exactCount": 0,
+      "sampleKeys": []
+    },
+    "activity_log": {
+      "ok": true,
+      "status": 200,
+      "rowsReturned": 0,
+      "exactCount": 0,
+      "sampleKeys": []
+    },
+    "company_settings": {
+      "ok": true,
+      "status": 200,
+      "rowsReturned": 0,
+      "exactCount": 0,
+      "sampleKeys": []
+    },
+    "maintenance_records": {
+      "ok": true,
+      "status": 200,
+      "rowsReturned": 0,
+      "exactCount": 0,
+      "sampleKeys": []
+    },
+    "rate_limit_events": {
+      "ok": true,
+      "status": 200,
+      "rowsReturned": 0,
+      "exactCount": 0,
+      "sampleKeys": []
+    }
+  },
+  "rpcs": {
+    "dashboard_summary(no-args)": {
+      "ok": true,
+      "status": 200,
+      "shape": "object{week_loads,week_miles,active_loads,week_revenue,status_counts,active_drivers,revenue_by_day,available_trucks,expiring_licenses,week_avg_rate_per_mile}",
+      "sample": "{\"week_loads\":17,\"week_miles\":18474,\"active_loads\":[{\"id\":2,\"status\":\"in_transit\",\"driver_name\":\"Terrance Montrell Borum\",\"load_number\":\"1136\",\"pickup_time\":\"2026-07-14T07:00:00+00:00\",\"customer_name\":\"C.L. Services, Inc. dba Prosponsive Logistics\",\"delivery_time\":\"2026-07-14T22:00:00+00:00\",\"pickup_address\":\"WESTROCK., West Chester, OH\",\"delivery_address\":\"MENASHA, Alsip, IL\"},{\"id\":4,\"status\":\"in_transit\",\"driver_name\":\"Spencer Ronald Jackson\",\"load_number\":\"1141\",\"pickup_time\":\"2026-07-15T08:"
+    },
+    "global_search(q)": {
+      "ok": true,
+      "status": 200,
+      "shape": "object{loads,trucks,drivers,customers}",
+      "sample": "{\"loads\":[{\"id\":2,\"label\":\"1136 — C.L. Services, Inc. dba Prosponsive Logistics\"},{\"id\":3,\"label\":\"1138 — AIR & OCEAN LOGISTICS INC\"},{\"id\":4,\"label\":\"1141 — New Wave International Cargo\"},{\"id\":5,\"label\":\"1142 — AIR & OCEAN LOGISTICS INC\"},{\"id\":6,\"label\":\"1145 — Select Transport Partners\"},{\"id\":7,\"label\":\"1146 — TQL\"},{\"id\":8,\"label\":\"1147 — AIR & OCEAN LOGISTICS INC\"},{\"id\":9,\"label\":\"1148 — AIR & OCEAN LOGISTICS INC\"},{\"id\":10,\"label\":\"1149 — High Tide Logistics\"},{\"id\":11,\"label\":\"1150 — W"
+    },
+    "global_search(query)": {
+      "ok": false,
+      "status": 404,
+      "code": "PGRST202",
+      "message": "Could not find the function public.global_search(query) in the schema cache"
+    },
+    "global_search(search_term)": {
+      "ok": false,
+      "status": 404,
+      "code": "PGRST202",
+      "message": "Could not find the function public.global_search(search_term) in the schema cache"
+    },
+    "weekly_report(no-args)": {
+      "ok": true,
+      "status": 200,
+      "shape": "object{totals,by_truck,week_end,by_driver,week_start}",
+      "sample": "{\"totals\":{\"loads\":17,\"miles\":18474,\"revenue\":53830,\"avg_rate_per_mile\":2.91},\"by_truck\":[{\"name\":\"14\",\"loads\":2,\"miles\":4114,\"key_id\":11,\"revenue\":11300,\"avg_rate_per_mile\":2.75},{\"name\":\"09\",\"loads\":2,\"miles\":3989,\"key_id\":6,\"revenue\":10800,\"avg_rate_per_mile\":2.71},{\"name\":\"12\",\"loads\":3,\"miles\":2890,\"key_id\":9,\"revenue\":7900,\"avg_rate_per_mile\":2.73},{\"name\":\"08\",\"loads\":4,\"miles\":1691,\"key_id\":5,\"revenue\":6650,\"avg_rate_per_mile\":3.93},{\"name\":\"003\",\"loads\":2,\"miles\":742,\"key_id\":2,\"revenue"
+    }
+  },
+  "leaks": [
+    {
+      "rpc": "dashboard_summary(no-args)",
+      "shape": "object{week_loads,week_miles,active_loads,week_revenue,status_counts,active_drivers,revenue_by_day,available_trucks,expiring_licenses,week_avg_rate_per_mile}"
+    },
+    {
+      "rpc": "global_search(q)",
+      "shape": "object{loads,trucks,drivers,customers}"
+    },
+    {
+      "rpc": "weekly_report(no-args)",
+      "shape": "object{totals,by_truck,week_end,by_driver,week_start}"
+    }
+  ]
+}
