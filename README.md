@@ -13,9 +13,11 @@ backups.
 frontend/            React + TypeScript + Tailwind (tablet-first UI)
 supabase/migrations/ Schema, workflow RPCs, RLS policies, storage bucket
 supabase/functions/  extract-pdf (AI), distance (Google Maps), admin-users
+supabase/tests/      SQL workflow / RLS regression seeds
+scripts/             Test harness (static security + smoke)
 deploy/backup/       NAS backup + restore-test scripts
 backend/             LEGACY — original FastAPI implementation, kept for reference
-docs/                Requirements spec
+docs/                Requirements spec + TESTING.md
 ```
 
 ## Modules
@@ -102,3 +104,14 @@ npx tsc -b && npm run build    # typecheck + production build (CI runs both)
 
 Schema changes: add a new file under `supabase/migrations/` (never edit an
 applied one) and run `supabase db push`.
+
+## Testing
+
+```bash
+./scripts/run-truxon-tests.sh                 # smoke (build) + static security
+./scripts/run-truxon-tests.sh static-security # authz / workflow source checks only
+./scripts/run-truxon-tests.sh sql             # needs DATABASE_URL or local Supabase
+```
+
+Full checklist, known baseline FAILs, and live E2E scripts: [docs/TESTING.md](docs/TESTING.md).
+CI runs frontend build, static security (advisory until P1 fixes land), and legacy backend smoke.

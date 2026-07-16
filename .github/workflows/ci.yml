@@ -22,6 +22,24 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+  # Static security + workflow source checks (no Supabase runtime required).
+  # continue-on-error: remove once B1/B2/B6/B11/C6 are fixed (see docs/TESTING.md).
+  security-static:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run static security harness
+        run: |
+          chmod +x scripts/run-truxon-tests.sh
+          ./scripts/run-truxon-tests.sh static-security | tee security-static.log
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-static-log
+          path: security-static.log
+
   # Legacy FastAPI implementation (backend/) — kept green until removed.
   backend-legacy:
     runs-on: ubuntu-latest
