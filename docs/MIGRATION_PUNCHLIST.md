@@ -3,7 +3,11 @@
 Migrated live on 2026-07-16 evening with `deploy/migration-its/` tooling.
 **Result: 203 customers, 27 drivers (11 active + 16 former), 12 trucks,
 20 trailers, 983 loads (load #1 → #1150, originals preserved), and all
-load documents** (rate cons, PODs, photos — see counts below).
+2,456 load documents** uploaded to Truxon storage, attached to their loads,
+with real filenames and doc types (Rate Confirmation / POD / Photo). The
+transfer stalled once when the ITS browser tab was navigated away (recovered
+from disk and completed); 736 files that came through the recovery path
+initially lost their names and were re-derived from the saved file index.
 
 ## Needs a decision or fix — review together
 
@@ -36,8 +40,9 @@ load documents** (rate cons, PODs, photos — see counts below).
    which don't export cleanly. If needed, we can scrape the shipper/consignee
    books and enrich the addresses by name.
 7. **Customer file attachments not migrated** (the ITS customer-list file
-   windows resisted automation). Load files all came over. If customers have
-   contracts/setup packets attached in ITS, we'll grab them in a second pass.
+   windows resisted automation). All 2,456 **load** files came over (named +
+   typed). If customers have contracts/setup packets attached in ITS, that's
+   a quick second pass.
 8. **Two ITS customers were merged as duplicates** (same name, punctuation
    differences): "J Boren & Son's Logistics" / "J. Boren & Son's Logistics"
    and "RDS Logistics Inc." / "RDS LOGISTICS, INC.". Verify no loads were
