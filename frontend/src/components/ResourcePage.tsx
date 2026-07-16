@@ -20,6 +20,9 @@ export interface FieldDef {
   step?: string
   full?: boolean
   createOnly?: boolean
+  /** Hide the field unless the current form state says it applies
+   * (e.g. a rate that only matters when its checkbox is on). */
+  showIf?: (form: Record<string, unknown>) => boolean
 }
 
 export interface ColumnDef<T> {
@@ -138,7 +141,7 @@ export default function ResourcePage<T extends { id: number | string }>({
     save.mutate(payload)
   }
 
-  const visibleFields = fields.filter((f) => !editing || !f.createOnly)
+  const visibleFields = fields.filter((f) => (!editing || !f.createOnly) && (f.showIf?.(form) ?? true))
 
   return (
     <Card

@@ -20,12 +20,13 @@ function ReportTable({ title, rows, isDriver }: { title: string; rows: WeeklyRow
       {rows.length === 0 ? (
         <p className="py-6 text-center text-sm text-slate-500">No completed loads this week.</p>
       ) : (
-        <Table headers={[isDriver ? 'Driver' : 'Truck', 'Loads', 'Miles', 'Revenue', 'Avg $/Mile', ...(isDriver ? ['Driver Pay'] : [])]}>
+        <Table headers={[isDriver ? 'Driver' : 'Truck', 'Loads', 'Miles', ...(isDriver ? ['Empty Mi.'] : []), 'Revenue', 'Avg $/Mile', ...(isDriver ? ['Driver Pay'] : [])]}>
           {rows.map((r) => (
             <tr key={r.key_id}>
               <td className="px-3 py-3 font-medium">{r.name}</td>
               <td className="px-3 py-3">{r.loads}</td>
               <td className="px-3 py-3">{Number(r.miles).toLocaleString()}</td>
+              {isDriver && <td className="px-3 py-3">{Number(r.empty_miles ?? 0).toLocaleString()}</td>}
               <td className="px-3 py-3">{money(r.revenue)}</td>
               <td className="px-3 py-3">{r.avg_rate_per_mile != null ? `$${Number(r.avg_rate_per_mile).toFixed(2)}` : '—'}</td>
               {isDriver && <td className="px-3 py-3 font-semibold text-navy-700">{money(r.driver_pay ?? null)}</td>}

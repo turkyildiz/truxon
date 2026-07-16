@@ -52,8 +52,12 @@ load documents** (rate cons, PODs, photos — see counts below).
     weekly reports from `pay_per_mile × miles`. ITS pay history was NOT
     migrated — decide whether historic weekly reports need to match ITS
     driver settlements before relying on them retroactively.
-12. **Miles = ITS "total miles" (loaded+empty)**; empty miles preserved in
-    load Notes. Rate-per-mile figures on old loads therefore use total miles.
+12. **Miles = ITS "total miles" (loaded+empty)** on migrated loads (new
+    loads get Google route miles + empty miles entered separately). Since
+    driver pay now adds empty-miles × empty-rate on top, weekly reports for
+    PRE-migration weeks can overstate pay vs. what ITS settled (empties
+    counted in both terms). Fine going forward; just don't re-settle old
+    weeks from Truxon without checking.
 13. **Extraction QA:** 19/20 real rate cons extract correctly (incl. all 5
     scanned ones via vision). Known failure: Freight-Tec's columnar layout
     ("RateConfirmation (3).pdf") still returns prose instead of JSON.

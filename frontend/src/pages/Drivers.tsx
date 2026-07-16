@@ -39,7 +39,8 @@ export default function Drivers() {
         { name: 'date_of_birth', label: 'Date of Birth', type: 'date' },
         { name: 'hire_date', label: 'Hire Date', type: 'date' },
         { name: 'pay_per_mile', label: 'Pay Per Mile ($)', type: 'number', step: '0.001' },
-        { name: 'pay_per_empty_mile', label: 'Pay Per Empty Mile ($)', type: 'number', step: '0.001' },
+        { name: 'empty_miles_paid', label: 'Empty Miles Paid', type: 'checkbox' },
+        { name: 'pay_per_empty_mile', label: 'Empty-Mile Rate ($)', type: 'number', step: '0.001', showIf: (f) => !!f.empty_miles_paid },
         {
           name: 'status',
           label: 'Status',
@@ -54,7 +55,7 @@ export default function Drivers() {
         { name: 'notes', label: 'Notes (medical, drug tests…)', type: 'textarea', full: true },
       ]}
       docs={{ entityType: 'driver', docTypes: ['License', 'Medical Card', 'Employment', 'Other'], label: (d) => d.full_name }}
-      defaults={{ full_name: '', phone: '', email: '', address: '', city: '', state: '', license_number: '', license_expiration: '', date_of_birth: '', hire_date: '', pay_per_mile: '0', pay_per_empty_mile: '0', status: 'active', notes: '' }}
+      defaults={{ full_name: '', phone: '', email: '', address: '', city: '', state: '', license_number: '', license_expiration: '', date_of_birth: '', hire_date: '', pay_per_mile: '0', empty_miles_paid: false, pay_per_empty_mile: '0', status: 'active', notes: '' }}
       toForm={(d) => ({
         full_name: d.full_name,
         phone: d.phone,
@@ -67,6 +68,7 @@ export default function Drivers() {
         date_of_birth: d.date_of_birth ?? '',
         hire_date: d.hire_date ?? '',
         pay_per_mile: d.pay_per_mile,
+        empty_miles_paid: d.empty_miles_paid,
         pay_per_empty_mile: d.pay_per_empty_mile,
         status: d.status,
         notes: d.notes,

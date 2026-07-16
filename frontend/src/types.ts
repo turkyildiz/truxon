@@ -39,6 +39,7 @@ export interface Driver {
   date_of_birth: string | null
   hire_date: string | null
   pay_per_mile: number
+  empty_miles_paid: boolean
   pay_per_empty_mile: number
   notes: string
   status: 'active' | 'inactive' | 'terminated'
@@ -141,6 +142,7 @@ export interface WeeklyRow {
   name: string
   loads: number
   miles: number
+  empty_miles?: number | null
   revenue: number
   avg_rate_per_mile: number | null
   driver_pay?: number | null
