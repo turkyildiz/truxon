@@ -57,7 +57,7 @@ for (const name of files) {
   console.log(
     `${result?.error ? 'ERR ' : f ? 'OK  ' : '??  '}[${via}] ${name} (${ms}ms)` +
       (f
-        ? ` | cust=${JSON.stringify(f.customer_name)} rate=${f.rate} pu=${JSON.stringify(f.pickup_time)} del=${JSON.stringify(f.delivery_time)}`
+        ? ` | cust=${JSON.stringify(f.customer_name)} ref=${JSON.stringify(f.reference_number ?? null)} rate=${f.rate} pu=${JSON.stringify(f.pickup_time)} del=${JSON.stringify(f.delivery_time)}`
         : ` | ${result?.error ?? 'no fields'}`),
   )
   // Stay under Groq's per-minute token budget between documents.

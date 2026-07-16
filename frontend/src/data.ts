@@ -141,7 +141,9 @@ export async function listLoads(filters: LoadFilters = {}): Promise<Load[]> {
   if (filters.date_from) query = query.gte('pickup_time', filters.date_from)
   if (filters.date_to) query = query.lte('pickup_time', filters.date_to + 'T23:59:59')
   if (filters.q) {
-    query = query.or(`load_number.ilike.%${filters.q}%,pickup_address.ilike.%${filters.q}%,delivery_address.ilike.%${filters.q}%`)
+    query = query.or(
+      `load_number.ilike.%${filters.q}%,reference_number.ilike.%${filters.q}%,pickup_address.ilike.%${filters.q}%,delivery_address.ilike.%${filters.q}%`,
+    )
   }
   const rows = unwrap<Row[]>(await query)
   return rows.map(mapLoad)
@@ -367,6 +369,9 @@ export interface ExtractResult {
   raw_text: string
   fields: {
     customer_name?: string | null
+    reference_number?: string | null
+    pickup_number?: string | null
+    delivery_number?: string | null
     pickup_address?: string | null
     pickup_time?: string | null
     delivery_address?: string | null

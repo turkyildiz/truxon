@@ -1,12 +1,15 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, Field, Input, Select, Textarea } from '../components/ui'
-import { calculateDistance, createLoad, extractPdf, listCustomers, listDrivers, trailersApi, trucksApi } from '../data'
+import { calculateDistance, createCustomer, createLoad, extractPdf, listCustomers, listDrivers, trailersApi, trucksApi } from '../data'
 import { errorMessage } from '../supabase'
 
 const EMPTY_FORM = {
   customer_id: '',
+  reference_number: '',
+  pickup_number: '',
+  delivery_number: '',
   pickup_address: '',
   pickup_time: '',
   delivery_address: '',
@@ -22,11 +25,14 @@ const EMPTY_FORM = {
 
 export default function Dispatch() {
   const navigate = useNavigate()
+  const qc = useQueryClient()
   const [form, setForm] = useState({ ...EMPTY_FORM })
   const [error, setError] = useState('')
   const [aiNote, setAiNote] = useState('')
   const [distError, setDistError] = useState('')
   const [dragOver, setDragOver] = useState(false)
+  /** Extracted customer name that matched nothing — offer add-or-pick. */
+  const [pendingCustomer, setPendingCustomer] = useState<string | null>(null)
 
   const customersQ = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
   const driversQ = useQuery({ queryKey: ['drivers', ''], queryFn: () => listDrivers() })
@@ -57,33 +63,67 @@ export default function Dispatch() {
         return
       }
       const f = result.fields ?? {}
-      // Try to match the extracted customer name against existing customers.
-      const match = f.customer_name
-        ? customers.find((c) => c.company_name.toLowerCase().includes(String(f.customer_name).toLowerCase().slice(0, 12)))
+      // Try to match the extracted customer name against existing customers
+      // (either direction: "TQL" ⊂ "Total Quality Logistics (TQL)" and back).
+      const name = f.customer_name?.trim()
+      const match = name
+        ? customers.find((c) => {
+            const a = c.company_name.toLowerCase()
+            const b = name.toLowerCase()
+            return a.includes(b.slice(0, 12)) || b.includes(a.slice(0, 12))
+          })
         : undefined
-      setForm((prev) => ({
-        ...prev,
-        customer_id: match ? String(match.id) : prev.customer_id,
-        pickup_address: f.pickup_address ?? prev.pickup_address,
-        pickup_time: f.pickup_time?.slice(0, 16) ?? prev.pickup_time,
-        delivery_address: f.delivery_address ?? prev.delivery_address,
-        delivery_time: f.delivery_time?.slice(0, 16) ?? prev.delivery_time,
-        rate: f.rate != null ? String(f.rate) : prev.rate,
-        special_terms: f.special_terms ?? prev.special_terms,
-      }))
-      setAiNote(match || !f.customer_name ? '✓ Fields extracted — review before saving' : `✓ Extracted. Customer "${f.customer_name}" not found — pick or create it.`)
+      const merged = {
+        ...form,
+        customer_id: match ? String(match.id) : form.customer_id,
+        reference_number: f.reference_number ?? form.reference_number,
+        pickup_number: f.pickup_number ?? form.pickup_number,
+        delivery_number: f.delivery_number ?? form.delivery_number,
+        pickup_address: f.pickup_address ?? form.pickup_address,
+        pickup_time: f.pickup_time?.slice(0, 16) ?? form.pickup_time,
+        delivery_address: f.delivery_address ?? form.delivery_address,
+        delivery_time: f.delivery_time?.slice(0, 16) ?? form.delivery_time,
+        rate: f.rate != null ? String(f.rate) : form.rate,
+        special_terms: f.special_terms ?? form.special_terms,
+      }
+      setForm(merged)
+      // Miles come from Google, not the paperwork — kick off the lookup as
+      // soon as both addresses are known.
+      if (merged.pickup_address && merged.delivery_address) {
+        distance.mutate({ origin: merged.pickup_address, destination: merged.delivery_address })
+      }
+      setPendingCustomer(match || !name ? null : name)
+      setAiNote(match || !name ? '✓ Fields extracted — review before saving' : '✓ Fields extracted — confirm the customer below')
     },
     onError: (err) => setAiNote(errorMessage(err)),
   })
 
   const distance = useMutation({
-    mutationFn: () => calculateDistance(form.pickup_address, form.delivery_address),
+    mutationFn: (route: { origin: string; destination: string }) => calculateDistance(route.origin, route.destination),
     onSuccess: (d) => {
       setDistError('')
       if (d.miles != null) setForm((prev) => ({ ...prev, miles: String(d.miles) }))
       else setDistError('Distance service unavailable (no Google Maps API key) — enter miles manually.')
     },
     onError: (err) => setDistError(`Mileage lookup failed: ${errorMessage(err)} — enter miles manually.`),
+  })
+
+  /** Auto-fill miles when both addresses are set and miles is still empty. */
+  function maybeAutoMiles() {
+    if (form.pickup_address && form.delivery_address && !form.miles && !distance.isPending) {
+      distance.mutate({ origin: form.pickup_address, destination: form.delivery_address })
+    }
+  }
+
+  const addCustomer = useMutation({
+    mutationFn: (name: string) => createCustomer({ company_name: name }),
+    onSuccess: (c) => {
+      qc.invalidateQueries({ queryKey: ['customers'] })
+      setForm((prev) => ({ ...prev, customer_id: String(c.id) }))
+      setPendingCustomer(null)
+      setAiNote(`✓ Customer "${c.company_name}" added and selected — fill in billing details later from Customers`)
+    },
+    onError: (err) => setAiNote(errorMessage(err)),
   })
 
   const create = useMutation({
@@ -151,16 +191,43 @@ export default function Dispatch() {
         )}
         <form onSubmit={onSubmit}>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Customer *">
-              <Select required value={form.customer_id} onChange={(e) => setForm({ ...form, customer_id: e.target.value })}>
-                <option value="">Select customer…</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.company_name}
-                  </option>
-                ))}
-              </Select>
+            <div>
+              <Field label="Customer *">
+                <Select
+                  required
+                  value={form.customer_id}
+                  onChange={(e) => {
+                    setForm({ ...form, customer_id: e.target.value })
+                    if (e.target.value) setPendingCustomer(null)
+                  }}
+                >
+                  <option value="">Select customer…</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.company_name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              {pendingCustomer && (
+                <p className="mt-1.5 rounded-lg bg-amber-50 p-2 text-sm text-amber-800">
+                  "{pendingCustomer}" isn't in your customer list —{' '}
+                  <button
+                    type="button"
+                    className="font-semibold underline"
+                    disabled={addCustomer.isPending}
+                    onClick={() => addCustomer.mutate(pendingCustomer)}
+                  >
+                    {addCustomer.isPending ? 'adding…' : 'add & select'}
+                  </button>{' '}
+                  or pick an existing customer above.
+                </p>
+              )}
+            </div>
+            <Field label="Broker Load / PRO #">
+              <Input value={form.reference_number} onChange={(e) => setForm({ ...form, reference_number: e.target.value })} />
             </Field>
+
             <div className="flex items-end gap-3">
               <Field label="Rate ($)" className="flex-1">
                 <Input type="number" step="0.01" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} />
@@ -170,21 +237,37 @@ export default function Dispatch() {
               </Field>
               {rpm && <div className="pb-3 text-sm font-semibold text-navy-700">${rpm}/mi</div>}
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Pickup #">
+                <Input value={form.pickup_number} onChange={(e) => setForm({ ...form, pickup_number: e.target.value })} />
+              </Field>
+              <Field label="Delivery #">
+                <Input value={form.delivery_number} onChange={(e) => setForm({ ...form, delivery_number: e.target.value })} />
+              </Field>
+            </div>
 
             <Field label="Pickup Address">
-              <Textarea value={form.pickup_address} onChange={(e) => setForm({ ...form, pickup_address: e.target.value })} />
+              <Textarea
+                value={form.pickup_address}
+                onChange={(e) => setForm({ ...form, pickup_address: e.target.value })}
+                onBlur={maybeAutoMiles}
+              />
             </Field>
             <Field label="Delivery Address">
               <div className="space-y-2">
-                <Textarea value={form.delivery_address} onChange={(e) => setForm({ ...form, delivery_address: e.target.value })} />
+                <Textarea
+                  value={form.delivery_address}
+                  onChange={(e) => setForm({ ...form, delivery_address: e.target.value })}
+                  onBlur={maybeAutoMiles}
+                />
                 <Button
                   type="button"
                   variant="secondary"
                   className="!py-1.5 text-xs"
                   disabled={!form.pickup_address || !form.delivery_address || distance.isPending}
-                  onClick={() => distance.mutate()}
+                  onClick={() => distance.mutate({ origin: form.pickup_address, destination: form.delivery_address })}
                 >
-                  {distance.isPending ? 'Calculating…' : '📍 Calculate miles'}
+                  {distance.isPending ? 'Calculating…' : '📍 Recalculate miles'}
                 </Button>
                 {distError && <p className="text-xs text-red-600">{distError}</p>}
               </div>
@@ -238,7 +321,16 @@ export default function Dispatch() {
           </div>
           {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
           <div className="mt-5 flex justify-end gap-3">
-            <Button type="button" variant="secondary" onClick={() => setForm({ ...EMPTY_FORM })}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setForm({ ...EMPTY_FORM })
+                setPendingCustomer(null)
+                setDistError('')
+                setAiNote('')
+              }}
+            >
               Clear
             </Button>
             <Button type="submit" disabled={create.isPending}>

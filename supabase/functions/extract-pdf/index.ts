@@ -15,6 +15,9 @@ function extractionPrompt(carrierName: string): string {
   return `You extract structured data from a trucking rate confirmation addressed to the carrier "${carrierName}".
 Respond with ONLY a JSON object (no markdown fences) with these keys:
 - customer_name: the broker or shipper company ISSUING the load. Never "${carrierName}" — that is the carrier being hired, usually next to labels like "Carrier:" or MC#.
+- reference_number: the broker's own load identifier as a string — labels like "Load Number", "Load #", "Order #", "PO#", "PRO#", "Reference". Pick the primary one for THIS shipment, not the carrier's MC/DOT numbers.
+- pickup_number: the pickup/PU number the driver must give at the shipper (labels like "PU#", "Pickup Number", "Pickup/Delivery Number" at the pickup stop). null if none.
+- delivery_number: the delivery/confirmation/appointment number for the receiver (labels like "Delivery #", "Confirmation #", "Pickup/Delivery Number" at the delivery stop). null if none.
 - pickup_address: first pickup — facility name, street, city, state, zip (whatever is present)
 - pickup_time: pickup date/time as "YYYY-MM-DDTHH:MM" (no timezone). If only a window is given (e.g. "FCFS 08:00-15:00"), use the window start. If only a date is known, use "YYYY-MM-DDT00:00". null only if no date at all.
 - delivery_address: final delivery — same format as pickup_address

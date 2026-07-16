@@ -90,6 +90,9 @@ export default function LoadDetail() {
     if (!load) return
     setEditForm({
       customer_id: String(load.customer_id),
+      reference_number: load.reference_number,
+      pickup_number: load.pickup_number,
+      delivery_number: load.delivery_number,
       pickup_address: load.pickup_address,
       pickup_time: load.pickup_time?.slice(0, 16) ?? '',
       delivery_address: load.delivery_address,
@@ -115,7 +118,10 @@ export default function LoadDetail() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-navy-800">{load.load_number}</h1>
-            <p className="text-sm text-slate-500">{load.customer_name}</p>
+            <p className="text-sm text-slate-500">
+              {load.customer_name}
+              {load.reference_number && <span className="ml-2 text-slate-400">· Broker # {load.reference_number}</span>}
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <Badge status={load.status} />
@@ -153,6 +159,17 @@ export default function LoadDetail() {
                 ))}
               </Select>
             </Field>
+            <Field label="Broker Load / PRO #">
+              <Input value={editForm.reference_number} onChange={(e) => setEditForm({ ...editForm, reference_number: e.target.value })} />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Pickup #">
+                <Input value={editForm.pickup_number} onChange={(e) => setEditForm({ ...editForm, pickup_number: e.target.value })} />
+              </Field>
+              <Field label="Delivery #">
+                <Input value={editForm.delivery_number} onChange={(e) => setEditForm({ ...editForm, delivery_number: e.target.value })} />
+              </Field>
+            </div>
             <div />
             <Field label="Pickup Address">
               <Textarea value={editForm.pickup_address} onChange={(e) => setEditForm({ ...editForm, pickup_address: e.target.value })} />
@@ -228,11 +245,13 @@ export default function LoadDetail() {
                 <dt className="text-xs font-semibold uppercase text-slate-500">Pickup</dt>
                 <dd>{load.pickup_address || '—'}</dd>
                 <dd className="text-slate-500">{formatDateTime(load.pickup_time)}</dd>
+                {load.pickup_number && <dd className="text-slate-500">PU # {load.pickup_number}</dd>}
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase text-slate-500">Delivery</dt>
                 <dd>{load.delivery_address || '—'}</dd>
                 <dd className="text-slate-500">{formatDateTime(load.delivery_time)}</dd>
+                {load.delivery_number && <dd className="text-slate-500">Delivery # {load.delivery_number}</dd>}
               </div>
               {load.special_terms && (
                 <div>

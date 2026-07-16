@@ -64,6 +64,9 @@ export const LOAD_STATUSES: LoadStatus[] = ['pending', 'assigned', 'in_transit',
 export interface Load {
   id: number
   load_number: string
+  reference_number: string
+  pickup_number: string
+  delivery_number: string
   customer_id: number
   customer_name: string | null
   status: LoadStatus

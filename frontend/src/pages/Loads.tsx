@@ -25,7 +25,7 @@ export default function Loads() {
   return (
     <Card title="Loads" actions={<Button onClick={() => navigate('/dispatch')}>+ New Load</Button>}>
       <div className="mb-4 flex flex-wrap gap-3">
-        <Input placeholder="Search load #, address…" value={q} onChange={(e) => setQ(e.target.value)} className="w-full sm:w-64" />
+        <Input placeholder="Search load #, broker #, address…" value={q} onChange={(e) => setQ(e.target.value)} className="w-full sm:w-64" />
         <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full sm:w-44">
           <option value="">All statuses</option>
           {LOAD_STATUSES.map((s) => (
@@ -82,6 +82,7 @@ export default function Loads() {
                     <Link to={`/loads/${load.id}`} onClick={(e) => e.stopPropagation()}>
                       {load.load_number}
                     </Link>
+                    {load.reference_number && <div className="text-xs font-normal text-slate-400">{load.reference_number}</div>}
                   </td>
                   <td className="px-3 py-3">{load.customer_name}</td>
                   <td className="px-3 py-3">
