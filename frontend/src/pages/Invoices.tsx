@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Badge, Button, Card, Field, formatDate, Modal, money, Select, Table } from '../components/ui'
-import { createInvoice, listCustomers, listInvoices, listLoads, setInvoiceStatus } from '../data'
+import { Badge, Button, Card, Field, formatDate, LoadError, Modal, money, Select, Table } from '../components/ui'
+import { createInvoice, listCustomers, listInvoices, listLoads, setInvoiceStatus, voidInvoice } from '../data'
 import { downloadInvoicePdf } from '../invoicePdf'
 import { errorMessage } from '../supabase'
 
@@ -11,9 +11,12 @@ export default function Invoices() {
   const [customerId, setCustomerId] = useState('')
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [error, setError] = useState('')
+  const [pageError, setPageError] = useState('')
 
-  const { data: invoices = [], isLoading } = useQuery({ queryKey: ['invoices'], queryFn: listInvoices })
-  const { data: customers = [] } = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
+  const invoicesQ = useQuery({ queryKey: ['invoices'], queryFn: listInvoices })
+  const { data: invoices = [], isLoading } = invoicesQ
+  const customersQ = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
+  const customers = customersQ.data ?? []
   const { data: billableLoads = [] } = useQuery({
     queryKey: ['loads', 'completed', customerId],
     queryFn: () => listLoads({ status: 'completed', customer_id: customerId }),
@@ -32,8 +35,26 @@ export default function Invoices() {
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) => setInvoiceStatus(id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['invoices'] }),
+    onSuccess: () => {
+      setPageError('')
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+    },
+    onError: (err) => setPageError(errorMessage(err)),
   })
+
+  const voidMutation = useMutation({
+    mutationFn: (id: number) => voidInvoice(id),
+    onSuccess: () => {
+      setPageError('')
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+      qc.invalidateQueries({ queryKey: ['loads'] })
+    },
+    onError: (err) => setPageError(errorMessage(err)),
+  })
+
+  function pdf(id: number) {
+    downloadInvoicePdf(id).catch((err) => setPageError(errorMessage(err)))
+  }
 
   function close() {
     setCreating(false)
@@ -53,8 +74,11 @@ export default function Invoices() {
 
   return (
     <Card title="Invoices" actions={<Button onClick={() => setCreating(true)}>+ Generate Invoice</Button>}>
+      {pageError && <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{pageError}</p>}
       {isLoading ? (
         <p className="py-8 text-center text-slate-500">Loading…</p>
+      ) : invoicesQ.isError ? (
+        <LoadError error={invoicesQ.error} onRetry={() => invoicesQ.refetch()} />
       ) : invoices.length === 0 ? (
         <p className="py-8 text-center text-slate-500">No invoices yet. Complete a load, then generate one.</p>
       ) : (
@@ -70,7 +94,7 @@ export default function Invoices() {
                 <Badge status={inv.status} />
               </td>
               <td className="px-3 py-3 text-right whitespace-nowrap">
-                <button onClick={() => downloadInvoicePdf(inv.id)} className="mr-3 text-sm font-medium text-navy-600 hover:underline">
+                <button onClick={() => pdf(inv.id)} className="mr-3 text-sm font-medium text-navy-600 hover:underline">
                   PDF
                 </button>
                 {inv.status === 'draft' && (
@@ -87,6 +111,14 @@ export default function Invoices() {
                     className="mr-3 text-sm font-medium text-green-600 hover:underline"
                   >
                     Mark Paid
+                  </button>
+                )}
+                {inv.status !== 'paid' && (
+                  <button
+                    onClick={() => window.confirm(`Void ${inv.invoice_number}? Its loads go back to "completed" for re-billing.`) && voidMutation.mutate(inv.id)}
+                    className="mr-3 text-sm font-medium text-red-600 hover:underline"
+                  >
+                    Void
                   </button>
                 )}
               </td>
@@ -112,6 +144,14 @@ export default function Invoices() {
                 </option>
               ))}
             </Select>
+            {customersQ.isError && (
+              <p className="mt-1 text-sm text-red-600">
+                Customer list failed to load —{' '}
+                <button type="button" className="font-medium underline" onClick={() => customersQ.refetch()}>
+                  retry
+                </button>
+              </p>
+            )}
           </Field>
 
           {customerId && (

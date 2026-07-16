@@ -45,6 +45,7 @@ export default function Drivers() {
           ],
         },
       ]}
+      docs={{ entityType: 'driver', docTypes: ['License', 'Medical Card', 'Employment', 'Other'], label: (d) => d.full_name }}
       defaults={{ full_name: '', license_number: '', license_expiration: '', date_of_birth: '', hire_date: '', pay_per_mile: '0', status: 'active' }}
       toForm={(d) => ({
         full_name: d.full_name,

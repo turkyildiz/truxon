@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
+import { errorMessage } from '../supabase'
 
 export function Button({ variant = 'primary', className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' }) {
   const styles = {
@@ -124,6 +125,21 @@ export function Table({ headers, children }: { headers: string[]; children: Reac
         </thead>
         <tbody className="divide-y divide-slate-100">{children}</tbody>
       </table>
+    </div>
+  )
+}
+
+/** Rendered in place of a list/detail body when its query failed — a failed
+ * fetch must never masquerade as an empty state or an endless spinner. */
+export function LoadError({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+  return (
+    <div className="py-8 text-center">
+      <p className="text-sm font-medium text-red-600">Couldn't load data — {errorMessage(error)}</p>
+      {onRetry && (
+        <Button variant="secondary" className="mt-3" onClick={onRetry}>
+          Try again
+        </Button>
+      )}
     </div>
   )
 }

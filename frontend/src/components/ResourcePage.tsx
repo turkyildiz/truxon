@@ -5,9 +5,11 @@
  * and saving.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { errorMessage } from '../supabase'
-import { Button, Card, Field, Input, Modal, Select, Table, Textarea } from './ui'
+import DocsNotes from './DocsNotes'
+import { Button, Card, Field, Input, LoadError, Modal, Select, Table, Textarea } from './ui'
 
 export interface FieldDef {
   name: string
@@ -37,6 +39,9 @@ interface Props<T extends { id: number | string }> {
   defaults: Record<string, unknown>
   searchable?: boolean
   addLabel?: string
+  /** When set, each row gets a "Docs" action opening the entity-generic
+   * documents + notes panel (spec: every major record carries both). */
+  docs?: { entityType: string; docTypes: string[]; label: (item: T) => string }
 }
 
 export default function ResourcePage<T extends { id: number | string }>({
@@ -51,18 +56,29 @@ export default function ResourcePage<T extends { id: number | string }>({
   defaults,
   searchable = true,
   addLabel,
+  docs,
 }: Props<T>) {
   const qc = useQueryClient()
-  const [q, setQ] = useState('')
+  const [params] = useSearchParams()
+  const urlQ = params.get('q') ?? ''
+  const [q, setQ] = useState(urlQ)
   const [editing, setEditing] = useState<T | null>(null)
   const [creating, setCreating] = useState(false)
+  const [docsFor, setDocsFor] = useState<T | null>(null)
   const [form, setForm] = useState<Record<string, unknown>>({})
   const [error, setError] = useState('')
 
-  const { data: items = [], isLoading } = useQuery({
+  // Global search deep-links here with ?q=…; pick it up even when the page
+  // is already mounted.
+  useEffect(() => {
+    if (urlQ) setQ(urlQ)
+  }, [urlQ])
+
+  const listQ = useQuery({
     queryKey: [queryKey, q],
     queryFn: () => list(q),
   })
+  const { data: items = [], isLoading } = listQ
 
   const save = useMutation({
     mutationFn: (payload: Record<string, unknown>) => {
@@ -118,6 +134,8 @@ export default function ResourcePage<T extends { id: number | string }>({
     >
       {isLoading ? (
         <p className="py-8 text-center text-slate-500">Loading…</p>
+      ) : listQ.isError ? (
+        <LoadError error={listQ.error} onRetry={() => listQ.refetch()} />
       ) : items.length === 0 ? (
         <p className="py-8 text-center text-slate-500">No records yet.</p>
       ) : (
@@ -130,6 +148,11 @@ export default function ResourcePage<T extends { id: number | string }>({
                 </td>
               ))}
               <td className="px-3 py-3 text-right whitespace-nowrap">
+                {docs && (
+                  <button onClick={() => setDocsFor(item)} className="mr-3 text-sm font-medium text-navy-600 hover:underline">
+                    Docs
+                  </button>
+                )}
                 <button onClick={() => openEdit(item)} className="text-sm font-medium text-navy-600 hover:underline">
                   Edit
                 </button>
@@ -137,6 +160,12 @@ export default function ResourcePage<T extends { id: number | string }>({
             </tr>
           ))}
         </Table>
+      )}
+
+      {docs && (
+        <Modal title={`Documents & Notes — ${docsFor ? docs.label(docsFor) : ''}`} open={!!docsFor} onClose={() => setDocsFor(null)}>
+          {docsFor && <DocsNotes entityType={docs.entityType} entityId={docsFor.id} docTypes={docs.docTypes} className="space-y-4" />}
+        </Modal>
       )}
 
       <Modal title={editing ? `Edit ${title.replace(/s$/, '')}` : `New ${title.replace(/s$/, '')}`} open={creating || !!editing} onClose={close}>

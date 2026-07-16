@@ -25,8 +25,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$BACKUP_DIR"
 
 echo "[1/3] Dumping Supabase Postgres…"
-# postgres:16 container so pg_dump matches the server version; NAS has Docker.
-docker run --rm postgres:16-alpine pg_dump "$SUPABASE_DB_URL" -Fc \
+# postgres:17 container so pg_dump matches the server version; NAS has Docker.
+# (A pg_dump older than the server exits nonzero but can leave a tiny useless
+#  dump behind — pipefail above turns that into a loud failure.)
+docker run --rm postgres:17-alpine pg_dump "$SUPABASE_DB_URL" -Fc \
   --schema=public --schema=storage --no-owner \
   | gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase "$BACKUP_PASSPHRASE" \
   > "$BACKUP_DIR/db_${STAMP}.dump.gpg"

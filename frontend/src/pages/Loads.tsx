@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Badge, Button, Card, formatDateTime, Input, money, Select } from '../components/ui'
-import { listCustomers, listLoads } from '../data'
+import { Badge, Button, Card, formatDateTime, Input, LoadError, money, Select } from '../components/ui'
+import { listCustomers, listDrivers, listLoads } from '../data'
 import { LOAD_STATUSES } from '../types'
 
 export default function Loads() {
@@ -10,14 +10,17 @@ export default function Loads() {
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('')
   const [customerId, setCustomerId] = useState('')
+  const [driverId, setDriverId] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
   const { data: customers = [] } = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
-  const { data: loads = [], isLoading } = useQuery({
-    queryKey: ['loads', q, status, customerId, dateFrom, dateTo],
-    queryFn: () => listLoads({ q, status, customer_id: customerId, date_from: dateFrom, date_to: dateTo }),
+  const { data: drivers = [] } = useQuery({ queryKey: ['drivers', ''], queryFn: () => listDrivers() })
+  const loadsQ = useQuery({
+    queryKey: ['loads', q, status, customerId, driverId, dateFrom, dateTo],
+    queryFn: () => listLoads({ q, status, customer_id: customerId, driver_id: driverId, date_from: dateFrom, date_to: dateTo }),
   })
+  const { data: loads = [], isLoading } = loadsQ
 
   return (
     <Card title="Loads" actions={<Button onClick={() => navigate('/dispatch')}>+ New Load</Button>}>
@@ -39,6 +42,14 @@ export default function Loads() {
             </option>
           ))}
         </Select>
+        <Select value={driverId} onChange={(e) => setDriverId(e.target.value)} className="w-full sm:w-48">
+          <option value="">All drivers</option>
+          {drivers.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.full_name}
+            </option>
+          ))}
+        </Select>
         <div className="flex items-center gap-2">
           <Input type="date" title="Pickup from" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="!w-40" />
           <span className="text-slate-400">–</span>
@@ -48,6 +59,8 @@ export default function Loads() {
 
       {isLoading ? (
         <p className="py-8 text-center text-slate-500">Loading…</p>
+      ) : loadsQ.isError ? (
+        <LoadError error={loadsQ.error} onRetry={() => loadsQ.refetch()} />
       ) : loads.length === 0 ? (
         <p className="py-8 text-center text-slate-500">No loads match.</p>
       ) : (

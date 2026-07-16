@@ -11,8 +11,11 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState>(null!)
 
+/** null = the profile genuinely doesn't exist; throws on fetch failure so a
+ * network blip is never mistaken for a disabled account. */
 async function fetchProfile(userId: string): Promise<Profile | null> {
-  const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+  if (error) throw new Error(error.message)
   return data
 }
 
@@ -22,7 +25,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
-      if (data.session) setUser(await fetchProfile(data.session.user.id))
+      if (data.session) {
+        try {
+          setUser(await fetchProfile(data.session.user.id))
+        } catch {
+          // Transient failure restoring the session — retry once before
+          // falling back to the login screen.
+          try {
+            setUser(await fetchProfile(data.session.user.id))
+          } catch {
+            /* leave user null; Protected routes redirect to /login */
+          }
+        }
+      }
       setLoading(false)
     })
 
@@ -37,7 +52,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function login(email: string, password: string) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
-    const profile = await fetchProfile(data.user.id)
+    let profile: Profile | null
+    try {
+      profile = await fetchProfile(data.user.id)
+    } catch {
+      throw new Error('Signed in, but your profile could not be loaded — check your connection and try again.')
+    }
     if (!profile || !profile.is_active) {
       await supabase.auth.signOut()
       throw new Error('Account is disabled')

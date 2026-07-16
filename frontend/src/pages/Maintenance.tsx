@@ -17,6 +17,7 @@ export default function Maintenance() {
       update={(id, payload) => updateMaintenance(Number(id), normalize(payload))}
       searchable={false}
       addLabel="+ Log Repair"
+      docs={{ entityType: 'maintenance', docTypes: ['Receipt', 'Invoice', 'Photo', 'Other'], label: (m) => `${m.equipment_unit ?? 'repair'} — ${m.description.slice(0, 40)}` }}
       columns={[
         { header: 'Date', render: (m) => formatDate(m.date_completed) },
         { header: 'Equipment', render: (m) => <span className="font-medium">{m.equipment_unit ?? '—'}</span> },

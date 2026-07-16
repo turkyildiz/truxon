@@ -128,6 +128,7 @@ export interface LoadFilters {
   q?: string
   status?: string
   customer_id?: string | number
+  driver_id?: string | number
   date_from?: string
   date_to?: string
 }
@@ -136,6 +137,7 @@ export async function listLoads(filters: LoadFilters = {}): Promise<Load[]> {
   let query = supabase.from('loads').select(LOAD_SELECT).order('created_at', { ascending: false }).limit(200)
   if (filters.status) query = query.eq('status', filters.status)
   if (filters.customer_id) query = query.eq('customer_id', filters.customer_id)
+  if (filters.driver_id) query = query.eq('driver_id', filters.driver_id)
   if (filters.date_from) query = query.gte('pickup_time', filters.date_from)
   if (filters.date_to) query = query.lte('pickup_time', filters.date_to + 'T23:59:59')
   if (filters.q) {
@@ -302,12 +304,15 @@ export async function globalSearch(q: string): Promise<SearchResults> {
   return unwrap(await supabase.rpc('global_search', { q }))
 }
 
-// ---------- Users (admin edge function) ----------
+// ---------- Edge functions ----------
 
-async function invokeAdminUsers<T>(options: { method: 'GET' | 'POST' | 'PATCH'; body?: Row }): Promise<T> {
-  const { data, error } = await supabase.functions.invoke('admin-users', options)
+/** Invoke an edge function, surfacing the server's JSON error body — on
+ * non-2xx, FunctionsHttpError.message is a fixed generic string and the real
+ * message (403 role denial, 413 too large, 429 rate limit…) is only on
+ * error.context. */
+async function invokeFunction<T>(name: string, options: { method?: 'GET' | 'POST' | 'PATCH'; body?: Row | FormData }): Promise<T> {
+  const { data, error } = await supabase.functions.invoke(name, options)
   if (error) {
-    // FunctionsHttpError carries the response; surface the server's message.
     const context = (error as { context?: Response }).context
     if (context) {
       const body = await context.json().catch(() => null)
@@ -316,6 +321,12 @@ async function invokeAdminUsers<T>(options: { method: 'GET' | 'POST' | 'PATCH'; 
     throw new Error(error.message)
   }
   return data as T
+}
+
+// ---------- Users (admin edge function) ----------
+
+function invokeAdminUsers<T>(options: { method: 'GET' | 'POST' | 'PATCH'; body?: Row }): Promise<T> {
+  return invokeFunction<T>('admin-users', options)
 }
 
 export async function listUsers(): Promise<Profile[]> {
@@ -369,13 +380,9 @@ export interface ExtractResult {
 export async function extractPdf(file: File): Promise<ExtractResult> {
   const form = new FormData()
   form.append('file', file)
-  const { data, error } = await supabase.functions.invoke('extract-pdf', { body: form })
-  if (error) throw new Error(error.message)
-  return data as ExtractResult
+  return invokeFunction<ExtractResult>('extract-pdf', { body: form })
 }
 
 export async function calculateDistance(origin: string, destination: string): Promise<{ miles: number | null; available: boolean }> {
-  const { data, error } = await supabase.functions.invoke('distance', { body: { origin, destination } })
-  if (error) throw new Error(error.message)
-  return data as { miles: number | null; available: boolean }
+  return invokeFunction<{ miles: number | null; available: boolean }>('distance', { body: { origin, destination } })
 }

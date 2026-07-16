@@ -1,10 +1,6 @@
 .env
-*.pyc
-__pycache__/
-.venv/
+.env.local
 node_modules/
 dist/
-uploads/
-*.db
-backend/truckson_dev.db
 .DS_Store
+.claude/

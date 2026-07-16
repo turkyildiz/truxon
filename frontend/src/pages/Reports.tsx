@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Button, Card, money, Table } from '../components/ui'
+import { Button, Card, LoadError, money, Table } from '../components/ui'
 import { weeklyReport } from '../data'
 import type { WeeklyRow } from '../types'
 
@@ -40,10 +40,11 @@ function ReportTable({ title, rows, isDriver }: { title: string; rows: WeeklyRow
 export default function Reports() {
   const [weekOf, setWeekOf] = useState(todayISO())
 
-  const { data, isLoading } = useQuery({
+  const reportQ = useQuery({
     queryKey: ['weekly-report', weekOf],
     queryFn: () => weeklyReport(weekOf),
   })
+  const { data, isLoading } = reportQ
 
   return (
     <div className="space-y-4">
@@ -67,7 +68,9 @@ export default function Reports() {
         </div>
       </div>
 
-      {isLoading || !data ? (
+      {reportQ.isError ? (
+        <LoadError error={reportQ.error} onRetry={() => reportQ.refetch()} />
+      ) : isLoading || !data ? (
         <p className="py-8 text-center text-slate-500">Loading…</p>
       ) : (
         <>

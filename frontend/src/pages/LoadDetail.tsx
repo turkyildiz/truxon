@@ -1,21 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Badge, Button, Card, Field, formatDateTime, Input, money, Select, Textarea } from '../components/ui'
-import {
-  addNote,
-  changeLoadStatus,
-  downloadDocument,
-  getLoad,
-  listActivity,
-  listCustomers,
-  listDocuments,
-  listDrivers,
-  trailersApi,
-  trucksApi,
-  updateLoad,
-  uploadDocument,
-} from '../data'
+import DocsNotes from '../components/DocsNotes'
+import { Badge, Button, Card, Field, formatDateTime, Input, LoadError, money, Select, Textarea } from '../components/ui'
+import { changeLoadStatus, getLoad, listCustomers, listDrivers, trailersApi, trucksApi, updateLoad } from '../data'
 import { errorMessage } from '../supabase'
 import { LOAD_STATUSES, type Load } from '../types'
 
@@ -53,22 +41,23 @@ export default function LoadDetail() {
   const { id } = useParams()
   const qc = useQueryClient()
   const [error, setError] = useState('')
-  const [note, setNote] = useState('')
-  const [docType, setDocType] = useState('')
-  const fileRef = useRef<HTMLInputElement>(null)
   const [editForm, setEditForm] = useState<Record<string, string> | null>(null)
 
-  const { data: load } = useQuery({ queryKey: ['load', id], queryFn: () => getLoad(id!) })
-  const { data: docs = [] } = useQuery({ queryKey: ['docs', id], queryFn: () => listDocuments('load', id!) })
-  const { data: activity = [] } = useQuery({ queryKey: ['activity', id], queryFn: () => listActivity('load', id!) })
-  const { data: drivers = [] } = useQuery({ queryKey: ['drivers', ''], queryFn: () => listDrivers() })
-  const { data: trucks = [] } = useQuery({ queryKey: ['trucks', ''], queryFn: () => trucksApi.list() })
-  const { data: trailers = [] } = useQuery({ queryKey: ['trailers', ''], queryFn: () => trailersApi.list() })
-  const { data: customers = [] } = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
+  const loadQ = useQuery({ queryKey: ['load', id], queryFn: () => getLoad(id!) })
+  const load = loadQ.data
+  const driversQ = useQuery({ queryKey: ['drivers', ''], queryFn: () => listDrivers() })
+  const trucksQ = useQuery({ queryKey: ['trucks', ''], queryFn: () => trucksApi.list() })
+  const trailersQ = useQuery({ queryKey: ['trailers', ''], queryFn: () => trailersApi.list() })
+  const customersQ = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
+  const drivers = driversQ.data ?? []
+  const trucks = trucksQ.data ?? []
+  const trailers = trailersQ.data ?? []
+  const customers = customersQ.data ?? []
+  const sourceQueries = [driversQ, trucksQ, trailersQ, customersQ]
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['load', id] })
-    qc.invalidateQueries({ queryKey: ['activity', id] })
+    qc.invalidateQueries({ queryKey: ['activity', 'load', String(id)] })
     qc.invalidateQueries({ queryKey: ['trucks'] })
     qc.invalidateQueries({ queryKey: ['trailers'] })
   }
@@ -92,23 +81,7 @@ export default function LoadDetail() {
     onError: (err) => setError(errorMessage(err)),
   })
 
-  const noteMutation = useMutation({
-    mutationFn: () => addNote('load', id!, note),
-    onSuccess: () => {
-      setNote('')
-      qc.invalidateQueries({ queryKey: ['activity', id] })
-    },
-  })
-
-  const upload = useMutation({
-    mutationFn: (file: File) => uploadDocument('load', id!, file, docType),
-    onSuccess: () => {
-      if (fileRef.current) fileRef.current.value = ''
-      qc.invalidateQueries({ queryKey: ['docs', id] })
-    },
-    onError: (err) => setError(errorMessage(err)),
-  })
-
+  if (loadQ.isError) return <LoadError error={loadQ.error} onRetry={() => loadQ.refetch()} />
   if (!load) return <p className="py-8 text-center text-slate-500">Loading…</p>
 
   const editable = load.status !== 'billed'
@@ -161,6 +134,15 @@ export default function LoadDetail() {
 
       {editForm ? (
         <Card title="Edit Load">
+          {sourceQueries.some((q) => q.isError) && (
+            <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+              Some dropdown options failed to load — check your connection and{' '}
+              <button type="button" className="font-medium underline" onClick={() => sourceQueries.forEach((q) => q.isError && q.refetch())}>
+                retry
+              </button>
+              .
+            </p>
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Customer">
               <Select value={editForm.customer_id} onChange={(e) => setEditForm({ ...editForm, customer_id: e.target.value })}>
@@ -288,73 +270,7 @@ export default function LoadDetail() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card title="Documents">
-          <div className="mb-3 flex flex-wrap gap-2">
-            <Select value={docType} onChange={(e) => setDocType(e.target.value)} className="!w-44">
-              <option value="">Type…</option>
-              {['Rate Confirmation', 'BOL', 'POD', 'Photo', 'Other'].map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </Select>
-            <input
-              ref={fileRef}
-              type="file"
-              onChange={(e) => e.target.files?.[0] && upload.mutate(e.target.files[0])}
-              className="text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-navy-700 file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-white hover:file:bg-navy-800"
-            />
-          </div>
-          {docs.length === 0 ? (
-            <p className="text-sm text-slate-500">No documents uploaded.</p>
-          ) : (
-            <ul className="divide-y divide-slate-100 text-sm">
-              {docs.map((d) => (
-                <li key={d.id} className="flex items-center justify-between py-2">
-                  <div>
-                    <button onClick={() => downloadDocument(d)} className="font-medium text-navy-600 hover:underline">
-                      {d.filename}
-                    </button>
-                    <span className="ml-2 text-xs text-slate-400">
-                      {d.doc_type && `${d.doc_type} · `}
-                      {(d.size_bytes / 1024).toFixed(0)} KB
-                    </span>
-                  </div>
-                  <span className="text-xs text-slate-400">{formatDateTime(d.uploaded_at)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <Card title="Notes & Activity">
-          <div className="mb-3 flex gap-2">
-            <Input
-              placeholder="Add a note…"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && note && noteMutation.mutate()}
-            />
-            <Button onClick={() => noteMutation.mutate()} disabled={!note || noteMutation.isPending}>
-              Add
-            </Button>
-          </div>
-          <ul className="max-h-80 space-y-2 overflow-y-auto text-sm">
-            {activity.map((a) => (
-              <li key={a.id} className={`rounded-lg p-2.5 ${a.action === 'note' ? 'bg-amber-50' : 'bg-slate-50'}`}>
-                <div className="flex justify-between text-xs text-slate-500">
-                  <span className="font-semibold">
-                    {a.action === 'note' ? '📝 note' : a.action.replace('_', ' ')} — {a.user_name ?? 'system'}
-                  </span>
-                  <span>{formatDateTime(a.created_at)}</span>
-                </div>
-                {a.detail && <div className="mt-1">{a.detail}</div>}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </div>
+      <DocsNotes entityType="load" entityId={id!} docTypes={['Rate Confirmation', 'BOL', 'POD', 'Photo', 'Other']} />
     </div>
   )
 }

@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
-import { Button, Card, Field, Input, Textarea } from '../components/ui'
+import { Button, Card, Field, Input, LoadError, Textarea } from '../components/ui'
 import { getCompanySettings, updateCompanySettings } from '../data'
 import { errorMessage } from '../supabase'
 
 export default function Settings() {
   const qc = useQueryClient()
-  const { data } = useQuery({ queryKey: ['company-settings'], queryFn: getCompanySettings })
+  const settingsQ = useQuery({ queryKey: ['company-settings'], queryFn: getCompanySettings })
+  const { data } = settingsQ
   const [form, setForm] = useState({ company_name: '', address: '', phone: '', email: '', mc_number: '' })
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
@@ -37,6 +38,27 @@ export default function Settings() {
   function onSubmit(e: FormEvent) {
     e.preventDefault()
     save.mutate()
+  }
+
+  // Never show an editable blank form when the fetch failed or is pending —
+  // saving it would overwrite the real company info with empty strings.
+  if (settingsQ.isError) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <Card title="Company Settings">
+          <LoadError error={settingsQ.error} onRetry={() => settingsQ.refetch()} />
+        </Card>
+      </div>
+    )
+  }
+  if (!data) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <Card title="Company Settings">
+          <p className="py-8 text-center text-slate-500">Loading…</p>
+        </Card>
+      </div>
+    )
   }
 
   return (

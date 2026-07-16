@@ -25,12 +25,18 @@ export default function Dispatch() {
   const [form, setForm] = useState({ ...EMPTY_FORM })
   const [error, setError] = useState('')
   const [aiNote, setAiNote] = useState('')
+  const [distError, setDistError] = useState('')
   const [dragOver, setDragOver] = useState(false)
 
-  const { data: customers = [] } = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
-  const { data: drivers = [] } = useQuery({ queryKey: ['drivers', ''], queryFn: () => listDrivers() })
-  const { data: trucks = [] } = useQuery({ queryKey: ['trucks', ''], queryFn: () => trucksApi.list() })
-  const { data: trailers = [] } = useQuery({ queryKey: ['trailers', ''], queryFn: () => trailersApi.list() })
+  const customersQ = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
+  const driversQ = useQuery({ queryKey: ['drivers', ''], queryFn: () => listDrivers() })
+  const trucksQ = useQuery({ queryKey: ['trucks', ''], queryFn: () => trucksApi.list() })
+  const trailersQ = useQuery({ queryKey: ['trailers', ''], queryFn: () => trailersApi.list() })
+  const customers = customersQ.data ?? []
+  const drivers = driversQ.data ?? []
+  const trucks = trucksQ.data ?? []
+  const trailers = trailersQ.data ?? []
+  const sourceQueries = [customersQ, driversQ, trucksQ, trailersQ]
 
   const extract = useMutation({
     mutationFn: extractPdf,
@@ -62,9 +68,11 @@ export default function Dispatch() {
   const distance = useMutation({
     mutationFn: () => calculateDistance(form.pickup_address, form.delivery_address),
     onSuccess: (d) => {
+      setDistError('')
       if (d.miles != null) setForm((prev) => ({ ...prev, miles: String(d.miles) }))
-      else setAiNote('Distance service unavailable (no Google Maps API key) — enter miles manually.')
+      else setDistError('Distance service unavailable (no Google Maps API key) — enter miles manually.')
     },
+    onError: (err) => setDistError(`Mileage lookup failed: ${errorMessage(err)} — enter miles manually.`),
   })
 
   const create = useMutation({
@@ -121,6 +129,15 @@ export default function Dispatch() {
       </Card>
 
       <Card title="Load Details">
+        {sourceQueries.some((q) => q.isError) && (
+          <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            Some dropdown options failed to load — check your connection and{' '}
+            <button type="button" className="font-medium underline" onClick={() => sourceQueries.forEach((q) => q.isError && q.refetch())}>
+              retry
+            </button>
+            .
+          </p>
+        )}
         <form onSubmit={onSubmit}>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Customer *">
@@ -158,6 +175,7 @@ export default function Dispatch() {
                 >
                   {distance.isPending ? 'Calculating…' : '📍 Calculate miles'}
                 </Button>
+                {distError && <p className="text-xs text-red-600">{distError}</p>}
               </div>
             </Field>
             <Field label="Pickup Time">

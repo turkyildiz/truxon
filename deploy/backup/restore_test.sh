@@ -17,7 +17,9 @@ fi
 echo "Testing restore of: $LATEST"
 
 CONTAINER="truxon-restore-test-$$"
-docker run -d --name "$CONTAINER" -e POSTGRES_PASSWORD=test -e POSTGRES_DB=restore_test postgres:16-alpine >/dev/null
+# postgres:17 to match the Supabase server — a version mismatch here makes
+# pg_restore reject the dump (and older pg_dump silently produced empty dumps).
+docker run -d --name "$CONTAINER" -e POSTGRES_PASSWORD=test -e POSTGRES_DB=restore_test postgres:17-alpine >/dev/null
 trap 'docker rm -f "$CONTAINER" >/dev/null' EXIT
 
 echo "Waiting for temporary Postgres…"

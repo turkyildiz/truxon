@@ -1,8 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { Badge, Button, Card, formatDate, formatDateTime, money } from '../components/ui'
+import { useAuth } from '../auth'
+import { Badge, Button, Card, formatDate, formatDateTime, LoadError, money } from '../components/ui'
 import { dashboardSummary } from '../data'
+
+/** Roles allowed the company-wide dashboard (mirrors the dashboard_summary
+ * RPC gate — driver/maintenance must not see fleet revenue or dispatch data). */
+const DASHBOARD_ROLES = ['admin', 'dispatcher', 'accountant']
 
 const STATUS_CHART_COLORS: Record<string, string> = {
   pending: '#94a3b8',
@@ -24,12 +29,27 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { data, isLoading } = useQuery({
+  const { user } = useAuth()
+  const canView = DASHBOARD_ROLES.includes(user?.role ?? '')
+  const summaryQ = useQuery({
     queryKey: ['dashboard'],
     queryFn: dashboardSummary,
     refetchInterval: 60_000,
+    enabled: canView,
   })
+  const { data, isLoading } = summaryQ
 
+  if (!canView) {
+    return (
+      <Card title={`Welcome, ${user?.full_name || user?.username}`}>
+        <p className="text-sm text-slate-600">
+          You're signed in as <span className="font-medium capitalize">{user?.role}</span>. Use the menu to reach your modules — company-wide
+          dashboards are limited to office staff.
+        </p>
+      </Card>
+    )
+  }
+  if (summaryQ.isError) return <LoadError error={summaryQ.error} onRetry={() => summaryQ.refetch()} />
   if (isLoading || !data) return <p className="py-8 text-center text-slate-500">Loading dashboard…</p>
 
   const pieData = Object.entries(data.status_counts)

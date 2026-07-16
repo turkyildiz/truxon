@@ -80,16 +80,31 @@ const NAV_ITEMS: { key: string; to: string; label: string; icon: string }[] = [
 function GlobalSearch() {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<SearchResults | null>(null)
+  const [failed, setFailed] = useState(false)
   const navigate = useNavigate()
   const boxRef = useRef<HTMLDivElement>(null)
+  const seq = useRef(0)
 
   useEffect(() => {
+    setFailed(false)
     if (q.trim().length < 2) {
       setResults(null)
       return
     }
+    // The seq guard drops out-of-order/failed responses so the dropdown never
+    // shows results (or errors) belonging to an earlier query string.
+    const mySeq = ++seq.current
     const t = setTimeout(() => {
-      globalSearch(q).then(setResults).catch(() => {})
+      globalSearch(q)
+        .then((r) => {
+          if (seq.current === mySeq) setResults(r)
+        })
+        .catch(() => {
+          if (seq.current === mySeq) {
+            setResults(null)
+            setFailed(true)
+          }
+        })
     }, 250)
     return () => clearTimeout(t)
   }, [q])
@@ -108,12 +123,15 @@ function GlobalSearch() {
     navigate(path)
   }
 
+  // Non-load entities have no detail routes; carrying the search term lets
+  // the destination list page pre-filter to the clicked match.
+  const carry = `?q=${encodeURIComponent(q.trim())}`
   const sections: { title: string; items: { id: number; label: string }[]; path: (id: number) => string }[] = results
     ? [
         { title: 'Loads', items: results.loads, path: (id) => `/loads/${id}` },
-        { title: 'Customers', items: results.customers, path: () => '/customers' },
-        { title: 'Drivers', items: results.drivers, path: () => '/drivers' },
-        { title: 'Trucks', items: results.trucks, path: () => '/trucks' },
+        { title: 'Customers', items: results.customers, path: () => `/customers${carry}` },
+        { title: 'Drivers', items: results.drivers, path: () => `/drivers${carry}` },
+        { title: 'Trucks', items: results.trucks, path: () => `/trucks${carry}` },
       ]
     : []
 
@@ -125,6 +143,11 @@ function GlobalSearch() {
         placeholder="Search loads, customers, drivers, trucks…"
         className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm focus:border-navy-600 focus:outline-none"
       />
+      {failed && (
+        <div className="absolute top-full z-40 mt-1 w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-red-600 shadow-lg">
+          Search failed — check your connection and keep typing to retry.
+        </div>
+      )}
       {results && (
         <div className="absolute top-full z-40 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg">
           {sections.every((s) => s.items.length === 0) && <div className="p-3 text-sm text-slate-500">No results</div>}
@@ -193,7 +216,8 @@ export default function Layout() {
           <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm lg:hidden" onClick={() => setMenuOpen(true)}>
             ☰
           </button>
-          <GlobalSearch />
+          {/* The global_search RPC is gated to office roles — don't show a box that can only fail. */}
+          {['admin', 'dispatcher', 'accountant'].includes(user?.role ?? '') && <GlobalSearch />}
           <div className="ml-auto flex items-center gap-3">
             <div className="hidden text-right sm:block">
               <div className="text-sm font-medium">{user?.full_name || user?.username}</div>

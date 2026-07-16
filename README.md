@@ -14,7 +14,6 @@ frontend/            React + TypeScript + Tailwind (tablet-first UI)
 supabase/migrations/ Schema, workflow RPCs, RLS policies, storage bucket
 supabase/functions/  extract-pdf (AI), distance (Google Maps), admin-users
 deploy/backup/       NAS backup + restore-test scripts
-backend/             LEGACY — original FastAPI implementation, kept for reference
 docs/                Requirements spec
 ```
 
@@ -38,6 +37,8 @@ RLS (admin / dispatcher / driver / accountant / maintenance).
    supabase db push                    # applies supabase/migrations/*
    supabase functions deploy extract-pdf distance admin-users
    supabase secrets set LLM_API_KEY=... GOOGLE_MAPS_API_KEY=...   # optional
+   # Optional extraction overrides (defaults: OpenRouter + llama-3.1-8b):
+   #   supabase secrets set LLM_BASE_URL=https://api.groq.com/openai/v1 LLM_MODEL=llama-3.3-70b-versatile
    ```
 
 3. Create the first admin: Dashboard → Authentication → Add user
@@ -96,6 +97,11 @@ Protection layers:
   never leaves the `admin-users` edge function).
 - Every table has row-level security; the load workflow and invoicing rules
   are enforced by SECURITY DEFINER functions, not client code.
+- Reporting RPCs (`dashboard_summary`, `global_search`, `weekly_report`) and
+  document/notes access are role-gated: driver and maintenance logins never
+  see company-wide financials, the customer list, or other records' files.
+- Billed loads are immutable — corrections go through **Void** on the
+  invoice, which reverts its loads to `completed` in one transaction.
 - Deactivating a user bans the auth account and revokes sessions.
 - The AI PDF-extraction edge function is auth- and role-gated, size-capped
   (15 MB), and rate-limited to 30 extractions/user/hour (`check_rate_limit`).

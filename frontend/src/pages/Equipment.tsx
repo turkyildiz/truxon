@@ -10,7 +10,7 @@ const STATUS_OPTIONS = [
   { value: 'retired', label: 'Retired' },
 ]
 
-function EquipmentPage({ title, api, queryKey }: { title: string; api: typeof trucksApi; queryKey: string }) {
+function EquipmentPage({ title, api, queryKey, entityType }: { title: string; api: typeof trucksApi; queryKey: string; entityType: 'truck' | 'trailer' }) {
   return (
     <ResourcePage<Equipment>
       title={title}
@@ -18,6 +18,7 @@ function EquipmentPage({ title, api, queryKey }: { title: string; api: typeof tr
       list={api.list}
       create={api.create}
       update={api.update}
+      docs={{ entityType, docTypes: ['Registration', 'Insurance', 'Inspection', 'Other'], label: (t) => `Unit ${t.unit_number}` }}
       columns={[
         { header: 'Unit #', render: (t) => <span className="font-medium">{t.unit_number}</span> },
         { header: 'Make / Model / Year', render: (t) => [t.make, t.model, t.year].filter(Boolean).join(' ') || '—' },
@@ -53,5 +54,5 @@ function EquipmentPage({ title, api, queryKey }: { title: string; api: typeof tr
   )
 }
 
-export const Trucks = () => <EquipmentPage title="Trucks" api={trucksApi} queryKey="trucks" />
-export const Trailers = () => <EquipmentPage title="Trailers" api={trailersApi} queryKey="trailers" />
+export const Trucks = () => <EquipmentPage title="Trucks" api={trucksApi} queryKey="trucks" entityType="truck" />
+export const Trailers = () => <EquipmentPage title="Trailers" api={trailersApi} queryKey="trailers" entityType="trailer" />

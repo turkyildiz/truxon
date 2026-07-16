@@ -29,6 +29,7 @@ export default function Customers() {
         { name: 'billing_address', label: 'Billing Address', type: 'textarea', full: true },
         { name: 'notes', label: 'Notes', type: 'textarea', full: true },
       ]}
+      docs={{ entityType: 'customer', docTypes: ['Contract', 'Rate Agreement', 'Insurance', 'Other'], label: (c) => c.company_name }}
       defaults={{ company_name: '', contact_person: '', phone: '', email: '', payment_terms: 'Net 30', billing_address: '', notes: '', is_active: true }}
       toForm={(c) => ({
         company_name: c.company_name,
