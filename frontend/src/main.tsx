@@ -19,6 +19,7 @@ import Reports from './pages/Reports'
 import Invoices from './pages/Invoices'
 import Users from './pages/Users'
 import Settings from './pages/Settings'
+import Drive from './pages/Drive'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 15_000 } },
@@ -57,6 +58,8 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/maintenance" element={<Maintenance />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/invoices" element={<Invoices />} />
+              <Route path="/personal-drive" element={<Drive drive="personal" />} />
+              <Route path="/team-drive" element={<Drive drive="team" />} />
               <Route path="/users" element={<Users />} />
               <Route path="/settings" element={<Settings />} />
             </Route>

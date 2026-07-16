@@ -378,6 +378,80 @@ export async function updateUser(id: string, payload: Row): Promise<void> {
   await invokeAdminUsers({ method: 'PATCH', body: { id, ...payload } })
 }
 
+// ---------- Personal / Team drives ----------
+
+export interface DriveFile {
+  id: number
+  drive: 'personal' | 'team'
+  owner_id: string
+  filename: string
+  storage_path: string
+  content_type: string
+  size_bytes: number
+  folder: string
+  uploaded_at: string
+  owner_name?: string | null
+}
+
+export async function listDriveFiles(drive: 'personal' | 'team', folder?: string): Promise<DriveFile[]> {
+  let query = supabase
+    .from('drive_files')
+    .select('*, owner:profiles(username, full_name)')
+    .eq('drive', drive)
+    .order('uploaded_at', { ascending: false })
+  if (folder !== undefined) query = query.eq('folder', folder)
+  const rows = unwrap<Row[]>(await query)
+  return rows.map((row) => {
+    const owner = row.owner as { username: string; full_name: string } | null
+    return { ...(row as unknown as DriveFile), owner_name: owner ? owner.full_name || owner.username : null }
+  })
+}
+
+/** Distinct folder labels present in a drive (for the folder filter). */
+export async function listDriveFolders(drive: 'personal' | 'team'): Promise<string[]> {
+  const rows = unwrap<Row[]>(await supabase.from('drive_files').select('folder').eq('drive', drive))
+  return [...new Set(rows.map((r) => String(r.folder)).filter(Boolean))].sort()
+}
+
+export async function uploadDriveFile(drive: 'personal' | 'team', file: File, folder = ''): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser()
+  const uid = userData.user?.id
+  if (!uid) throw new Error('Not signed in')
+  const safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_')
+  const safeFolder = folder ? `${folder.replace(/[^A-Za-z0-9._ -]/g, '_')}/` : ''
+  const path = `${uid}/${safeFolder}${crypto.randomUUID().slice(0, 12)}_${safeName}`
+  const { error: upErr } = await supabase.storage.from(drive).upload(path, file, { contentType: file.type })
+  if (upErr) throw new Error(upErr.message)
+  unwrap(
+    await supabase.from('drive_files').insert({
+      drive,
+      owner_id: uid,
+      filename: file.name,
+      storage_path: path,
+      content_type: file.type || 'application/octet-stream',
+      size_bytes: file.size,
+      folder,
+    }),
+  )
+}
+
+export async function downloadDriveFile(f: DriveFile): Promise<void> {
+  const { data, error } = await supabase.storage.from(f.drive).download(f.storage_path)
+  if (error) throw new Error(error.message)
+  const url = URL.createObjectURL(data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = f.filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export async function deleteDriveFile(f: DriveFile): Promise<void> {
+  const { error: storageErr } = await supabase.storage.from(f.drive).remove([f.storage_path])
+  if (storageErr) throw new Error(storageErr.message)
+  unwrap(await supabase.from('drive_files').delete().eq('id', f.id))
+}
+
 // ---------- Company settings ----------
 
 export interface CompanySettings {

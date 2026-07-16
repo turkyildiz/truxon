@@ -76,10 +76,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export const useAuth = () => useContext(AuthContext)
 
 /** Which nav sections each role can see (admin sees everything). */
+const DRIVES = ['personal_drive', 'team_drive']
 export const ROLE_MODULES: Record<string, string[]> = {
-  admin: ['dashboard', 'loads', 'dispatch', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'users', 'settings'],
-  dispatcher: ['dashboard', 'loads', 'dispatch', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices'],
-  accountant: ['dashboard', 'loads', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices'],
-  maintenance: ['trucks', 'trailers', 'maintenance'],
-  driver: ['dashboard'],
+  admin: ['dashboard', 'loads', 'dispatch', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', ...DRIVES, 'users', 'settings'],
+  dispatcher: ['dashboard', 'loads', 'dispatch', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', ...DRIVES],
+  accountant: ['dashboard', 'loads', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', ...DRIVES],
+  maintenance: ['trucks', 'trailers', 'maintenance', ...DRIVES],
+  driver: ['dashboard', ...DRIVES],
 }
