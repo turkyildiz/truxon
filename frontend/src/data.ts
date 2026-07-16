@@ -374,12 +374,15 @@ export interface ExtractResult {
     rate?: number | null
     special_terms?: string | null
   } | null
+  /** Set when the PDF has no text layer — retry with rendered page images. */
+  needs_images?: boolean
   error: string | null
 }
 
-export async function extractPdf(file: File): Promise<ExtractResult> {
+export async function extractPdf(file: File, pageImages: Blob[] = []): Promise<ExtractResult> {
   const form = new FormData()
   form.append('file', file)
+  pageImages.forEach((img, i) => form.append(`page${i}`, new File([img], `page${i}.jpg`, { type: 'image/jpeg' })))
   return invokeFunction<ExtractResult>('extract-pdf', { body: form })
 }
 

@@ -39,7 +39,18 @@ export default function Dispatch() {
   const sourceQueries = [customersQ, driversQ, trucksQ, trailersQ]
 
   const extract = useMutation({
-    mutationFn: extractPdf,
+    mutationFn: async (file: File) => {
+      const first = await extractPdf(file)
+      if (first.needs_images) {
+        // Scanned PDF — render the pages in the browser and let the vision
+        // model read them.
+        setAiNote('Scanned PDF — reading pages with vision AI…')
+        const { renderPdfPages } = await import('../pdfPages')
+        const pages = await renderPdfPages(file)
+        if (pages.length > 0) return extractPdf(file, pages)
+      }
+      return first
+    },
     onSuccess: (result) => {
       if (result.error && !result.fields) {
         setAiNote(result.error)
