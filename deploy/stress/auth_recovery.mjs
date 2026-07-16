@@ -1,0 +1,17 @@
+import { createClient } from '/home/turkyildiz/TRUXON/frontend/node_modules/@supabase/supabase-js/dist/index.mjs'
+import { readFileSync } from 'node:fs'
+const env = Object.fromEntries(readFileSync('/home/turkyildiz/TRUXON/frontend/.env.local', 'utf8').split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
+const mk = () => createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+console.error('waiting 75s for IP rate-limit window to clear...')
+await new Promise((r) => setTimeout(r, 75000))
+let t = Date.now()
+let r = await mk().auth.signInWithPassword({ email: 'turkyildiz@gmail.com', password: 'Towtruck505.' })
+console.log('CORRECT_PW:', JSON.stringify({ ms: Date.now() - t, ok: !!r.data?.session, status: r.error?.status, msg: r.error?.message, user: r.data?.user?.email }))
+await new Promise((r) => setTimeout(r, 1500))
+t = Date.now()
+r = await mk().auth.signInWithPassword({ email: 'turkyildiz@gmail.com', password: 'definitely_wrong_xyz' })
+console.log('WRONG_PW:', JSON.stringify({ ms: Date.now() - t, ok: !!r.data?.session, status: r.error?.status, msg: r.error?.message }))
+await new Promise((r) => setTimeout(r, 1500))
+t = Date.now()
+r = await mk().auth.signInWithPassword({ email: 'turkyildiz@gmail.com', password: 'Towtruck505.' })
+console.log('CORRECT_AGAIN:', JSON.stringify({ ms: Date.now() - t, ok: !!r.data?.session, status: r.error?.status, msg: r.error?.message, user: r.data?.user?.email }))
