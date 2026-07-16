@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import DocsNotes from '../components/DocsNotes'
+import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Badge, Button, Card, Field, formatDateTime, Input, LoadError, money, Select, Textarea } from '../components/ui'
-import { changeLoadStatus, getLoad, listCustomers, listDrivers, trailersApi, trucksApi, updateLoad } from '../data'
+import { changeLoadStatus, getLoad, listCustomers, listDrivers, listStops, replaceStops, trailersApi, trucksApi, updateLoad } from '../data'
 import { errorMessage } from '../supabase'
 import { LOAD_STATUSES, type Load } from '../types'
 
@@ -42,9 +43,12 @@ export default function LoadDetail() {
   const qc = useQueryClient()
   const [error, setError] = useState('')
   const [editForm, setEditForm] = useState<Record<string, string> | null>(null)
+  const [editStops, setEditStops] = useState<StopForm[]>([])
 
   const loadQ = useQuery({ queryKey: ['load', id], queryFn: () => getLoad(id!) })
   const load = loadQ.data
+  const stopsQ = useQuery({ queryKey: ['load-stops', id], queryFn: () => listStops(id!) })
+  const itinerary = stopsQ.data ?? []
   const driversQ = useQuery({ queryKey: ['drivers', ''], queryFn: () => listDrivers() })
   const trucksQ = useQuery({ queryKey: ['trucks', ''], queryFn: () => trucksApi.list() })
   const trailersQ = useQuery({ queryKey: ['trailers', ''], queryFn: () => trailersApi.list() })
@@ -72,10 +76,27 @@ export default function LoadDetail() {
   })
 
   const saveEdit = useMutation({
-    mutationFn: (payload: Record<string, unknown>) => updateLoad(id!, payload),
+    mutationFn: async (payload: Record<string, unknown>) => {
+      const realStops = editStops.filter((s) => s.facility || s.address || s.time || s.reference)
+      const firstPu = realStops.find((s) => s.stop_type === 'pickup')
+      const lastDel = [...realStops].reverse().find((s) => s.stop_type === 'delivery')
+      const line = (s?: StopForm) => (s ? [s.facility, s.address].filter(Boolean).join(', ') : '')
+      Object.assign(payload, {
+        pickup_address: line(firstPu),
+        pickup_time: firstPu?.time || null,
+        pickup_number: firstPu?.reference ?? '',
+        delivery_address: line(lastDel),
+        delivery_time: lastDel?.time || null,
+        delivery_number: lastDel?.reference ?? '',
+      })
+      const updated = await updateLoad(id!, payload)
+      await replaceStops(id!, realStops.map((s) => ({ stop_type: s.stop_type, facility: s.facility, address: s.address, stop_time: s.time || null, reference: s.reference })))
+      return updated
+    },
     onSuccess: () => {
       setEditForm(null)
       setError('')
+      qc.invalidateQueries({ queryKey: ['load-stops', id] })
       refresh()
     },
     onError: (err) => setError(errorMessage(err)),
@@ -91,12 +112,6 @@ export default function LoadDetail() {
     setEditForm({
       customer_id: String(load.customer_id),
       reference_number: load.reference_number,
-      pickup_number: load.pickup_number,
-      delivery_number: load.delivery_number,
-      pickup_address: load.pickup_address,
-      pickup_time: load.pickup_time?.slice(0, 16) ?? '',
-      delivery_address: load.delivery_address,
-      delivery_time: load.delivery_time?.slice(0, 16) ?? '',
       driver_id: load.driver_id ? String(load.driver_id) : '',
       truck_id: load.truck_id ? String(load.truck_id) : '',
       trailer_id: load.trailer_id ? String(load.trailer_id) : '',
@@ -105,6 +120,16 @@ export default function LoadDetail() {
       special_terms: load.special_terms,
       notes: load.notes,
     })
+    // Edit the stored itinerary; loads that predate load_stops fall back to
+    // the primary route fields.
+    setEditStops(
+      itinerary.length > 0
+        ? itinerary.map((s) => ({ stop_type: s.stop_type, facility: s.facility, address: s.address, time: s.stop_time?.slice(0, 16) ?? '', reference: s.reference }))
+        : [
+            { ...emptyStop('pickup'), address: load.pickup_address, time: load.pickup_time?.slice(0, 16) ?? '', reference: load.pickup_number },
+            { ...emptyStop('delivery'), address: load.delivery_address, time: load.delivery_time?.slice(0, 16) ?? '', reference: load.delivery_number },
+          ],
+    )
   }
 
   function submitEdit() {
@@ -162,27 +187,7 @@ export default function LoadDetail() {
             <Field label="Broker Load / PRO #">
               <Input value={editForm.reference_number} onChange={(e) => setEditForm({ ...editForm, reference_number: e.target.value })} />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Pickup #">
-                <Input value={editForm.pickup_number} onChange={(e) => setEditForm({ ...editForm, pickup_number: e.target.value })} />
-              </Field>
-              <Field label="Delivery #">
-                <Input value={editForm.delivery_number} onChange={(e) => setEditForm({ ...editForm, delivery_number: e.target.value })} />
-              </Field>
-            </div>
-            <div />
-            <Field label="Pickup Address">
-              <Textarea value={editForm.pickup_address} onChange={(e) => setEditForm({ ...editForm, pickup_address: e.target.value })} />
-            </Field>
-            <Field label="Delivery Address">
-              <Textarea value={editForm.delivery_address} onChange={(e) => setEditForm({ ...editForm, delivery_address: e.target.value })} />
-            </Field>
-            <Field label="Pickup Time">
-              <Input type="datetime-local" value={editForm.pickup_time} onChange={(e) => setEditForm({ ...editForm, pickup_time: e.target.value })} />
-            </Field>
-            <Field label="Delivery Time">
-              <Input type="datetime-local" value={editForm.delivery_time} onChange={(e) => setEditForm({ ...editForm, delivery_time: e.target.value })} />
-            </Field>
+            <StopsEditor stops={editStops} onChange={setEditStops} />
             <Field label="Driver">
               <Select value={editForm.driver_id} onChange={(e) => setEditForm({ ...editForm, driver_id: e.target.value })}>
                 <option value="">—</option>
@@ -239,20 +244,36 @@ export default function LoadDetail() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Card title="Route">
+          <Card title={itinerary.length > 2 ? `Route (${itinerary.length} stops)` : 'Route'}>
             <dl className="space-y-3 text-sm">
-              <div>
-                <dt className="text-xs font-semibold uppercase text-slate-500">Pickup</dt>
-                <dd>{load.pickup_address || '—'}</dd>
-                <dd className="text-slate-500">{formatDateTime(load.pickup_time)}</dd>
-                {load.pickup_number && <dd className="text-slate-500">PU # {load.pickup_number}</dd>}
-              </div>
-              <div>
-                <dt className="text-xs font-semibold uppercase text-slate-500">Delivery</dt>
-                <dd>{load.delivery_address || '—'}</dd>
-                <dd className="text-slate-500">{formatDateTime(load.delivery_time)}</dd>
-                {load.delivery_number && <dd className="text-slate-500">Delivery # {load.delivery_number}</dd>}
-              </div>
+              {itinerary.length > 0 ? (
+                itinerary.map((s, i) => (
+                  <div key={s.id ?? i}>
+                    <dt className="text-xs font-semibold uppercase text-slate-500">
+                      {s.stop_type === 'pickup' ? 'Pickup' : 'Delivery'}
+                      {itinerary.filter((x) => x.stop_type === s.stop_type).length > 1 ? ` #${s.seq}` : ''}
+                    </dt>
+                    <dd>{[s.facility, s.address].filter(Boolean).join(', ') || '—'}</dd>
+                    <dd className="text-slate-500">{formatDateTime(s.stop_time)}</dd>
+                    {s.reference && <dd className="text-slate-500">{s.stop_type === 'pickup' ? 'PU' : 'Delivery'} # {s.reference}</dd>}
+                  </div>
+                ))
+              ) : (
+                <>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase text-slate-500">Pickup</dt>
+                    <dd>{load.pickup_address || '—'}</dd>
+                    <dd className="text-slate-500">{formatDateTime(load.pickup_time)}</dd>
+                    {load.pickup_number && <dd className="text-slate-500">PU # {load.pickup_number}</dd>}
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase text-slate-500">Delivery</dt>
+                    <dd>{load.delivery_address || '—'}</dd>
+                    <dd className="text-slate-500">{formatDateTime(load.delivery_time)}</dd>
+                    {load.delivery_number && <dd className="text-slate-500">Delivery # {load.delivery_number}</dd>}
+                  </div>
+                </>
+              )}
               {load.special_terms && (
                 <div>
                   <dt className="text-xs font-semibold uppercase text-slate-500">Special Terms</dt>

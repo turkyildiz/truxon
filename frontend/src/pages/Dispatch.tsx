@@ -1,19 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Button, Card, Field, Input, Select, Textarea } from '../components/ui'
-import { calculateDistance, createCustomer, createLoad, extractPdf, listCustomers, listDrivers, trailersApi, trucksApi } from '../data'
+import { calculateDistance, createCustomer, createLoad, extractPdf, listCustomers, listDrivers, trailersApi, trucksApi, type ExtractedStop } from '../data'
 import { errorMessage } from '../supabase'
 
 const EMPTY_FORM = {
   customer_id: '',
   reference_number: '',
-  pickup_number: '',
-  delivery_number: '',
-  pickup_address: '',
-  pickup_time: '',
-  delivery_address: '',
-  delivery_time: '',
   driver_id: '',
   truck_id: '',
   trailer_id: '',
@@ -23,10 +18,22 @@ const EMPTY_FORM = {
   notes: '',
 }
 
+const EMPTY_STOPS: StopForm[] = [emptyStop('pickup'), emptyStop('delivery')]
+
+const stopLine = (s: StopForm) => [s.facility, s.address].filter(Boolean).join(', ')
+
+/** Route order: pickups in sequence, then deliveries in sequence. */
+function routeOf(stops: StopForm[]): { origin: string; destination: string; waypoints: string[] } {
+  const ordered = [...stops.filter((s) => s.stop_type === 'pickup'), ...stops.filter((s) => s.stop_type === 'delivery')].filter(stopLine)
+  const lines = ordered.map(stopLine)
+  return { origin: lines[0] ?? '', destination: lines.at(-1) ?? '', waypoints: lines.slice(1, -1) }
+}
+
 export default function Dispatch() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [form, setForm] = useState({ ...EMPTY_FORM })
+  const [stops, setStops] = useState<StopForm[]>(() => EMPTY_STOPS.map((s) => ({ ...s })))
   const [error, setError] = useState('')
   const [aiNote, setAiNote] = useState('')
   const [distError, setDistError] = useState('')
@@ -77,21 +84,36 @@ export default function Dispatch() {
         ...form,
         customer_id: match ? String(match.id) : form.customer_id,
         reference_number: f.reference_number ?? form.reference_number,
-        pickup_number: f.pickup_number ?? form.pickup_number,
-        delivery_number: f.delivery_number ?? form.delivery_number,
-        pickup_address: f.pickup_address ?? form.pickup_address,
-        pickup_time: f.pickup_time?.slice(0, 16) ?? form.pickup_time,
-        delivery_address: f.delivery_address ?? form.delivery_address,
-        delivery_time: f.delivery_time?.slice(0, 16) ?? form.delivery_time,
         rate: f.rate != null ? String(f.rate) : form.rate,
         special_terms: f.special_terms ?? form.special_terms,
       }
       setForm(merged)
+      // Build the itinerary — prefer the full stops list, fall back to the
+      // flat pickup/delivery fields.
+      const extractedStops: ExtractedStop[] = Array.isArray(f.stops) && f.stops.length > 0 ? f.stops : []
+      const toStop = (type: 'pickup' | 'delivery', addr?: string | null, time?: string | null, ref?: string | null): StopForm => ({
+        stop_type: type,
+        facility: '',
+        address: addr ?? '',
+        time: time?.slice(0, 16) ?? '',
+        reference: ref ?? '',
+      })
+      const nextStops: StopForm[] = extractedStops.length
+        ? extractedStops
+            .filter((s) => s.address || s.facility)
+            .map((s) => ({
+              stop_type: s.type === 'delivery' ? 'delivery' : 'pickup',
+              facility: s.facility ?? '',
+              address: s.address ?? '',
+              time: s.datetime?.slice(0, 16) ?? '',
+              reference: s.reference ?? '',
+            }))
+        : [toStop('pickup', f.pickup_address, f.pickup_time, f.pickup_number), toStop('delivery', f.delivery_address, f.delivery_time, f.delivery_number)]
+      if (nextStops.some((s) => s.address || s.facility)) setStops(nextStops)
       // Miles come from Google, not the paperwork — kick off the lookup as
-      // soon as both addresses are known.
-      if (merged.pickup_address && merged.delivery_address) {
-        distance.mutate({ origin: merged.pickup_address, destination: merged.delivery_address })
-      }
+      // soon as the route is known.
+      const route = routeOf(nextStops)
+      if (route.origin && route.destination) distance.mutate(route)
       setPendingCustomer(match || !name ? null : name)
       setAiNote(match || !name ? '✓ Fields extracted — review before saving' : '✓ Fields extracted — confirm the customer below')
     },
@@ -99,7 +121,8 @@ export default function Dispatch() {
   })
 
   const distance = useMutation({
-    mutationFn: (route: { origin: string; destination: string }) => calculateDistance(route.origin, route.destination),
+    mutationFn: (route: { origin: string; destination: string; waypoints?: string[] }) =>
+      calculateDistance(route.origin, route.destination, route.waypoints ?? []),
     onSuccess: (d) => {
       setDistError('')
       if (d.miles != null) setForm((prev) => ({ ...prev, miles: String(d.miles) }))
@@ -108,11 +131,10 @@ export default function Dispatch() {
     onError: (err) => setDistError(`Mileage lookup failed: ${errorMessage(err)} — enter miles manually.`),
   })
 
-  /** Auto-fill miles when both addresses are set and miles is still empty. */
+  /** Auto-fill miles when the route is known and miles is still empty. */
   function maybeAutoMiles() {
-    if (form.pickup_address && form.delivery_address && !form.miles && !distance.isPending) {
-      distance.mutate({ origin: form.pickup_address, destination: form.delivery_address })
-    }
+    const route = routeOf(stops)
+    if (route.origin && route.destination && !form.miles && !distance.isPending) distance.mutate(route)
   }
 
   const addCustomer = useMutation({
@@ -128,8 +150,24 @@ export default function Dispatch() {
 
   const create = useMutation({
     mutationFn: () => {
+      const realStops = stops.filter((s) => s.facility || s.address || s.time || s.reference)
+      const pickups = realStops.filter((s) => s.stop_type === 'pickup')
+      const dels = realStops.filter((s) => s.stop_type === 'delivery')
+      const firstPu = pickups[0]
+      const lastDel = dels.at(-1)
       const payload = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v === '' ? null : v]))
-      return createLoad(payload)
+      Object.assign(payload, {
+        pickup_address: firstPu ? stopLine(firstPu) : '',
+        pickup_time: firstPu?.time || null,
+        pickup_number: firstPu?.reference ?? '',
+        delivery_address: lastDel ? stopLine(lastDel) : '',
+        delivery_time: lastDel?.time || null,
+        delivery_number: lastDel?.reference ?? '',
+      })
+      return createLoad(
+        payload,
+        realStops.map((s) => ({ stop_type: s.stop_type, facility: s.facility, address: s.address, stop_time: s.time || null, reference: s.reference })),
+      )
     },
     onSuccess: (load) => navigate(`/loads/${load.id}`),
     onError: (err) => setError(errorMessage(err)),
@@ -237,47 +275,20 @@ export default function Dispatch() {
               </Field>
               {rpm && <div className="pb-3 text-sm font-semibold text-navy-700">${rpm}/mi</div>}
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Pickup #">
-                <Input value={form.pickup_number} onChange={(e) => setForm({ ...form, pickup_number: e.target.value })} />
-              </Field>
-              <Field label="Delivery #">
-                <Input value={form.delivery_number} onChange={(e) => setForm({ ...form, delivery_number: e.target.value })} />
-              </Field>
+            <div className="flex items-end gap-3 pb-1">
+              <Button
+                type="button"
+                variant="secondary"
+                className="!py-1.5 text-xs"
+                disabled={!routeOf(stops).origin || !routeOf(stops).destination || distance.isPending}
+                onClick={() => distance.mutate(routeOf(stops))}
+              >
+                {distance.isPending ? 'Calculating…' : '📍 Recalculate miles (all stops)'}
+              </Button>
+              {distError && <p className="pb-1 text-xs text-red-600">{distError}</p>}
             </div>
 
-            <Field label="Pickup Address">
-              <Textarea
-                value={form.pickup_address}
-                onChange={(e) => setForm({ ...form, pickup_address: e.target.value })}
-                onBlur={maybeAutoMiles}
-              />
-            </Field>
-            <Field label="Delivery Address">
-              <div className="space-y-2">
-                <Textarea
-                  value={form.delivery_address}
-                  onChange={(e) => setForm({ ...form, delivery_address: e.target.value })}
-                  onBlur={maybeAutoMiles}
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="!py-1.5 text-xs"
-                  disabled={!form.pickup_address || !form.delivery_address || distance.isPending}
-                  onClick={() => distance.mutate({ origin: form.pickup_address, destination: form.delivery_address })}
-                >
-                  {distance.isPending ? 'Calculating…' : '📍 Recalculate miles'}
-                </Button>
-                {distError && <p className="text-xs text-red-600">{distError}</p>}
-              </div>
-            </Field>
-            <Field label="Pickup Time">
-              <Input type="datetime-local" value={form.pickup_time} onChange={(e) => setForm({ ...form, pickup_time: e.target.value })} />
-            </Field>
-            <Field label="Delivery Time">
-              <Input type="datetime-local" value={form.delivery_time} onChange={(e) => setForm({ ...form, delivery_time: e.target.value })} />
-            </Field>
+            <StopsEditor stops={stops} onChange={setStops} onRouteBlur={maybeAutoMiles} />
 
             <Field label="Driver">
               <Select value={form.driver_id} onChange={(e) => setForm({ ...form, driver_id: e.target.value })}>
@@ -326,6 +337,7 @@ export default function Dispatch() {
               variant="secondary"
               onClick={() => {
                 setForm({ ...EMPTY_FORM })
+                setStops([emptyStop('pickup'), emptyStop('delivery')])
                 setPendingCustomer(null)
                 setDistError('')
                 setAiNote('')

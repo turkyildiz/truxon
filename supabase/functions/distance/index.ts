@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
     return json({ error: 'Not enough permissions' }, 403)
   }
 
-  const { origin, destination } = await req.json()
+  const { origin, destination, waypoints } = await req.json()
   const key = Deno.env.get('GOOGLE_MAPS_API_KEY')
   if (!key || !origin || !destination) return json({ miles: null, available: false })
 
@@ -21,6 +21,11 @@ Deno.serve(async (req) => {
     const url = new URL('https://maps.googleapis.com/maps/api/directions/json')
     url.searchParams.set('origin', origin)
     url.searchParams.set('destination', destination)
+    // Multi-stop loads: intermediate stops in route order, capped at
+    // Google's 25-waypoint limit.
+    if (Array.isArray(waypoints) && waypoints.length > 0) {
+      url.searchParams.set('waypoints', waypoints.filter((w: unknown) => typeof w === 'string' && w).slice(0, 25).join('|'))
+    }
     url.searchParams.set('key', key)
     const resp = await fetch(url)
     const data = await resp.json()

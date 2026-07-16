@@ -154,8 +154,42 @@ export async function getLoad(id: number | string): Promise<Load> {
   return mapLoad(unwrap(await supabase.from('loads').select(LOAD_SELECT).eq('id', id).single()))
 }
 
-export async function createLoad(payload: Row): Promise<Load> {
-  return mapLoad(unwrap(await supabase.from('loads').insert(payload).select(LOAD_SELECT).single()))
+// ---------- Load stops (multi-stop itinerary) ----------
+
+export interface LoadStop {
+  id?: number
+  load_id?: number
+  stop_type: 'pickup' | 'delivery'
+  seq: number
+  facility: string
+  address: string
+  stop_time: string | null
+  reference: string
+}
+
+export async function listStops(loadId: number | string): Promise<LoadStop[]> {
+  return unwrap(
+    await supabase.from('load_stops').select('*').eq('load_id', loadId).order('stop_type', { ascending: false }).order('seq'),
+  )
+}
+
+/** Replace a load's full itinerary (delete + insert, seq renumbered). */
+export async function replaceStops(loadId: number | string, stops: Omit<LoadStop, 'id' | 'load_id' | 'seq'>[]): Promise<void> {
+  unwrap(await supabase.from('load_stops').delete().eq('load_id', loadId))
+  if (stops.length === 0) return
+  let pu = 0
+  let del = 0
+  unwrap(
+    await supabase.from('load_stops').insert(
+      stops.map((s) => ({ ...s, load_id: Number(loadId), seq: s.stop_type === 'pickup' ? ++pu : ++del })),
+    ),
+  )
+}
+
+export async function createLoad(payload: Row, stops: Omit<LoadStop, 'id' | 'load_id' | 'seq'>[] = []): Promise<Load> {
+  const load = mapLoad(unwrap(await supabase.from('loads').insert(payload).select(LOAD_SELECT).single()))
+  if (stops.length > 0) await replaceStops(load.id, stops)
+  return load
 }
 
 export async function updateLoad(id: number | string, payload: Row): Promise<Load> {
@@ -366,6 +400,14 @@ export async function updateCompanySettings(payload: Partial<CompanySettings>): 
 
 // ---------- Dispatch helpers (edge functions) ----------
 
+export interface ExtractedStop {
+  type?: 'pickup' | 'delivery' | null
+  facility?: string | null
+  address?: string | null
+  datetime?: string | null
+  reference?: string | null
+}
+
 export interface ExtractResult {
   raw_text: string
   fields: {
@@ -379,6 +421,7 @@ export interface ExtractResult {
     delivery_time?: string | null
     rate?: number | null
     special_terms?: string | null
+    stops?: ExtractedStop[] | null
   } | null
   /** Set when the PDF has no text layer — retry with rendered page images. */
   needs_images?: boolean
@@ -418,6 +461,10 @@ export async function extractCustomerPdf(file: File, pageImages: Blob[] = []): P
   return invokeFunction<CustomerExtract>('extract-pdf', { body: form })
 }
 
-export async function calculateDistance(origin: string, destination: string): Promise<{ miles: number | null; available: boolean }> {
-  return invokeFunction<{ miles: number | null; available: boolean }>('distance', { body: { origin, destination } })
+export async function calculateDistance(
+  origin: string,
+  destination: string,
+  waypoints: string[] = [],
+): Promise<{ miles: number | null; available: boolean }> {
+  return invokeFunction<{ miles: number | null; available: boolean }>('distance', { body: { origin, destination, waypoints } })
 }

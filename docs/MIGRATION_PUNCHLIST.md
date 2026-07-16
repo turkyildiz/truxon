@@ -7,25 +7,30 @@ load documents** (rate cons, PODs, photos — see counts below).
 
 ## Needs a decision or fix — review together
 
-1. **Apply the pending schema migration** `20260716180001_migration_fields.sql`
-   (`supabase db push`) — adds driver phone/email/notes and truck/trailer
-   plate fields — then run `deploy/migration-its/backfill_extras.mjs` to fill
-   them from the ITS exports. Driver phones/emails/medical dates and
-   equipment plate numbers are NOT in Truxon until this runs.
+1. ~~Apply the pending schema migration~~ **DONE 2026-07-16 evening** —
+   migration applied and `backfill_extras.mjs` run: driver phones/emails/
+   medical notes and all truck/trailer plates are in.
 2. **Expose the new fields in the UI** (Drivers: phone/email/notes;
-   Trucks/Trailers: plate number + expiry) once the migration is applied.
-3. **Invoices were not recreated.** ITS invoice numbers and dates are kept on
-   each load's Notes (e.g. "ITS invoice #1035 (2026-07-16)"), and the loads
-   are `completed`, ready to re-bill from Truxon if desired. Recreating 971
-   historical invoices with their original numbers would need a schema
-   exception — decide: regenerate in Truxon (new numbers) vs. keep ITS as the
-   billing archive for pre-migration loads.
-4. **All 971 ITS invoices show UNPAID in ITS** ("Mark Paid" was never used),
-   so receivables/aging could not be migrated meaningfully. If you track
-   payments elsewhere (factoring statements?), we can backfill paid status.
-5. **Multi-stop loads (123 of 983):** Truxon models one pickup + one delivery;
-   intermediate stops were preserved in each load's Notes ("All stops: …").
-   Proper multi-stop support is a future feature decision.
+   Trucks/Trailers: plate number + expiry). Data is in the DB, forms don't
+   show it yet.
+3. **Invoicing → QuickBooks** (owner decision 2026-07-16): QuickBooks owns
+   accounting. The claude.ai QuickBooks connector is linked to the
+   "Aida Logistics LLC" QBO company and verified working. Plan:
+   - Near term: generate the invoice PDF in Truxon, book it in QBO (manual
+     or Claude-assisted via the connector).
+   - Product feature: a `quickbooks-sync` edge function using Intuit OAuth
+     (needs an Intuit developer app + client keys — owner action), a
+     "Connect QuickBooks" button in Settings, and auto-creating the QBO
+     invoice when a Truxon invoice is marked Sent. Design session tomorrow.
+   - Historical ITS invoices stay archived in ITS/QBO; each migrated load's
+     Notes carries its ITS invoice # and date.
+4. **All 971 ITS invoices show UNPAID in ITS** ("Mark Paid" was never used).
+   Real receivables live in QuickBooks — nothing to migrate here.
+5. ~~Multi-stop loads~~ **DONE 2026-07-16 evening** — `load_stops` table +
+   "+ Add pickup/delivery location" editor on Dispatch and the load screen;
+   full itineraries (2,115 stops incl. 51 multi-stop loads) backfilled from
+   ITS; AI extraction now returns every stop; mileage sums all legs via
+   Google waypoints.
 6. **Street addresses on migrated loads are "Facility name, City, ST"** — ITS
    stores the full street address in its Shipper/Consignee address books,
    which don't export cleanly. If needed, we can scrape the shipper/consignee
