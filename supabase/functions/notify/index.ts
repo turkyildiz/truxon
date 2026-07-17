@@ -5,8 +5,10 @@
 //   POST { action: "unregister", token }
 //
 // Service role / webhook secret:
-//   POST { action: "send", user_id, title, body, data? }
-//   POST { action: "notify_load", load_id, type: "paperwork"|"assignment", title?, body?, data? }
+//   POST { action: "send", user_id, title, body, data?, urgent? }
+//   POST { action: "notify_load", load_id, type: "paperwork"|"assignment", title?, body?, data?, urgent? }
+//     urgent=true rings through Do-Not-Disturb (alarm channel + full-screen).
+//     A new "assignment" defaults to urgent unless urgent:false is passed.
 //
 // Secrets (function only):
 //   FCM_SERVICE_ACCOUNT_JSON — Firebase service account JSON for HTTP v1
@@ -100,7 +102,35 @@ async function sendFcm(
   title: string,
   body: string,
   data?: Record<string, string>,
+  urgent = false,
 ): Promise<{ ok: boolean; invalid?: boolean; detail?: string }> {
+  // Urgent = ring through Do-Not-Disturb. On Android we target the app's
+  // pre-created `dispatch_alarm` channel (configured bypassDnd + full-screen
+  // intent client-side) and flag data.alarm so the FCM background handler can
+  // raise a full-screen alarm even when the app is killed. On iOS we send an
+  // interruption-level "time-sensitive"/critical push with the alarm sound.
+  const payload: Record<string, unknown> = {
+    token: deviceToken,
+    notification: { title, body },
+    data: { ...(data ?? {}), ...(urgent ? { alarm: '1', channel: 'dispatch_alarm' } : {}) },
+  }
+  if (urgent) {
+    payload.android = {
+      priority: 'high',
+      notification: {
+        channel_id: 'dispatch_alarm',
+        sound: 'default',
+        notification_priority: 'PRIORITY_MAX',
+        default_vibrate_timings: true,
+      },
+    }
+    payload.apns = {
+      headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
+      payload: { aps: { sound: 'default', 'interruption-level': 'time-sensitive' } },
+    }
+  } else {
+    payload.android = { priority: 'high' }
+  }
   const res = await fetch(
     `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
     {
@@ -109,13 +139,7 @@ async function sendFcm(
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        message: {
-          token: deviceToken,
-          notification: { title, body },
-          data: data ?? {},
-        },
-      }),
+      body: JSON.stringify({ message: payload }),
     },
   )
   if (res.ok) return { ok: true }
@@ -185,6 +209,7 @@ Deno.serve(async (req) => {
     let title = String(body.title ?? 'Truxon')
     let message = String(body.body ?? '')
     let data: Record<string, string> = {}
+    let urgent = body.urgent === true || body.urgent === 'true'
 
     if (body.data && typeof body.data === 'object') {
       for (const [k, v] of Object.entries(body.data as Record<string, unknown>)) {
@@ -209,6 +234,8 @@ Deno.serve(async (req) => {
       data = { type: nType, load_id: String(loadId), ...data }
       if (!body.title) title = nType === 'paperwork' ? 'New paperwork' : 'Load update'
       if (!body.body) message = `Load ${load.load_number}`
+      // A brand-new assignment should ring through DND so the driver sees it.
+      if (nType === 'assignment' && body.urgent === undefined) urgent = true
     }
 
     if (!userId) return json({ error: 'user_id required' }, 422)
@@ -226,6 +253,10 @@ Deno.serve(async (req) => {
       projectId = fcmRaw ? JSON.parse(fcmRaw).project_id : ''
     } catch { /* ignore */ }
     const accessToken = await getFcmAccessToken()
+    console.log('notify.send begin', JSON.stringify({
+      user_id: userId, devices: devices.length, urgent,
+      project_id: projectId, has_access_token: !!accessToken,
+    }))
 
     let sent = 0
     const errors: string[] = []
@@ -234,7 +265,8 @@ Deno.serve(async (req) => {
         errors.push('FCM not configured')
         break
       }
-      const result = await sendFcm(projectId, accessToken, dev.token, title, message, data)
+      const result = await sendFcm(projectId, accessToken, dev.token, title, message, data, urgent)
+      console.log('notify.fcm', JSON.stringify({ platform: dev.platform, ok: result.ok, invalid: result.invalid, detail: result.detail }))
       if (result.ok) {
         sent++
       } else {

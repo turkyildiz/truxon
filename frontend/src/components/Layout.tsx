@@ -66,6 +66,7 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
 
 const NAV_ITEMS: { key: string; to: string; label: string; icon: string }[] = [
   { key: 'dashboard', to: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { key: 'track', to: '/track', label: 'Track & Trace', icon: '📍' },
   { key: 'loads', to: '/loads', label: 'Loads', icon: '📦' },
   { key: 'dispatch', to: '/dispatch', label: 'Dispatch', icon: '🚚' },
   { key: 'customers', to: '/customers', label: 'Customers', icon: '🏢' },

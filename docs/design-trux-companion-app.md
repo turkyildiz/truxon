@@ -5,7 +5,7 @@
 | **Document title** | Trux Companion App Design (Voice AI, GPS, Mumble PTT) |
 | **Author** | _(design / systems architecture)_ |
 | **Date** | 2026-07-16 |
-| **Status** | Draft (Rev 5 — user decisions incorporated) |
+| **Status** | Rev 5 — Companion app BUILT 2026-07-17 (login, voice, POD photos, always-on GPS, Mumla PTT, DND alarms). See `mobile/README.md`. |
 | **Repo** | `/Users/ike/development/truxon` |
 | **Related** | MVP Requirements v1.0; Code Review Developer Handoff (2026-07-15) |
 

@@ -41,6 +41,35 @@ dependencies:
   flutter_secure_storage: ^10.3.1
   url_launcher: ^6.3.2
 
+  # Always-on background GPS: a foreground service that keeps the tracking
+  # isolate alive when backgrounded/screen-off and restarts after reboot.
+  flutter_foreground_task: ^8.17.0
+
+  # Feature 2 — Trux voice (British, Jarvis-style): on-device STT + TTS.
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.2.0
+
+  # Feature 3 — delivery-receipt photos.
+  image_picker: ^1.1.2
+
+  # Feature 6 — DND-bypass alarms + urgent dispatch pushes.
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.9.4
+  flutter_timezone: ^3.0.1
+  permission_handler: ^11.3.1
+  android_intent_plus: ^5.2.0
+
+  # Push receive (urgent dispatch alarms). Optional at runtime — the app boots
+  # without Firebase configured; wiring google-services.json activates it.
+  firebase_core: ^3.8.0
+  firebase_messaging: ^15.1.6
+
+  # Self-update (OTA): check a hosted latest.json on launch, download + install
+  # a newer APK. No app store, no USB.
+  package_info_plus: ^10.2.1
+  path_provider: ^2.1.5
+  open_filex: ^4.5.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

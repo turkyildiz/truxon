@@ -73,9 +73,23 @@
 	<string>Trux tracks the truck every 60 seconds while you are on duty or on an active load.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Trux tracks the truck every 60 seconds while you are on duty or on an active load.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Trux uses the microphone so you can talk to the Trux voice assistant.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Trux transcribes your speech so it can answer questions and update loads.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Trux uses the camera to photograph delivery receipts and paperwork.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Trux can attach a saved photo of a delivery receipt to a load.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>mumble</string>
 	</array>
 </dict>
 </plist>

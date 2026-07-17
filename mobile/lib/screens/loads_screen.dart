@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api.dart';
@@ -85,6 +86,66 @@ class _LoadsScreenState extends State<LoadsScreen> {
     if (status == 'assigned') return 'Start trip (In transit)';
     if (status == 'in_transit') return 'Mark delivered';
     return status;
+  }
+
+  final _picker = ImagePicker();
+  int? _uploadingFor;
+
+  /// Feature 3 — snap a delivery receipt / BOL / POD and attach it to the load.
+  Future<void> _capturePod(DriverLoad load) async {
+    final docType = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(title: Text('What are you photographing?')),
+            for (final t in const [
+              ['pod', 'Proof of delivery (POD)'],
+              ['bol', 'Bill of lading (BOL)'],
+              ['receipt', 'Receipt'],
+              ['lumper', 'Lumper receipt'],
+              ['scale', 'Scale ticket'],
+              ['photo', 'Other photo'],
+            ])
+              ListTile(
+                leading: const Icon(Icons.description_outlined),
+                title: Text(t[1]),
+                onTap: () => Navigator.pop(ctx, t[0]),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (docType == null) return;
+    try {
+      final shot = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 70,
+        maxWidth: 2200,
+      );
+      if (shot == null) return;
+      setState(() => _uploadingFor = load.id);
+      final bytes = await shot.readAsBytes();
+      await widget.api.uploadReceipt(
+        load.id,
+        bytes,
+        docType: docType,
+        filename: shot.name,
+        contentType: shot.mimeType ?? 'image/jpeg',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${docType.toUpperCase()} sent to dispatch')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingFor = null);
+    }
   }
 
   Future<void> _openDocs(DriverLoad load) async {
@@ -186,6 +247,14 @@ class _LoadsScreenState extends State<LoadsScreen> {
                       OutlinedButton(
                         onPressed: () => _openDocs(load),
                         child: const Text('Paperwork'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _uploadingFor == load.id ? null : () => _capturePod(load),
+                        icon: _uploadingFor == load.id
+                            ? const SizedBox(
+                                width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.photo_camera, size: 18),
+                        label: Text(_uploadingFor == load.id ? 'Sending…' : 'Photo POD'),
                       ),
                     ],
                   ),

@@ -5,3 +5,6 @@ dist/
 .DS_Store
 .claude/
 node_modules
+
+# Firebase config (per build machine; not committed)
+mobile/android/app/google-services.json

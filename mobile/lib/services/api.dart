@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final _sb = Supabase.instance.client;
@@ -57,6 +58,57 @@ class CompanionApi {
 
   Future<String?> signedDocUrl(String storagePath) async {
     return await _sb.storage.from('documents').createSignedUrl(storagePath, 180);
+  }
+
+  /// Feature 3 — upload a delivery-receipt / POD photo for one of the driver's
+  /// own loads. Uploads to the `documents` bucket under `load/<id>/…` (the path
+  /// the driver storage policy + driver_add_document RPC both require), then
+  /// registers the metadata row so it shows up on the web load and pings
+  /// dispatch via the activity log.
+  Future<Map<String, dynamic>> uploadReceipt(
+    int loadId,
+    Uint8List bytes, {
+    String docType = 'pod',
+    String? filename,
+    String contentType = 'image/jpeg',
+  }) async {
+    final safeName = (filename == null || filename.isEmpty) ? 'photo.jpg' : filename;
+    final unique = DateTime.now().microsecondsSinceEpoch;
+    final path = 'load/$loadId/${unique}_$safeName';
+    await _sb.storage.from('documents').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: false),
+        );
+    final data = await _sb.rpc('driver_add_document', params: {
+      'p_load_id': loadId,
+      'p_storage_path': path,
+      'p_filename': safeName,
+      'p_content_type': contentType,
+      'p_size_bytes': bytes.length,
+      'p_doc_type': docType,
+    });
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  /// Feature 2 — send a message to the Trux agent (edge fn `trux-agent`,
+  /// propose mode). Returns the raw response (reply text + optional confirm
+  /// card). Pass [sessionId] to keep a conversation, or a confirm/reject token.
+  Future<Map<String, dynamic>> truxSend({
+    String? sessionId,
+    String? message,
+    String? confirmToken,
+    String? rejectToken,
+  }) async {
+    final res = await _sb.functions.invoke('trux-agent', body: {
+      if (sessionId != null) 'session_id': sessionId,
+      if (message != null) 'message': message,
+      if (confirmToken != null) 'confirm_token': confirmToken,
+      if (rejectToken != null) 'reject_token': rejectToken,
+    });
+    final data = res.data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return {'reply': data?.toString() ?? ''};
   }
 
   /// Register FCM/APNs token with notify edge function.

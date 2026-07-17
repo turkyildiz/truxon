@@ -9,6 +9,7 @@ import Layout from './components/Layout'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import FleetMap from './pages/FleetMap'
 import Loads from './pages/Loads'
 import LoadDetail from './pages/LoadDetail'
 import Dispatch from './pages/Dispatch'
@@ -64,6 +65,7 @@ createRoot(document.getElementById('root')!).render(
               }
             >
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/track" element={<FleetMap />} />
               <Route path="/loads" element={<Loads />} />
               <Route path="/loads/:id" element={<LoadDetail />} />
               <Route path="/dispatch" element={<Dispatch />} />

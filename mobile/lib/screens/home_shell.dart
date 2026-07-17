@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import '../services/alarms.dart';
 import '../services/api.dart';
-import '../services/gps_tracker.dart';
+import '../services/push.dart';
+import '../services/tracking_service.dart';
+import '../services/update_service.dart';
 import 'loads_screen.dart';
+import 'voice_screen.dart';
+import 'radio_screen.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -12,9 +18,10 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   final _api = CompanionApi();
-  late final GpsTracker _gps = GpsTracker(_api);
+  final _tracking = TruxTrackingService.instance;
   Map<String, dynamic>? _profile;
-  bool _onDuty = false;
+  bool _trackingOn = false;
+  bool _locationDenied = false;
   String? _error;
   int _tab = 0;
 
@@ -26,105 +33,146 @@ class _HomeShellState extends State<HomeShell> {
 
   Future<void> _bootstrap() async {
     try {
+      _tracking.init();
+      // Alarm + urgent-push plumbing (best-effort; app works without them).
+      await Alarms.requestPermissions();
+      await PushService.init(_api);
       final p = await _api.profile();
-      await _gps.loadPersisted();
-      await _gps.start();
       setState(() => _profile = p);
+      // Drivers share location continuously — always on, no toggle.
+      if ((p?['role'] as String?) == 'driver') {
+        await _startTracking();
+      }
+      // Self-update check (best-effort; prompts only if a newer APK is hosted).
+      if (mounted) UpdateService.checkAndPrompt(context);
     } catch (e) {
       setState(() => _error = e.toString());
     }
   }
 
-  Future<void> _toggleDuty(bool v) async {
+  /// Start (and keep) always-on background location for a driver. Retries the
+  /// permission prompt if it isn't granted yet; the driver has no way to turn
+  /// this off inside the app.
+  Future<void> _startTracking() async {
+    final ok = await _tracking.setTracking(true);
     try {
-      await _api.setDuty(v);
+      await _api.setDuty(true);
+    } catch (_) {/* duty flag is best-effort */}
+    if (mounted) {
       setState(() {
-        _onDuty = v;
-        _gps.trackingAllowed = v;
+        _trackingOn = ok;
+        _locationDenied = !ok;
       });
-      if (v) await _gps.flush();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-      }
     }
   }
 
-  @override
-  void dispose() {
-    _gps.stop();
-    super.dispose();
+  Future<void> _onTrackingHint(bool active) async {
+    // Tracking is always on for drivers; ensure the service is running.
+    if (!_trackingOn) await _startTracking();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) return Scaffold(body: Center(child: Text(_error!)));
+    if (_profile == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     final role = _profile?['role'] as String? ?? '';
     final name = (_profile?['full_name'] as String?)?.isNotEmpty == true
         ? _profile!['full_name'] as String
         : (_profile?['username'] as String? ?? 'User');
+    final isDriver = role == 'driver';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(role == 'driver' ? 'My loads' : 'Trux Companion'),
-        actions: [
-          IconButton(
-            tooltip: 'Sign out',
-            onPressed: () => _api.signOut(),
-            icon: const Icon(Icons.logout),
+    final tabs = isDriver
+        ? <Widget>[_loadsTab(), VoiceScreen(api: _api), RadioScreen(username: name), _aboutTab(role, name)]
+        : <Widget>[VoiceScreen(api: _api), RadioScreen(username: name), _aboutTab(role, name)];
+
+    final dests = isDriver
+        ? const [
+            NavigationDestination(icon: Icon(Icons.local_shipping), label: 'Loads'),
+            NavigationDestination(icon: Icon(Icons.mic_none), label: 'Trux'),
+            NavigationDestination(icon: Icon(Icons.record_voice_over), label: 'Radio'),
+            NavigationDestination(icon: Icon(Icons.info_outline), label: 'About'),
+          ]
+        : const [
+            NavigationDestination(icon: Icon(Icons.mic_none), label: 'Trux'),
+            NavigationDestination(icon: Icon(Icons.record_voice_over), label: 'Radio'),
+            NavigationDestination(icon: Icon(Icons.info_outline), label: 'About'),
+          ];
+
+    final safeTab = _tab.clamp(0, tabs.length - 1);
+
+    return WithForegroundTask(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(isDriver ? 'Trux Companion' : 'Trux'),
+          actions: [
+            IconButton(
+              tooltip: 'Sign out',
+              onPressed: () => _api.signOut(),
+              icon: const Icon(Icons.logout),
+            ),
+          ],
+        ),
+        body: IndexedStack(index: safeTab, children: tabs),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: safeTab,
+          onDestinationSelected: (i) => setState(() => _tab = i),
+          destinations: dests,
+        ),
+      ),
+    );
+  }
+
+  Widget _loadsTab() {
+    return Column(
+      children: [
+        if (_locationDenied)
+          Material(
+            color: Colors.red.withValues(alpha: 0.12),
+            child: ListTile(
+              leading: const Icon(Icons.location_off, color: Colors.red),
+              title: const Text('Location is required'),
+              subtitle: const Text(
+                'Enable "Allow all the time" so dispatch can see the truck.'),
+              trailing: FilledButton(
+                onPressed: _startTracking,
+                child: const Text('Enable'),
+              ),
+            ),
+          )
+        else
+          ListTile(
+            leading: const Icon(Icons.gps_fixed, color: Colors.green),
+            title: const Text('Sharing location'),
+            subtitle: const Text('Always on — dispatch can see the truck 24/7'),
           ),
+        const Divider(height: 1),
+        Expanded(child: LoadsScreen(api: _api, onTrackingHint: _onTrackingHint)),
+      ],
+    );
+  }
+
+  Widget _aboutTab(String role, String name) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Hello, $name', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 8),
+          Text('Role: $role'),
+          const SizedBox(height: 16),
+          const Text('Trux Companion'),
+          const Text('• Trux voice assistant (Trux tab)'),
+          const Text('• Dispatch radio / push-to-talk (Radio tab)'),
+          if (role == 'driver') ...[
+            const Text('• Your loads, status, paperwork & photo POD (Loads tab)'),
+            const Text('• Continuous background location (always on)'),
+          ],
         ],
       ),
-      body: _error != null
-          ? Center(child: Text(_error!))
-          : _profile == null
-              ? const Center(child: CircularProgressIndicator())
-              : role == 'driver'
-                  ? Column(
-                      children: [
-                        SwitchListTile(
-                          title: const Text('On duty'),
-                          subtitle: Text(_onDuty ? 'GPS tracking every 60s' : 'Enable to share location when idle'),
-                          value: _onDuty,
-                          onChanged: _toggleDuty,
-                        ),
-                        const Divider(height: 1),
-                        Expanded(
-                          child: LoadsScreen(
-                            api: _api,
-                            onTrackingHint: (activeLoad) {
-                              // Track when on duty OR has active load
-                              _gps.trackingAllowed = _onDuty || activeLoad;
-                            },
-                          ),
-                        ),
-                      ],
-                    )
-                  : Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Hello, $name', style: Theme.of(context).textTheme.headlineSmall),
-                          const SizedBox(height: 8),
-                          Text('Role: $role'),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Dispatcher / office tools (Trux voice agent) arrive in Phase 2. '
-                            'Use the web TMS for dispatch today. Drivers should use a linked driver login.',
-                          ),
-                        ],
-                      ),
-                    ),
-      bottomNavigationBar: role == 'driver'
-          ? NavigationBar(
-              selectedIndex: _tab,
-              onDestinationSelected: (i) => setState(() => _tab = i),
-              destinations: const [
-                NavigationDestination(icon: Icon(Icons.local_shipping), label: 'Loads'),
-                NavigationDestination(icon: Icon(Icons.info_outline), label: 'About'),
-              ],
-            )
-          : null,
     );
   }
 }
