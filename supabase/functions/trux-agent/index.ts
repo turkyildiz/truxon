@@ -263,15 +263,11 @@ Deno.serve(async (req) => {
     content: message,
   })
 
-  // Budget check (~2¢ reserve)
-  const { data: okBudget } = await svc.rpc('llm_reserve_spend', { p_provider: 'pending', p_cents: 2 }).maybeSingle?.() ?? { data: null }
-  // rpc may not be granted — call via SQL workaround with service role ignore if missing
   try {
     await svc.rpc('llm_reserve_spend', { p_provider: 'agent', p_cents: 2 })
   } catch {
-    // if function not executable, continue (table may still work via direct insert in future)
+    /* budget optional if RPC missing */
   }
-  void okBudget
 
   const { data: history } = await svc
     .from('trux_messages')
@@ -284,92 +280,131 @@ Deno.serve(async (req) => {
 You help create loads from rate sheets, assign truck numbers and drivers, and advance load status.
 Today is ${new Date().toISOString().slice(0, 10)}.
 Rules:
-- Use tools for data; never invent customer_id / driver_id / truck_id.
-- Write operations will be proposed to the user for confirmation — describe them clearly.
+- ALWAYS call search_customers / list_available_equipment before inventing IDs.
+- Never invent customer_id / driver_id / truck_id — use tool results only.
+- Write tools (create_load, assign_resources, change_load_status) are proposed for user confirmation.
 - Prefer available trucks and active drivers.
 - Be concise and operational.`
 
-  let completion
+  type Msg = { role: 'system' | 'user' | 'assistant' | 'tool'; content: string }
+  const messages: Msg[] = [
+    { role: 'system', content: system },
+    ...(history ?? []).map((h) => ({
+      role: (h.role === 'tool' ? 'assistant' : h.role) as Msg['role'],
+      content: h.content as string,
+    })),
+  ]
+
+  const proposals: { token: string; tool: string; args: unknown; summary: string }[] = []
+  let assistantText = ''
+  let lastProvider = ''
+  let lastModel = ''
+  const deadline = Date.now() + 22_000
+  const maxRounds = 3
+
   try {
-    completion = await completeChat({
-      messages: [
-        { role: 'system', content: system },
-        ...(history ?? []).map((h) => ({
-          role: (h.role === 'tool' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
-          content: h.content,
-        })),
-      ],
-      tools: TOOLS,
-    })
+    for (let round = 0; round < maxRounds && Date.now() < deadline; round++) {
+      const completion = await completeChat({ messages, tools: TOOLS })
+      lastProvider = completion.provider
+      lastModel = completion.model
+      try {
+        await svc.rpc('llm_reserve_spend', { p_provider: completion.provider, p_cents: completion.est_cents })
+      } catch { /* ignore */ }
+
+      if (!completion.tool_calls.length) {
+        assistantText = completion.content || assistantText
+        break
+      }
+
+      const toolNotes: string[] = []
+      let hadRead = false
+
+      for (const tc of completion.tool_calls.slice(0, 6)) {
+        let args: Record<string, unknown> = {}
+        try {
+          args = JSON.parse(tc.arguments || '{}')
+        } catch {
+          args = {}
+        }
+
+        if (!WRITE_TOOLS.has(tc.name)) {
+          hadRead = true
+          try {
+            const result = await readTool(svc, tc.name, args)
+            const snippet = JSON.stringify(result).slice(0, 1200)
+            toolNotes.push(`${tc.name}: ${snippet}`)
+            messages.push({ role: 'assistant', content: `Tool ${tc.name} args=${JSON.stringify(args)}` })
+            messages.push({ role: 'user', content: `Tool result for ${tc.name}: ${snippet}` })
+          } catch (e) {
+            toolNotes.push(`${tc.name} failed: ${e instanceof Error ? e.message : e}`)
+            messages.push({ role: 'user', content: `Tool ${tc.name} failed: ${e instanceof Error ? e.message : e}` })
+          }
+          continue
+        }
+
+        const tok = token()
+        await svc.from('trux_actions').insert({
+          session_id: sessionId,
+          user_id: caller.userId,
+          tool_name: tc.name,
+          args,
+          status: 'proposed',
+          confirmation_token: tok,
+          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+        })
+        proposals.push({
+          token: tok,
+          tool: tc.name,
+          args,
+          summary: `${tc.name}(${JSON.stringify(args).slice(0, 200)})`,
+        })
+      }
+
+      if (proposals.length) {
+        assistantText = completion.content || 'I prepared actions for your confirmation:'
+        break
+      }
+
+      // Only reads — loop once more so the model can propose writes with real IDs
+      if (hadRead) {
+        messages.push({
+          role: 'user',
+          content: 'Using the tool results above, propose the next write actions if needed, or answer the user.',
+        })
+        if (toolNotes.length) {
+          assistantText = (completion.content || '') + '\n' + toolNotes.map((n) => `(${n.slice(0, 400)})`).join('\n')
+        }
+        continue
+      }
+
+      assistantText = completion.content || assistantText
+      break
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return json({ error: msg }, 502)
   }
 
-  // Record spend better if we have provider
-  try {
-    await svc.rpc('llm_reserve_spend', { p_provider: completion.provider, p_cents: completion.est_cents })
-  } catch { /* ignore */ }
-
-  const proposals: { token: string; tool: string; args: unknown; summary: string }[] = []
-  let assistantText = completion.content || ''
-
-  for (const tc of completion.tool_calls.slice(0, 6)) {
-    let args: Record<string, unknown> = {}
-    try {
-      args = JSON.parse(tc.arguments || '{}')
-    } catch {
-      args = {}
-    }
-
-    if (!WRITE_TOOLS.has(tc.name)) {
-      try {
-        const result = await readTool(svc, tc.name, args)
-        assistantText += `\n\n(${tc.name} → ${JSON.stringify(result).slice(0, 800)})`
-      } catch (e) {
-        assistantText += `\n\n(${tc.name} failed: ${e instanceof Error ? e.message : e})`
-      }
-      continue
-    }
-
-    const tok = token()
-    await svc.from('trux_actions').insert({
-      session_id: sessionId,
-      user_id: caller.userId,
-      tool_name: tc.name,
-      args,
-      status: 'proposed',
-      confirmation_token: tok,
-      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-    })
-    proposals.push({
-      token: tok,
-      tool: tc.name,
-      args,
-      summary: `${tc.name}(${JSON.stringify(args).slice(0, 200)})`,
-    })
-  }
-
-  if (proposals.length && !assistantText.trim()) {
-    assistantText = 'I prepared actions for your confirmation:'
-  }
   if (proposals.length) {
     assistantText += '\n\n' + proposals.map((p, i) => `${i + 1}. ${p.summary}`).join('\n')
     assistantText += '\n\nConfirm each card to apply, or reject to cancel.'
+  }
+  if (!assistantText.trim()) {
+    assistantText = 'I could not complete that request. Try rephrasing or check LLM API keys.'
   }
 
   await svc.from('trux_messages').insert({
     session_id: sessionId,
     role: 'assistant',
     content: assistantText,
-    meta: { proposals, provider: completion.provider, model: completion.model },
+    meta: { proposals, provider: lastProvider, model: lastModel },
   })
 
   return json({
     session_id: sessionId,
     reply: assistantText,
     proposals,
-    provider: completion.provider,
-    model: completion.model,
+    provider: lastProvider,
+    model: lastModel,
   })
 })
