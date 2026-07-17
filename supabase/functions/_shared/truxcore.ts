@@ -51,6 +51,19 @@ const ALL_TOOLS: Record<string, ToolDef> = {
     description: 'List the most recent maintenance records',
     parameters: { type: 'object', properties: {} },
   },
+  query_data: {
+    name: 'query_data',
+    description: `Answer ANY analytical question by writing one read-only SQL SELECT (Postgres). It runs AS the signed-in user — row-level security decides what they can see. Max 200 rows; keep it to one statement, no semicolons.
+Schema: loads(id, load_number, reference_number, customer_id, driver_id, truck_id, trailer_id, status[pending|assigned|in_transit|delivered|completed|billed], pickup_address, pickup_time, delivery_address, delivery_time, rate, miles, empty_miles, equipment_type, invoice_id, created_at) · customers(id, company_name, phone, email, billing_address, payment_terms, is_active) · drivers(id, full_name, status, pay_per_mile, empty_miles_paid, pay_per_empty_mile, license_expiration, hire_date) · trucks/trailers(id, unit_number, status, plate_number, monthly_cost) · invoices(id, invoice_number, customer_id, invoice_date, total, status) · maintenance_records(id, equipment_type, truck_id, trailer_id, date_completed, description, cost) · load_stops(load_id, stop_type, seq, facility, address, stop_time).
+Revenue convention: completed/billed loads, delivery_time as the date. Example: monthly revenue = select to_char(date_trunc('month', delivery_time),'YYYY-MM') m, sum(rate) rev, sum(miles) mi, count(*) loads from loads where status in ('completed','billed') group by 1 order by 1.
+RULES: rate-per-mile and similar averages must be WEIGHTED — sum(rate)/nullif(sum(miles),0) — never avg(rate/miles). Always select the supporting figures (counts, sums) alongside any ratio and show them in your answer so the user can verify. If a result looks implausible (e.g. rate/mile far outside $1.50-$6 for linehaul), double-check with a second query before answering.`,
+    parameters: { type: 'object', properties: { sql: { type: 'string' } }, required: ['sql'] },
+  },
+  system_status: {
+    name: 'system_status',
+    description: 'Current Truxon system health: watchdog check states (email pipeline, edge functions, AI provider, Microsoft Graph auth)',
+    parameters: { type: 'object', properties: {} },
+  },
   my_loads: {
     name: 'my_loads',
     description: 'List the loads assigned to me (the calling driver)',
@@ -127,8 +140,9 @@ export const WRITE_TOOLS = new Set(['create_load', 'assign_resources', 'change_l
 
 /** Tool result JSON is clipped before going back to the model; report tools need more room. */
 const SNIPPET_LIMITS: Record<string, number> = {
-  dashboard_recap: 4000,
+  dashboard_recap: 6000,
   weekly_report: 4000,
+  query_data: 5000,
   my_loads: 2500,
   my_load_detail: 2500,
 }
@@ -137,17 +151,23 @@ export function toolsForRole(role: string): ToolDef[] {
   const names: string[] = (() => {
     switch (role) {
       case 'admin':
+        return [
+          'search_customers', 'search_loads', 'list_available_equipment', 'dashboard_recap', 'weekly_report',
+          'list_equipment', 'recent_maintenance', 'create_load', 'assign_resources', 'change_load_status',
+          'system_status', 'query_data',
+        ]
       case 'dispatcher':
         return [
           'search_customers', 'search_loads', 'list_available_equipment', 'dashboard_recap', 'weekly_report',
           'list_equipment', 'recent_maintenance', 'create_load', 'assign_resources', 'change_load_status',
+          'query_data',
         ]
       case 'accountant':
-        return ['search_customers', 'search_loads', 'dashboard_recap', 'weekly_report']
+        return ['search_customers', 'search_loads', 'dashboard_recap', 'weekly_report', 'query_data']
       case 'driver':
-        return ['my_loads', 'my_load_detail', 'update_my_load_status']
+        return ['my_loads', 'my_load_detail', 'update_my_load_status', 'query_data']
       case 'maintenance':
-        return ['list_equipment', 'recent_maintenance']
+        return ['list_equipment', 'recent_maintenance', 'query_data']
       default:
         return []
     }
@@ -217,6 +237,8 @@ export async function readTool(user: Sb, name: string, args: Record<string, unkn
       active_drivers: d.active_drivers,
       top_customers_90d: d.top_customers,
       driver_performance_30d: d.driver_perf,
+      trend_last_12_weeks: d.trend_weekly,
+      trend_last_12_months: d.trend_monthly,
       licenses_expiring_30d: (d.expiring_licenses as unknown[])?.length ?? 0,
     }
   }
@@ -247,6 +269,19 @@ export async function readTool(user: Sb, name: string, args: Record<string, unkn
       .select('id, equipment_type, date_completed, description, cost, technician_shop')
       .order('date_completed', { ascending: false, nullsFirst: false })
       .limit(10)
+    if (error) throw new Error(error.message)
+    return data
+  }
+  if (name === 'query_data') {
+    const { data, error } = await user.rpc('trux_query', { p_sql: String(args.sql ?? '') })
+    if (error) throw new Error(error.message)
+    return data
+  }
+  if (name === 'system_status') {
+    // RLS limits this table to admins; the tool is only offered to admins.
+    const { data, error } = await user.from('watchdog_state')
+      .select('check_name, status, detail, last_change, updated_at')
+      .order('check_name')
     if (error) throw new Error(error.message)
     return data
   }
@@ -404,14 +439,19 @@ ${mode === 'propose'
   const maxRounds = mode === 'auto' ? 5 : 3
 
   for (let round = 0; round < maxRounds && Date.now() < deadline; round++) {
-    // Retry once: malformed tool calls (400) recover after a beat; 429s need
-    // to wait out the provider's per-minute token window.
+    // Retry once: malformed tool calls (400) recover after a beat; 429s wait
+    // exactly as long as the provider asks ("try again in 420ms" / "8.7s").
     let completion
     try {
       completion = await completeChat({ messages, tools })
     } catch (e) {
-      const wait = String(e).includes('429') ? 25_000 : 1_200
-      if (Date.now() + wait + 5_000 > deadline) throw e
+      const msg = String(e)
+      let wait = 1_200
+      if (msg.includes('429')) {
+        const m = msg.match(/try again in ([\d.]+)\s*(ms|s)/i)
+        wait = m ? Math.ceil(parseFloat(m[1]) * (m[2].toLowerCase() === 'ms' ? 1 : 1000)) + 800 : 20_000
+      }
+      if (Date.now() + wait + 3_000 > deadline) throw e
       await new Promise((r) => setTimeout(r, wait))
       completion = await completeChat({ messages, tools })
     }
@@ -422,6 +462,11 @@ ${mode === 'propose'
     } catch { /* ignore */ }
 
     if (!completion.tool_calls.length) {
+      if (!completion.content && !assistantText && round < maxRounds - 1) {
+        // Model returned nothing at all — nudge once instead of giving up.
+        messages.push({ role: 'user', content: 'Your last response was empty. Answer the user now, or call the appropriate tool.' })
+        continue
+      }
       assistantText = completion.content || assistantText
       break
     }

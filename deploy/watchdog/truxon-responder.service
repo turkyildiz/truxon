@@ -1,0 +1,7 @@
+[Unit]
+Description=Truxon incident responder (summons Claude when watchdog checks stay red)
+
+[Service]
+Type=oneshot
+ExecStart=/home/turkyildiz/.local/node/bin/node /home/turkyildiz/TRUXON/deploy/watchdog/responder.mjs
+Environment=PATH=/home/turkyildiz/.local/node/bin:/home/turkyildiz/.local/bin:/usr/local/bin:/usr/bin:/bin

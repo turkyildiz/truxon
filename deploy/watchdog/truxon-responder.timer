@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Truxon incident responder every 10 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=10min
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

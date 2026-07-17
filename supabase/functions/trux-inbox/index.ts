@@ -146,7 +146,15 @@ Deno.serve(async (req) => {
       subject: m.subject ?? '',
       status: 'processing',
     })
-    if (claimErr) continue // already claimed by an earlier/parallel poll
+    if (claimErr) {
+      // Already claimed — unless the watchdog scheduled a retry.
+      const { data: reclaimed } = await svc.from('trux_inbox_log')
+        .update({ status: 'processing' })
+        .eq('graph_message_id', m.id)
+        .eq('status', 'retry_pending')
+        .select()
+      if (!reclaimed?.length) continue
+    }
     const finish = (status: string, detail: string, sessionId?: string) =>
       svc.from('trux_inbox_log').update({ status, detail: detail.slice(0, 2000), session_id: sessionId ?? null }).eq('graph_message_id', m.id)
 

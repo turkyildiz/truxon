@@ -26,6 +26,40 @@ function svcClient() {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 }
 
+/** Signatures of failures that clear themselves given another attempt. */
+const TRANSIENT = /429|tool_use_failed|timed? ?out|ECONN|fetch failed|network|50[0-9]:/i
+
+/** Playbook: schedule automatic retry of transient inbox failures — mark the
+ * Graph message unread and flip the log row to retry_pending; the poller
+ * reclaims it on its next sweep. Max 2 retries per message, and only after
+ * the rate-limit window has had time to clear. */
+async function runPlaybooks(svc: ReturnType<typeof svcClient>, tok: string): Promise<string[]> {
+  const actions: string[] = []
+  const cutoff = new Date(Date.now() - 8 * 60000).toISOString()
+  const { data: failed } = await svc.from('trux_inbox_log')
+    .select('graph_message_id, detail, retries')
+    .eq('status', 'failed')
+    .lt('created_at', cutoff)
+    .lt('retries', 2)
+    .limit(5)
+  for (const f of failed ?? []) {
+    if (!TRANSIENT.test(f.detail ?? '')) continue
+    const r = await graph(tok, `/users/${encodeURIComponent(TRUX_MAILBOX)}/messages/${f.graph_message_id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isRead: false }),
+    })
+    if (r.ok) {
+      await svc.from('trux_inbox_log')
+        .update({ status: 'retry_pending', retries: (f.retries ?? 0) + 1 })
+        .eq('graph_message_id', f.graph_message_id)
+      actions.push(`retry scheduled for message ${f.graph_message_id.slice(-12)} (attempt ${(f.retries ?? 0) + 1})`)
+    } else {
+      actions.push(`retry mark-unread failed (${r.status}) for ${f.graph_message_id.slice(-12)}`)
+    }
+  }
+  return actions
+}
+
 async function runChecks(svc: ReturnType<typeof svcClient>): Promise<CheckResult[]> {
   const results: CheckResult[] = []
 
@@ -110,12 +144,43 @@ async function runChecks(svc: ReturnType<typeof svcClient>): Promise<CheckResult
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST' && req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
+  const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {}
+
+  // Report mode: the workstation responder emails its resolution through us.
+  // Fixed recipients only; gated by a shared key.
+  if (body.report) {
+    const expected = Deno.env.get('WATCHDOG_REPORT_KEY')
+    if (!expected || body.key !== expected) return json({ error: 'Forbidden' }, 403)
+    try {
+      const tok = await graphToken()
+      const sent = await sendMailAsTrux(
+        tok,
+        ALERT_TO,
+        `[Trux responder] ${String(body.report.subject ?? 'report')}`.slice(0, 150),
+        String(body.report.body ?? '').slice(0, 8000),
+      )
+      return json({ sent })
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : String(e) }, 502)
+    }
+  }
+
   const svc = svcClient()
+
+  // Playbooks first — they may clear failures before we alert on them.
+  let playbook: string[] = []
+  if (graphConfigured()) {
+    try {
+      playbook = await runPlaybooks(svc, await graphToken())
+    } catch { /* playbooks must never break the checks */ }
+  }
+
   const results = await runChecks(svc)
   const now = new Date().toISOString()
 
   const transitions: { name: string; from: string; to: string; detail: string }[] = []
   const needAlert: CheckResult[] = []
+  const stateful: (CheckResult & { last_change: string })[] = []
 
   for (const r of results) {
     const { data: prev } = await svc.from('watchdog_state').select('*').eq('check_name', r.name).maybeSingle()
@@ -127,14 +192,29 @@ Deno.serve(async (req) => {
     const alertNow = !r.ok && (changed || cooldownOver)
     if (alertNow) needAlert.push(r)
 
+    const lastChange = changed ? now : prev?.last_change ?? now
+    stateful.push({ ...r, last_change: lastChange })
+
     await svc.from('watchdog_state').upsert({
       check_name: r.name,
       status: newStatus,
       detail: r.detail,
-      last_change: changed ? now : prev?.last_change ?? now,
+      last_change: lastChange,
       last_alert: alertNow ? now : prev?.last_alert ?? null,
       updated_at: now,
     })
+  }
+
+  // Context for the workstation responder: recent failure detail without
+  // needing any privileged credentials on its side.
+  let recentFailures: unknown[] = []
+  if (results.some((r) => !r.ok)) {
+    const { data } = await svc.from('trux_inbox_log')
+      .select('created_at, subject, status, detail, retries')
+      .in('status', ['failed', 'retry_pending'])
+      .order('id', { ascending: false })
+      .limit(5)
+    recentFailures = data ?? []
   }
 
   const recoveries = transitions.filter((t) => t.to === 'ok')
@@ -151,6 +231,10 @@ Deno.serve(async (req) => {
         lines.push('', 'RECOVERED:')
         for (const t of recoveries) lines.push(`  ✓ ${t.name} — ${t.detail}`)
       }
+      if (playbook.length) {
+        lines.push('', 'AUTO-REMEDIATION:')
+        for (const p of playbook) lines.push(`  ⟳ ${p}`)
+      }
       lines.push('', `All checks: ${results.filter((r) => r.ok).length}/${results.length} ok`, `Time: ${now}`, '', '— Trux watchdog')
       const subject = needAlert.length
         ? `⚠ Truxon watchdog: ${needAlert.length} check${needAlert.length > 1 ? 's' : ''} failing`
@@ -161,8 +245,10 @@ Deno.serve(async (req) => {
 
   return json({
     ok: results.every((r) => r.ok),
-    checks: results,
+    checks: stateful,
     transitions,
+    playbook,
+    recent_failures: recentFailures,
     alerted,
   })
 })

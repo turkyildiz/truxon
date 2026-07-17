@@ -77,7 +77,11 @@ async function completeOpenAICompat(
   const body: Record<string, unknown> = {
     model,
     messages: messages.map((m) => ({ role: m.role === 'tool' ? 'assistant' : m.role, content: m.content })),
+    max_tokens: 4096,
   }
+  // gpt-oss burns completion tokens on hidden reasoning; low effort leaves
+  // room for the actual answer/tool call and is plenty for dispatch work.
+  if (/gpt-oss/i.test(model)) body.reasoning_effort = 'low'
   if (tools?.length) {
     body.tools = tools.map((t) => ({
       type: 'function',
@@ -111,7 +115,9 @@ async function completeOpenAICompat(
   const est_cents = Math.max(1, Math.ceil(tokens / 2000))
 
   return {
-    content: choice.content ?? '',
+    // gpt-oss occasionally puts its whole answer in the reasoning channel and
+    // leaves content empty — fall back to it rather than returning nothing.
+    content: choice.content || choice.reasoning || '',
     tool_calls,
     provider,
     model,
