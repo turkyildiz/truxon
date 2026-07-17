@@ -4,6 +4,7 @@ import { ROLE_MODULES, useAuth } from '../auth'
 import { globalSearch } from '../data'
 import { errorMessage, supabase } from '../supabase'
 import type { SearchResults } from '../types'
+import { TruxLauncher } from './TruxChat'
 import { Button, Field, Input, Modal } from './ui'
 
 function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -240,6 +241,7 @@ export default function Layout() {
         <main className="flex-1 p-4 lg:p-6">
           <Outlet />
         </main>
+        <TruxLauncher />
         <ChangePasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
       </div>
     </div>

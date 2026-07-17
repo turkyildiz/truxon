@@ -206,7 +206,27 @@ to jump straight to it; other results take you to that list, filtered.
 
 ---
 
-## 12. Tips
+## 12. Trux — the Truxon assistant
+
+The **🤖 Trux** button (bottom-right, every page) opens a chat with Truxon's
+built-in agent. Trux answers with live data and only within *your* role's
+permissions:
+
+- **Owner / dispatcher:** "Give me a recap — how are we doing vs last week?",
+  "Which trucks and drivers are free?", "Find loads for TQL", or ask it to
+  create a load / assign a driver+truck / advance a status.
+- **Accountant:** recaps and weekly reports (per-driver pay, per-truck revenue).
+- **Driver:** "What are my loads?", load details, and marking in-transit /
+  delivered.
+- **Maintenance:** equipment status and recent maintenance records.
+
+Anything that *changes* data is only ever **proposed** — Trux shows a card and
+nothing happens until you press **Confirm**. Every executed action is logged
+to an audit trail under your name.
+
+---
+
+## 13. Tips
 
 - **Tablet-friendly:** the whole app works on a tablet; the sidebar collapses
   behind the ☰ menu in portrait.

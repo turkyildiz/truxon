@@ -1,10 +1,12 @@
 /**
- * Trux dispatcher agent — text chat with confirm-before-write cards.
+ * Trux — Truxon's operating agent. Floating app-wide chat with
+ * confirm-before-write cards. Tools are role-scoped server-side.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useAuth } from '../auth'
 import { supabase, errorMessage } from '../supabase'
-import { Button, Card, Input } from './ui'
+import { Button, Input } from './ui'
 
 type Proposal = { token: string; tool: string; args: unknown; summary: string }
 
@@ -28,12 +30,26 @@ async function truxAgent(body: Record<string, unknown>) {
   }
 }
 
-export default function TruxChat() {
+const SUGGESTIONS: Record<string, string[]> = {
+  admin: ['Give me a recap — how are we doing vs last week?', 'List available trucks and drivers'],
+  dispatcher: ['List available trucks and drivers', 'Find loads for customer TQL'],
+  accountant: ['Weekly report for this week', 'Give me a recap of this week'],
+  driver: ['What are my loads?', 'Show my next pickup'],
+  maintenance: ['List equipment status', 'Recent maintenance records'],
+}
+
+export default function TruxChat({ onClose }: { onClose?: () => void }) {
   const qc = useQueryClient()
+  const { user } = useAuth()
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [text, setText] = useState('')
   const [log, setLog] = useState<{ role: 'user' | 'assistant'; content: string; proposals?: Proposal[] }[]>([])
   const [error, setError] = useState('')
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+  }, [log])
 
   const send = useMutation({
     mutationFn: async (message: string) => {
@@ -67,6 +83,7 @@ export default function TruxChat() {
       ])
       void qc.invalidateQueries({ queryKey: ['loads'] })
       void qc.invalidateQueries({ queryKey: ['fleet-positions'] })
+      void qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
     onError: (e) => setError(errorMessage(e)),
   })
@@ -85,29 +102,50 @@ export default function TruxChat() {
     send.mutate(m)
   }
 
+  const suggestions = SUGGESTIONS[user?.role ?? ''] ?? []
+
   return (
-    <Card title="Trux assistant">
-      <p className="mb-3 text-sm text-slate-600">
-        Ask Trux to create a load, assign truck/driver, or advance status. Write actions require your confirmation.
-      </p>
-      <div className="mb-3 max-h-80 space-y-2 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+    <div className="flex h-full flex-col rounded-xl bg-white shadow-2xl ring-1 ring-slate-200">
+      <div className="flex items-center justify-between rounded-t-xl bg-navy-900 px-4 py-3 text-white">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🤖</span>
+          <span className="font-bold tracking-wide">Trux</span>
+          <span className="text-xs text-navy-100">Truxon assistant</span>
+        </div>
+        {onClose && (
+          <button onClick={onClose} className="rounded-md px-2 py-0.5 text-navy-100 hover:bg-navy-700" aria-label="Close Trux">
+            ✕
+          </button>
+        )}
+      </div>
+      <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto bg-slate-50 p-3 text-sm">
         {log.length === 0 && (
-          <p className="text-slate-500">
-            Try: “List available trucks and drivers” or “Create a load for customer Acme from Dallas to Houston at $1800”.
-          </p>
+          <div className="space-y-2">
+            <p className="text-slate-500">Ask Trux about your work. Any action it proposes needs your confirmation.</p>
+            {suggestions.map((s) => (
+              <button
+                key={s}
+                onClick={() => send.mutate(s)}
+                disabled={send.isPending}
+                className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-slate-700 hover:border-navy-600 hover:text-navy-700"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         )}
         {log.map((m, i) => (
           <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
             <div
-              className={`inline-block max-w-[95%] rounded-lg px-3 py-2 whitespace-pre-wrap ${
-                m.role === 'user' ? 'bg-navy-700 text-white' : 'bg-white border border-slate-200 text-slate-800'
+              className={`inline-block max-w-[95%] rounded-lg px-3 py-2 text-left whitespace-pre-wrap ${
+                m.role === 'user' ? 'bg-navy-700 text-white' : 'border border-slate-200 bg-white text-slate-800'
               }`}
             >
               {m.content}
             </div>
             {m.proposals?.map((p) => (
               <div key={p.token} className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-left">
-                <div className="font-medium text-amber-900">{p.summary}</div>
+                <div className="font-medium break-all text-amber-900">{p.summary}</div>
                 <div className="mt-2 flex gap-2">
                   <Button type="button" onClick={() => confirm.mutate(p.token)} disabled={confirm.isPending}>
                     Confirm
@@ -120,9 +158,10 @@ export default function TruxChat() {
             ))}
           </div>
         ))}
+        {send.isPending && <p className="text-slate-400">Trux is thinking…</p>}
       </div>
-      {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
-      <form onSubmit={onSubmit} className="flex gap-2">
+      {error && <p className="px-3 pt-2 text-sm text-red-600">{error}</p>}
+      <form onSubmit={onSubmit} className="flex gap-2 p-3">
         <Input
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -134,6 +173,28 @@ export default function TruxChat() {
           {send.isPending ? '…' : 'Send'}
         </Button>
       </form>
-    </Card>
+    </div>
+  )
+}
+
+/** Floating launcher + panel, mounted once in Layout. */
+export function TruxLauncher() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      {open && (
+        <div className="fixed right-4 bottom-20 z-40 flex h-[min(34rem,calc(100vh-7rem))] w-[min(24rem,calc(100vw-2rem))] flex-col">
+          <TruxChat onClose={() => setOpen(false)} />
+        </div>
+      )}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-label={open ? 'Close Trux' : 'Open Trux'}
+        className="fixed right-4 bottom-4 z-40 flex h-13 items-center gap-2 rounded-full bg-navy-900 px-4 text-white shadow-lg transition-transform hover:scale-105"
+      >
+        <span className="text-xl">🤖</span>
+        <span className="text-sm font-bold tracking-wide">{open ? 'Close' : 'Trux'}</span>
+      </button>
+    </>
   )
 }
