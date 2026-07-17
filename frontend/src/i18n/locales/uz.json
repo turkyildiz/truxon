@@ -1,0 +1,5 @@
+{
+  "nav": { "dashboard": "Boshqaruv paneli", "track": "Kuzatuv", "loads": "Yuklar", "dispatch": "Dispetcher", "customers": "Mijozlar", "drivers": "Haydovchilar", "trucks": "Yuk mashinalari", "trailers": "Tirkamalar", "maintenance": "Texnik xizmat", "reports": "Buxgalteriya", "invoices": "Hisob-fakturalar", "personal_drive": "Shaxsiy disk", "team_drive": "Jamoa diski", "users": "Foydalanuvchilar", "settings": "Sozlamalar" },
+  "common": { "signOut": "Chiqish", "search": "Qidirish…", "changePassword": "Parolni o'zgartirish", "language": "Til", "save": "Saqlash", "cancel": "Bekor qilish", "loading": "Yuklanmoqda…" },
+  "login": { "subtitle": "Transport boshqaruv tizimi", "email": "Email", "password": "Parol", "signIn": "Kirish", "signingIn": "Kirilmoqda…" }
+}

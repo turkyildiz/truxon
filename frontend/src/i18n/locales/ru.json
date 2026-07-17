@@ -1,0 +1,5 @@
+{
+  "nav": { "dashboard": "Панель", "track": "Отслеживание", "loads": "Грузы", "dispatch": "Диспетчер", "customers": "Клиенты", "drivers": "Водители", "trucks": "Тягачи", "trailers": "Прицепы", "maintenance": "Обслуживание", "reports": "Бухгалтерия", "invoices": "Счета", "personal_drive": "Личный диск", "team_drive": "Общий диск", "users": "Пользователи", "settings": "Настройки" },
+  "common": { "signOut": "Выйти", "search": "Поиск…", "changePassword": "Сменить пароль", "language": "Язык", "save": "Сохранить", "cancel": "Отмена", "loading": "Загрузка…" },
+  "login": { "subtitle": "Система управления перевозками", "email": "Эл. почта", "password": "Пароль", "signIn": "Войти", "signingIn": "Вход…" }
+}

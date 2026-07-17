@@ -1,0 +1,5 @@
+{
+  "nav": { "dashboard": "Pulpit", "track": "Śledzenie", "loads": "Ładunki", "dispatch": "Dyspozytornia", "customers": "Klienci", "drivers": "Kierowcy", "trucks": "Ciężarówki", "trailers": "Naczepy", "maintenance": "Serwis", "reports": "Księgowość", "invoices": "Faktury", "personal_drive": "Dysk osobisty", "team_drive": "Dysk zespołu", "users": "Użytkownicy", "settings": "Ustawienia" },
+  "common": { "signOut": "Wyloguj", "search": "Szukaj…", "changePassword": "Zmień hasło", "language": "Język", "save": "Zapisz", "cancel": "Anuluj", "loading": "Ładowanie…" },
+  "login": { "subtitle": "System zarządzania transportem", "email": "E-mail", "password": "Hasło", "signIn": "Zaloguj się", "signingIn": "Logowanie…" }
+}

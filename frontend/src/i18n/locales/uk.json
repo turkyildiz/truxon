@@ -1,0 +1,5 @@
+{
+  "nav": { "dashboard": "Панель", "track": "Відстеження", "loads": "Вантажі", "dispatch": "Диспетчер", "customers": "Клієнти", "drivers": "Водії", "trucks": "Вантажівки", "trailers": "Причепи", "maintenance": "Обслуговування", "reports": "Бухгалтерія", "invoices": "Рахунки", "personal_drive": "Особистий диск", "team_drive": "Командний диск", "users": "Користувачі", "settings": "Налаштування" },
+  "common": { "signOut": "Вийти", "search": "Пошук…", "changePassword": "Змінити пароль", "language": "Мова", "save": "Зберегти", "cancel": "Скасувати", "loading": "Завантаження…" },
+  "login": { "subtitle": "Система управління перевезеннями", "email": "Ел. пошта", "password": "Пароль", "signIn": "Увійти", "signingIn": "Вхід…" }
+}

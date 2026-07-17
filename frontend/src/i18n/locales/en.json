@@ -1,0 +1,5 @@
+{
+  "nav": { "dashboard": "Dashboard", "track": "Track & Trace", "loads": "Loads", "dispatch": "Dispatch", "customers": "Customers", "drivers": "Drivers", "trucks": "Trucks", "trailers": "Trailers", "maintenance": "Maintenance", "reports": "Accounting", "invoices": "Invoices", "personal_drive": "Personal Drive", "team_drive": "Team Drive", "users": "Users", "settings": "Settings" },
+  "common": { "signOut": "Sign out", "search": "Search…", "changePassword": "Change password", "language": "Language", "save": "Save", "cancel": "Cancel", "loading": "Loading…" },
+  "login": { "subtitle": "Transportation Management System", "email": "Email", "password": "Password", "signIn": "Sign in", "signingIn": "Signing in…" }
+}

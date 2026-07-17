@@ -1,0 +1,5 @@
+{
+  "nav": { "dashboard": "Башкы бет", "track": "Көзөмөл", "loads": "Жүктөр", "dispatch": "Диспетчер", "customers": "Кардарлар", "drivers": "Айдоочулар", "trucks": "Жүк ташуучулар", "trailers": "Чиркегичтер", "maintenance": "Тейлөө", "reports": "Бухгалтерия", "invoices": "Эсептер", "personal_drive": "Жеке диск", "team_drive": "Команда диски", "users": "Колдонуучулар", "settings": "Жөндөөлөр" },
+  "common": { "signOut": "Чыгуу", "search": "Издөө…", "changePassword": "Сырсөздү өзгөртүү", "language": "Тил", "save": "Сактоо", "cancel": "Жокко чыгаруу", "loading": "Жүктөлүүдө…" },
+  "login": { "subtitle": "Ташуу башкаруу тутуму", "email": "Эл. почта", "password": "Сырсөз", "signIn": "Кирүү", "signingIn": "Кирүүдө…" }
+}
