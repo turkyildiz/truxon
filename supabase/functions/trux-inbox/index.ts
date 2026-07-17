@@ -140,12 +140,20 @@ Deno.serve(async (req) => {
     return json({ error: msg }, 502)
   }
 
-  const listRes = await graph(
-    tok,
-    `/users/${encodeURIComponent(MAILBOX)}/mailFolders/Inbox/messages?$filter=isRead eq false&$top=5&$select=id,conversationId,subject,from,body,hasAttachments,internetMessageHeaders`,
-  )
-  if (!listRes.ok) return json({ error: `Graph list failed: ${listRes.status} ${(await listRes.text()).slice(0, 300)}` }, 502)
-  const { value: messages = [] } = await listRes.json()
+  // Junk is polled too: sender verification is the real gate, and fresh
+  // threads from staff gmail routinely land in Junk on a young mailbox.
+  const messages: Record<string, unknown>[] = []
+  for (const folder of ['Inbox', 'JunkEmail']) {
+    const listRes = await graph(
+      tok,
+      `/users/${encodeURIComponent(MAILBOX)}/mailFolders/${folder}/messages?$filter=isRead eq false&$top=5&$select=id,conversationId,subject,from,body,hasAttachments,internetMessageHeaders`,
+    )
+    if (!listRes.ok) {
+      if (folder === 'Inbox') return json({ error: `Graph list failed: ${listRes.status} ${(await listRes.text()).slice(0, 300)}` }, 502)
+      continue
+    }
+    messages.push(...((await listRes.json()).value ?? []))
+  }
 
   const results: unknown[] = []
 
@@ -235,7 +243,10 @@ Deno.serve(async (req) => {
       // Always list attachments — Gmail inline-attached files sometimes arrive
       // with hasAttachments=false but still appear in the attachments list.
       {
-        const aRes = await graph(tok, `/users/${encodeURIComponent(MAILBOX)}/messages/${m.id}/attachments?$select=id,name,contentType,size,isInline,contentBytes`)
+        // No $select here — Graph rejects contentBytes in $select on the
+        // attachments collection; the default response already includes it.
+        const aRes = await graph(tok, `/users/${encodeURIComponent(MAILBOX)}/messages/${m.id}/attachments`)
+        if (!aRes.ok) attDiag += ` listErr:${aRes.status}:${(await aRes.clone().text()).slice(0, 120)}`
         if (aRes.ok) {
           const atts = ((await aRes.json()).value ?? []) as Record<string, any>[]
           attDiag += ' [' + atts.map((a) => `${a.name ?? '?'}|${a.contentType ?? '?'}|${a.size ?? 0}|${(a['@odata.type'] ?? '').split('.').pop()}`).join(', ') + ']'
