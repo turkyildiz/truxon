@@ -170,15 +170,28 @@ export interface DashboardActiveLoad {
   driver_name: string | null
 }
 
+export interface TrendPoint {
+  label: string
+  revenue: number
+  miles: number
+  empty_miles: number
+  loads: number
+}
+
 export interface DashboardSummary {
   week_revenue: number
   week_miles: number
   week_loads: number
   week_avg_rate_per_mile: number | null
+  prev_week: { revenue: number; miles: number; loads: number; avg_rate_per_mile: number | null }
   available_trucks: number
   active_drivers: number
   status_counts: Record<string, number>
   revenue_by_day: { day: string; revenue: number }[]
+  trend_weekly: TrendPoint[]
+  trend_monthly: TrendPoint[]
+  top_customers: { name: string; revenue: number; loads: number }[]
+  driver_perf: { name: string; miles: number; revenue: number; loads: number }[]
   expiring_licenses: { id: number; full_name: string; license_expiration: string }[]
   active_loads: DashboardActiveLoad[]
 }
