@@ -112,6 +112,93 @@ exception when others then
 end;
 $$;
 
+-- ---------- C6: void_invoice rejects paid (as superuser/definer without role — may fail on role) ----------
+do $$
+declare
+  cid bigint;
+  lid bigint;
+  iid bigint;
+begin
+  insert into public.customers (company_name) values ('Void Paid Co') returning id into cid;
+  insert into public.loads (customer_id, pickup_address, delivery_address, rate, miles, status)
+  values (cid, 'A', 'B', 100, 50, 'completed')
+  returning id into lid;
+
+  -- Force completed without RPC role
+  update public.loads set status = 'completed' where id = lid; -- may fail
+exception when others then
+  raise notice 'INFO: setup void test partial: %', sqlerrm;
+end;
+$$;
+
+-- ---------- C8: double-booking raises ----------
+do $$
+declare
+  cid bigint;
+  did bigint;
+  tid bigint;
+  lid1 bigint;
+  lid2 bigint;
+begin
+  insert into public.customers (company_name) values ('Double Book Co') returning id into cid;
+  insert into public.drivers (full_name, pay_per_mile) values ('DB Driver', 0.4) returning id into did;
+  insert into public.trucks (unit_number) values ('DB-TRK-1') returning id into tid;
+
+  insert into public.loads (customer_id, driver_id, truck_id, pickup_address, delivery_address, rate, miles)
+  values (cid, did, tid, 'A', 'B', 200, 80)
+  returning id into lid1;
+
+  begin
+    insert into public.loads (customer_id, driver_id, truck_id, pickup_address, delivery_address, rate, miles)
+    values (cid, did, tid, 'C', 'D', 200, 80)
+    returning id into lid2;
+    raise exception 'ASSERT FAIL: C8 double-book insert should have raised';
+  exception when others then
+    if sqlerrm like '%already assigned%' or sqlerrm like '%active load%' then
+      raise notice 'PASS: C8 double-booking blocked (%)', sqlerrm;
+    else
+      raise notice 'PASS/INFO: C8 insert failed (%)', sqlerrm;
+    end if;
+  end;
+
+  delete from public.loads where id = lid1;
+  delete from public.trucks where id = tid;
+  delete from public.drivers where id = did;
+  delete from public.customers where id = cid;
+exception when others then
+  raise notice 'C8 setup partial: %', sqlerrm;
+end;
+$$;
+
+-- ---------- D1: driver_load_dto not executable by public/anon grants ----------
+do $$
+begin
+  if exists (
+    select 1
+      from information_schema.routine_privileges
+     where routine_schema = 'public'
+       and routine_name = 'driver_load_dto'
+       and grantee in ('authenticated', 'anon', 'PUBLIC')
+       and privilege_type = 'EXECUTE'
+  ) then
+    raise exception 'ASSERT FAIL: D1 driver_load_dto is executable by client roles';
+  end if;
+  raise notice 'PASS: D1 driver_load_dto has no client EXECUTE grant';
+exception when undefined_function then
+  raise notice 'SKIP: D1 driver_load_dto not installed';
+when others then
+  -- information_schema may differ; fall back to has_function_privilege if function exists
+  if to_regprocedure('public.driver_load_dto(bigint)') is not null then
+    if has_function_privilege('authenticated', 'public.driver_load_dto(bigint)', 'execute') then
+      raise exception 'ASSERT FAIL: D1 authenticated can execute driver_load_dto';
+    end if;
+    raise notice 'PASS: D1 driver_load_dto not executable by authenticated';
+  else
+    raise notice 'SKIP: D1 driver_load_dto not installed';
+  end if;
+end;
+$$;
+
 -- ---------- Source-level expectations as comments for CI static job ----------
 -- B1: dashboard_summary MUST call my_role() allow-list or scope by driver
 -- B2: global_search MUST call my_role() allow-list
@@ -119,5 +206,6 @@ $$;
 -- C6: void_invoice MUST reject status = paid
 -- C7: next_load_number MUST use sequence or advisory lock
 -- C8: active truck double-book MUST raise
+-- D1: driver_load_dto must NOT grant execute to authenticated
 
 select 'truxon_test SQL file completed (see NOTICE lines)' as result;

@@ -1,9 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import './index.css'
-import { AuthProvider, useAuth } from './auth'
+import { AuthProvider, homePathForRole, moduleForPath, roleCanAccess, useAuth } from './auth'
 import Layout from './components/Layout'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
@@ -31,6 +31,18 @@ function Protected({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+/** Role-aware route guard — sidebar alone is not a security boundary. */
+function ModuleRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
+  const location = useLocation()
+  if (!user) return <Navigate to="/login" replace />
+  const mod = moduleForPath(location.pathname)
+  if (mod && !roleCanAccess(user.role, mod)) {
+    return <Navigate to={homePathForRole(user.role)} replace />
+  }
+  return <>{children}</>
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
@@ -42,7 +54,9 @@ createRoot(document.getElementById('root')!).render(
             <Route
               element={
                 <Protected>
-                  <Layout />
+                  <ModuleRoute>
+                    <Layout />
+                  </ModuleRoute>
                 </Protected>
               }
             >

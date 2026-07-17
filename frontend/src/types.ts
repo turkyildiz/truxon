@@ -30,6 +30,8 @@ export interface Driver {
   hire_date: string | null
   pay_per_mile: number
   status: 'active' | 'inactive' | 'terminated'
+  /** Linked auth profile (role must be driver). */
+  user_id?: string | null
 }
 
 export interface Equipment {

@@ -114,4 +114,4 @@ applied one) and run `supabase db push`.
 ```
 
 Full checklist, known baseline FAILs, and live E2E scripts: [docs/TESTING.md](docs/TESTING.md).
-CI runs frontend build, static security (advisory until P1 fixes land), and legacy backend smoke.
+CI runs frontend build, static security (hard gate after Phase 0), and legacy backend smoke.

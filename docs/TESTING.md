@@ -32,18 +32,20 @@ export DATABASE_URL='postgresql://…'
 | Static security | B1–B11, C1, C6 | DEFINER RPC role gates, storage RLS, search filter safety, void paid, workflow locks |
 | SQL | C1–C3… | Direct status update blocked, change_load_status step rules (see `supabase/tests/rls_and_workflow.sql`) |
 
-### Known baseline failures on current main (code review)
+### Phase 0 security (companion prerequisites)
 
-These are intentional FAIL signals until the related migrations/frontend fixes land:
+Migrations `20260716200001_phase0_security.sql` and `20260716200002_phase0_driver_link.sql` close the former baseline failures:
 
-| Check | Issue |
-|-------|--------|
-| **B1 / B2** | `dashboard_summary` / `global_search` only check `auth.uid()`, not role — drivers can call and see company-wide data |
-| **B6** | Storage `documents` SELECT open to all authenticated roles |
-| **B11** | `frontend/src/data.ts` interpolates search text into PostgREST `.or()` filters |
-| **C6** | `void_invoice` has no guard against voiding **paid** invoices |
+| Check | Fix |
+|-------|-----|
+| **B1 / B2** | `dashboard_summary` / `global_search` gated with `my_role()` staff allow-list |
+| **B6** | Storage + `documents` SELECT/INSERT restricted to staff roles |
+| **B11** | `sanitizeSearchTerm()` before PostgREST `.or()` / `ilike` |
+| **C6** | `void_invoice` rejects `status = paid` |
+| **C7 / C8** | Advisory locks on numbering; `assert_no_double_booking` |
+| **D1** | `driver_load_dto` internal-only (no `authenticated` EXECUTE grant) |
 
-CI job **security-static** runs the static suite and is **allowed to fail** until those are fixed (see `.github/workflows/ci.yml`). When they are fixed, remove `continue-on-error` so the job becomes a hard gate.
+CI job **security-static** is a **hard gate** (no `continue-on-error`).
 
 ## Live / E2E scripts (existing)
 

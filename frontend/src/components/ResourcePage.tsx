@@ -18,6 +18,8 @@ export interface FieldDef {
   step?: string
   full?: boolean
   createOnly?: boolean
+  /** Hide this field when creating (edit-only). */
+  editOnly?: boolean
 }
 
 export interface ColumnDef<T> {
@@ -37,6 +39,8 @@ interface Props<T extends { id: number | string }> {
   defaults: Record<string, unknown>
   searchable?: boolean
   addLabel?: string
+  /** Load dynamic select options when opening create/edit (e.g. driver login link). */
+  fieldOptionsLoader?: (item: T | null) => Promise<Record<string, { value: string; label: string }[]>>
 }
 
 export default function ResourcePage<T extends { id: number | string }>({
@@ -51,6 +55,7 @@ export default function ResourcePage<T extends { id: number | string }>({
   defaults,
   searchable = true,
   addLabel,
+  fieldOptionsLoader,
 }: Props<T>) {
   const qc = useQueryClient()
   const [q, setQ] = useState('')
@@ -58,6 +63,7 @@ export default function ResourcePage<T extends { id: number | string }>({
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState<Record<string, unknown>>({})
   const [error, setError] = useState('')
+  const [dynamicOptions, setDynamicOptions] = useState<Record<string, { value: string; label: string }[]>>({})
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: [queryKey, q],
@@ -66,7 +72,6 @@ export default function ResourcePage<T extends { id: number | string }>({
 
   const save = useMutation({
     mutationFn: (payload: Record<string, unknown>) => {
-      // Empty strings for optional fields become null so Postgres accepts them.
       const cleaned = Object.fromEntries(
         Object.entries(payload).map(([k, v]) => [k, v === '' ? null : v]),
       )
@@ -79,32 +84,56 @@ export default function ResourcePage<T extends { id: number | string }>({
     onError: (err) => setError(errorMessage(err)),
   })
 
+  async function loadOptions(item: T | null) {
+    if (!fieldOptionsLoader) {
+      setDynamicOptions({})
+      return
+    }
+    try {
+      setDynamicOptions(await fieldOptionsLoader(item))
+    } catch {
+      setDynamicOptions({})
+    }
+  }
+
   function openCreate() {
     setForm({ ...defaults })
     setCreating(true)
     setError('')
+    void loadOptions(null)
   }
 
   function openEdit(item: T) {
     setForm(toForm(item))
     setEditing(item)
     setError('')
+    void loadOptions(item)
   }
 
   function close() {
     setEditing(null)
     setCreating(false)
     setError('')
+    setDynamicOptions({})
   }
 
   function onSubmit(e: FormEvent) {
     e.preventDefault()
     const payload = { ...form }
     if (editing) for (const f of fields) if (f.createOnly) delete payload[f.name]
+    if (!editing) for (const f of fields) if (f.editOnly) delete payload[f.name]
     save.mutate(payload)
   }
 
-  const visibleFields = fields.filter((f) => !editing || !f.createOnly)
+  const visibleFields = fields.filter((f) => {
+    if (editing && f.createOnly) return false
+    if (!editing && f.editOnly) return false
+    return true
+  })
+
+  function optionsFor(f: FieldDef) {
+    return dynamicOptions[f.name] ?? f.options ?? []
+  }
 
   return (
     <Card
@@ -147,7 +176,7 @@ export default function ResourcePage<T extends { id: number | string }>({
                 {f.type === 'select' ? (
                   <Select value={String(form[f.name] ?? '')} onChange={(e) => setForm({ ...form, [f.name]: e.target.value })} required={f.required}>
                     {!f.required && <option value="">—</option>}
-                    {f.options?.map((o) => (
+                    {optionsFor(f).map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
                       </option>

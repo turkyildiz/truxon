@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { supabase } from './supabase'
-import type { Profile } from './types'
+import type { Profile, Role } from './types'
 
 interface AuthState {
   user: Profile | null
@@ -21,17 +21,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
+
+    async function applySession(userId: string | undefined) {
+      if (!userId) {
+        if (!cancelled) setUser(null)
+        return
+      }
+      const profile = await fetchProfile(userId)
+      if (cancelled) return
+      if (!profile || !profile.is_active) {
+        await supabase.auth.signOut()
+        setUser(null)
+        return
+      }
+      setUser(profile)
+    }
+
     supabase.auth.getSession().then(async ({ data }) => {
-      if (data.session) setUser(await fetchProfile(data.session.user.id))
-      setLoading(false)
+      await applySession(data.session?.user.id)
+      if (!cancelled) setLoading(false)
     })
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') setUser(null)
-      // SIGNED_IN is handled by login() so the UI waits for the profile.
-      if (event === 'TOKEN_REFRESHED' && !session) setUser(null)
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+        return
+      }
+      // Re-fetch profile on refresh so demotions / deactivations take effect.
+      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        void applySession(session?.user.id)
+      }
     })
-    return () => sub.subscription.unsubscribe()
+    return () => {
+      cancelled = true
+      sub.subscription.unsubscribe()
+    }
   }, [])
 
   async function login(email: string, password: string) {
@@ -56,10 +81,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export const useAuth = () => useContext(AuthContext)
 
 /** Which nav sections each role can see (admin sees everything). */
-export const ROLE_MODULES: Record<string, string[]> = {
+export const ROLE_MODULES: Record<Role | string, string[]> = {
   admin: ['dashboard', 'loads', 'dispatch', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'users', 'settings'],
   dispatcher: ['dashboard', 'loads', 'dispatch', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices'],
   accountant: ['dashboard', 'loads', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices'],
   maintenance: ['trucks', 'trailers', 'maintenance'],
   driver: ['dashboard'],
+}
+
+/** Map app route prefixes to ROLE_MODULES keys. */
+export const ROUTE_MODULE: { prefix: string; module: string }[] = [
+  { prefix: '/dashboard', module: 'dashboard' },
+  { prefix: '/loads', module: 'loads' },
+  { prefix: '/dispatch', module: 'dispatch' },
+  { prefix: '/customers', module: 'customers' },
+  { prefix: '/drivers', module: 'drivers' },
+  { prefix: '/trucks', module: 'trucks' },
+  { prefix: '/trailers', module: 'trailers' },
+  { prefix: '/maintenance', module: 'maintenance' },
+  { prefix: '/reports', module: 'reports' },
+  { prefix: '/invoices', module: 'invoices' },
+  { prefix: '/users', module: 'users' },
+  { prefix: '/settings', module: 'settings' },
+]
+
+export function moduleForPath(pathname: string): string | null {
+  const hit = ROUTE_MODULE.find((r) => pathname === r.prefix || pathname.startsWith(r.prefix + '/'))
+  return hit?.module ?? null
+}
+
+export function roleCanAccess(role: string, module: string): boolean {
+  if (role === 'admin') return true
+  return (ROLE_MODULES[role] ?? []).includes(module)
+}
+
+export function homePathForRole(role: string): string {
+  const mods = ROLE_MODULES[role] ?? ['dashboard']
+  const first = mods[0] ?? 'dashboard'
+  return `/${first}`
 }

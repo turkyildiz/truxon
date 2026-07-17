@@ -21,11 +21,25 @@ import type {
 
 type Row = Record<string, unknown>
 
+/**
+ * Sanitize user search input before embedding in PostgREST filter strings.
+ * Strips characters that rewrite filter grammar (, . ( ) *) and escapes ILIKE wildcards.
+ */
+export function sanitizeSearchTerm(q: string): string {
+  return q
+    .replace(/[%_\\]/g, '') // avoid ILIKE wildcard injection
+    .replace(/[,.()*"'\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80)
+}
+
 // ---------- Customers ----------
 
 export async function listCustomers(q?: string): Promise<Customer[]> {
   let query = supabase.from('customers').select('*').eq('is_active', true).order('company_name')
-  if (q) query = query.or(`company_name.ilike.%${q}%,contact_person.ilike.%${q}%`)
+  const s = q ? sanitizeSearchTerm(q) : ''
+  if (s) query = query.or(`company_name.ilike.%${s}%,contact_person.ilike.%${s}%`)
   return unwrap(await query)
 }
 
@@ -41,8 +55,23 @@ export async function updateCustomer(id: number, payload: Row): Promise<Customer
 
 export async function listDrivers(q?: string): Promise<Driver[]> {
   let query = supabase.from('drivers').select('*').order('full_name')
-  if (q) query = query.ilike('full_name', `%${q}%`)
+  const s = q ? sanitizeSearchTerm(q) : ''
+  if (s) query = query.ilike('full_name', `%${s}%`)
   return unwrap(await query)
+}
+
+/** Driver-role profiles that can be linked (or the currently linked profile). */
+export async function listLinkableDriverProfiles(currentUserId?: string | null): Promise<Profile[]> {
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('id, username, full_name, role, is_active')
+    .eq('role', 'driver')
+    .eq('is_active', true)
+    .order('username')
+  if (error) throw error
+  const drivers = await listDrivers()
+  const taken = new Set(drivers.map((d) => d.user_id).filter(Boolean) as string[])
+  return (profiles ?? []).filter((p) => !taken.has(p.id) || p.id === currentUserId)
 }
 
 export async function createDriver(payload: Row): Promise<Driver> {
@@ -59,7 +88,8 @@ function equipmentApi(table: 'trucks' | 'trailers') {
   return {
     async list(q?: string): Promise<Equipment[]> {
       let query = supabase.from(table).select('*').order('unit_number')
-      if (q) query = query.ilike('unit_number', `%${q}%`)
+      const s = q ? sanitizeSearchTerm(q) : ''
+      if (s) query = query.ilike('unit_number', `%${s}%`)
       return unwrap(await query)
     },
     async create(payload: Row): Promise<Equipment> {
@@ -139,7 +169,10 @@ export async function listLoads(filters: LoadFilters = {}): Promise<Load[]> {
   if (filters.date_from) query = query.gte('pickup_time', filters.date_from)
   if (filters.date_to) query = query.lte('pickup_time', filters.date_to + 'T23:59:59')
   if (filters.q) {
-    query = query.or(`load_number.ilike.%${filters.q}%,pickup_address.ilike.%${filters.q}%,delivery_address.ilike.%${filters.q}%`)
+    const s = sanitizeSearchTerm(filters.q)
+    if (s) {
+      query = query.or(`load_number.ilike.%${s}%,pickup_address.ilike.%${s}%,delivery_address.ilike.%${s}%`)
+    }
   }
   const rows = unwrap<Row[]>(await query)
   return rows.map(mapLoad)
@@ -323,7 +356,13 @@ export async function listUsers(): Promise<Profile[]> {
 }
 
 export async function createUser(payload: Row): Promise<void> {
-  await invokeAdminUsers({ method: 'POST', body: payload })
+  const body = { ...payload }
+  if (body.link_driver_id === '' || body.link_driver_id == null) {
+    delete body.link_driver_id
+  } else {
+    body.link_driver_id = Number(body.link_driver_id)
+  }
+  await invokeAdminUsers({ method: 'POST', body })
 }
 
 export async function updateUser(id: string, payload: Row): Promise<void> {

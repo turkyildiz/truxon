@@ -23,10 +23,9 @@ jobs:
         run: npm run build
 
   # Static security + workflow source checks (no Supabase runtime required).
-  # continue-on-error: remove once B1/B2/B6/B11/C6 are fixed (see docs/TESTING.md).
+  # Hard gate after Phase 0 security fixes (B1/B2/B6/B11/C6).
   security-static:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Run static security harness

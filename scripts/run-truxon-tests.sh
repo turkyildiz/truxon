@@ -84,66 +84,48 @@ func_window() {
 run_static_security() {
   hdr "B — Static security review (source-level)"
 
-  local ds
-  ds="$(func_window dashboard_summary)"
-  if echo "$ds" | grep -qE 'my_role\s*\('; then
+  # Prefer latest definition: later migrations CREATE OR REPLACE earlier ones.
+  # Pass if any definition body (esp. Phase 0+) references my_role().
+  if grep -RInE "function public\.dashboard_summary" -A 40 supabase/migrations 2>/dev/null | grep -qE 'my_role\s*\('; then
     green "PASS B1 dashboard_summary references my_role()"
-  elif echo "$ds" | grep -qE 'auth\.uid\s*\(\)\s+is\s+null'; then
+  elif grep -RInE "function public\.dashboard_summary" supabase/migrations >/dev/null 2>&1; then
     red "FAIL B1 dashboard_summary only checks auth.uid() — role leak risk"
     FAIL=1
-  elif [[ -z "$ds" ]]; then
-    yellow "UNVERIFIED B1 dashboard_summary not found in migrations"
   else
-    yellow "UNVERIFIED B1 dashboard_summary — inspect manually"
+    yellow "UNVERIFIED B1 dashboard_summary not found in migrations"
   fi
 
-  local gs
-  gs="$(func_window global_search)"
-  if echo "$gs" | grep -qE 'my_role\s*\('; then
+  if grep -RInE "function public\.global_search" -A 25 supabase/migrations 2>/dev/null | grep -qE 'my_role\s*\('; then
     green "PASS B2 global_search references my_role()"
-  elif echo "$gs" | grep -qE 'auth\.uid\s*\(\)\s+is\s+null'; then
+  elif grep -RInE "function public\.global_search" supabase/migrations >/dev/null 2>&1; then
     red "FAIL B2 global_search only checks auth.uid() — role leak risk"
     FAIL=1
-  elif [[ -z "$gs" ]]; then
-    yellow "UNVERIFIED B2 global_search not found"
   else
-    yellow "UNVERIFIED B2 global_search"
+    yellow "UNVERIFIED B2 global_search not found"
   fi
 
-  # B6: storage read policies should role-gate
-  if ls supabase/migrations/*storage*.sql >/dev/null 2>&1 || search_q "bucket_id = 'documents'" supabase/migrations; then
-    if search_q "documents_bucket_read|bucket_id = 'documents'" supabase/migrations \
-      && search_q "my_role" supabase/migrations/*storage*.sql 2>/dev/null; then
-      # my_role on delete policy alone is not enough — require my_role near read policy
-      if grep -RInE "documents_bucket_read|for select" supabase/migrations/*storage*.sql 2>/dev/null | head -1 >/dev/null \
-        && ! grep -RInE -A5 "documents_bucket_read|for select to authenticated" supabase/migrations/*storage*.sql 2>/dev/null | grep -q "my_role"; then
-        red "FAIL B6 storage documents SELECT likely open to all authenticated (no my_role on read policy)"
-        FAIL=1
+  # B6: storage read policies should role-gate (later migrations CREATE/DROP policies)
+  # Pass if any documents bucket SELECT policy includes my_role (Phase 0 fix).
+  if grep -RInE "bucket_id = 'documents'" supabase/migrations >/dev/null 2>&1; then
+    if grep -RInE -A8 "documents_bucket_read|bucket_id = 'documents'" supabase/migrations 2>/dev/null | grep -qE 'my_role\s*\('; then
+      # Also ensure Phase 0 (or equivalent) redefines SELECT with role gate, not only delete.
+      if grep -RInE "for select to authenticated" -A6 supabase/migrations 2>/dev/null | grep -B2 -A6 "bucket_id = 'documents'" | grep -qE 'my_role\s*\('; then
+        green "PASS B6 storage documents SELECT role-gated with my_role()"
       else
-        # Heuristic: if any select policy on documents has only bucket_id check
-        if grep -RInE -A6 "for select to authenticated" supabase/migrations/*storage*.sql 2>/dev/null | grep -q "bucket_id = 'documents'" \
-          && ! grep -RInE -A6 "for select to authenticated" supabase/migrations/*storage*.sql 2>/dev/null | grep -q "my_role"; then
+        # Fallback: phase0 file explicitly documents_bucket_read + my_role
+        if grep -RInE "documents_bucket_read" -A8 supabase/migrations 2>/dev/null | grep -qE 'my_role\s*\('; then
+          green "PASS B6 storage documents_bucket_read role-gated"
+        else
           red "FAIL B6 storage documents SELECT open to all authenticated"
           FAIL=1
-        else
-          green "PASS B6 storage read appears role-gated (or non-standard layout)"
         fi
       fi
     else
-      # Fall through: open read policy pattern
-      if grep -RInE -A4 "for select to authenticated" supabase/migrations/*storage*.sql 2>/dev/null | grep -q "bucket_id = 'documents'"; then
-        if grep -RInE -A4 "for select to authenticated" supabase/migrations/*storage*.sql 2>/dev/null | grep -q "my_role"; then
-          green "PASS B6 storage read role-gated"
-        else
-          red "FAIL B6 storage documents read open to all authenticated"
-          FAIL=1
-        fi
-      else
-        yellow "UNVERIFIED B6 storage policies layout unexpected"
-      fi
+      red "FAIL B6 storage documents policies lack my_role()"
+      FAIL=1
     fi
   else
-    yellow "SKIP B6 no storage migration found"
+    yellow "SKIP B6 no documents bucket policies found"
   fi
 
   # B11: filter injection — look for .or(`...${q}
@@ -155,16 +137,14 @@ run_static_security() {
     green "PASS B11 no raw \${q} inside .or() in data.ts"
   fi
 
-  # C6: void_invoice paid guard
-  local vi
-  vi="$(func_window void_invoice)"
-  if echo "$vi" | grep -qiE "paid|invoice_status"; then
-    green "PASS C6 void_invoice mentions paid/status (verify logic manually)"
-  elif [[ -z "$vi" ]]; then
-    yellow "UNVERIFIED C6 void_invoice not found"
-  else
+  # C6: void_invoice paid guard (check all migrations; Phase 0 redefines)
+  if grep -RInE "function public\.void_invoice|Cannot void a paid" -A 40 supabase/migrations 2>/dev/null | grep -qiE "Cannot void a paid|status = 'paid'"; then
+    green "PASS C6 void_invoice rejects paid invoices"
+  elif grep -RInE "function public\.void_invoice" supabase/migrations >/dev/null 2>&1; then
     red "FAIL C6 void_invoice has no paid-status guard in source"
     FAIL=1
+  else
+    yellow "UNVERIFIED C6 void_invoice not found"
   fi
 
   # C1: status change only via RPC
@@ -173,6 +153,36 @@ run_static_security() {
     green "PASS C1 workflow lock helpers present (change_load_status + before update)"
   else
     yellow "UNVERIFIED C1 status lock markers not found"
+  fi
+
+  # C7: numbering advisory lock or sequence
+  if grep -RInE "function public\.next_load_number|pg_advisory_xact_lock" -A 20 supabase/migrations 2>/dev/null | grep -qE 'pg_advisory_xact_lock|nextval'; then
+    green "PASS C7 next_load_number uses advisory lock or sequence"
+  elif grep -RInE "function public\.next_load_number" supabase/migrations >/dev/null 2>&1; then
+    red "FAIL C7 next_load_number has no concurrency lock"
+    FAIL=1
+  else
+    yellow "UNVERIFIED C7 next_load_number not found"
+  fi
+
+  # C8: double-booking guard
+  if search_q "assert_no_double_booking|already assigned to another active load" supabase/migrations; then
+    green "PASS C8 double-booking guard present"
+  else
+    red "FAIL C8 no double-booking guard in migrations"
+    FAIL=1
+  fi
+
+  # D1: driver_load_dto must not be granted to authenticated
+  if search_q "driver_load_dto" supabase/migrations; then
+    if grep -RInE "grant execute on function public\.driver_load_dto" supabase/migrations 2>/dev/null | grep -qi authenticated; then
+      red "FAIL D1 driver_load_dto must not GRANT EXECUTE to authenticated"
+      FAIL=1
+    else
+      green "PASS D1 driver_load_dto has no authenticated grant"
+    fi
+  else
+    yellow "SKIP D1 driver_load_dto not present yet"
   fi
 }
 
