@@ -281,6 +281,15 @@ Deno.serve(async (req) => {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       await finish('failed', msg)
+      // Never leave the sender in silence: best-effort apology, then mark read
+      // so the claim row doesn't strand an unread message forever.
+      try {
+        await graph(tok, `/users/${encodeURIComponent(MAILBOX)}/messages/${m.id}/reply`, {
+          method: 'POST',
+          body: JSON.stringify({ comment: 'I hit a technical problem processing this email and could not complete it. Please resend in a few minutes, or use the Truxon app.\n\n— Trux' }),
+        })
+        await markRead()
+      } catch { /* ignore */ }
       results.push({ id: m.id, failed: msg })
     }
   }

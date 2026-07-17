@@ -396,7 +396,15 @@ ${mode === 'propose'
   const maxRounds = mode === 'auto' ? 5 : 3
 
   for (let round = 0; round < maxRounds && Date.now() < deadline; round++) {
-    const completion = await completeChat({ messages, tools })
+    // Small models occasionally emit malformed tool calls (400 tool_use_failed)
+    // — one retry usually lands.
+    let completion
+    try {
+      completion = await completeChat({ messages, tools })
+    } catch (e) {
+      await new Promise((r) => setTimeout(r, 1200))
+      completion = await completeChat({ messages, tools })
+    }
     lastProvider = completion.provider
     lastModel = completion.model
     try {

@@ -41,11 +41,13 @@ export function pickProvider(): { provider: 'xai' | 'openai' | 'anthropic'; mode
   if (env('ANTHROPIC_API_KEY')) {
     return { provider: 'anthropic', model: env('ANTHROPIC_MODEL', 'claude-sonnet-4-20250514'), apiKey: env('ANTHROPIC_API_KEY') }
   }
-  // Last resort: OpenRouter-style LLM_* used by extract-pdf
+  // Last resort: OpenRouter-style LLM_* used by extract-pdf.
+  // TRUX_MODEL (agent-only) overrides LLM_MODEL here so the Trux agent can run
+  // a stronger tool-calling model without touching extract-pdf's extraction model.
   if (env('LLM_API_KEY')) {
     return {
       provider: 'openai',
-      model: env('LLM_MODEL', 'gpt-4o-mini'),
+      model: env('TRUX_MODEL') || env('LLM_MODEL', 'gpt-4o-mini'),
       apiKey: env('LLM_API_KEY'),
       baseUrl: env('LLM_BASE_URL', 'https://openrouter.ai/api/v1'),
     }
