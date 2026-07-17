@@ -241,7 +241,15 @@ export async function createLoad(payload: Row, stops: Omit<LoadStop, 'id' | 'loa
 }
 
 export async function updateLoad(id: number | string, payload: Row): Promise<Load> {
-  return mapLoad(unwrap(await supabase.from('loads').update(payload).eq('id', id).select(LOAD_SELECT).single()))
+  const load = mapLoad(unwrap(await supabase.from('loads').update(payload).eq('id', id).select(LOAD_SELECT).single()))
+  if (payload.driver_id != null) {
+    void supabase.functions
+      .invoke('notify', {
+        body: { action: 'notify_load', load_id: Number(id), type: 'assignment', title: 'New load assignment', body: load.load_number },
+      })
+      .catch(() => {})
+  }
+  return load
 }
 
 export async function changeLoadStatus(id: number | string, status: LoadStatus): Promise<void> {
@@ -331,6 +339,21 @@ export async function uploadDocument(entityType: string, entityId: number | stri
       uploaded_by: userData.user?.id,
     }),
   )
+
+  // Notify linked driver when load paperwork is uploaded (best-effort).
+  if (entityType === 'load') {
+    void supabase.functions
+      .invoke('notify', {
+        body: {
+          action: 'notify_load',
+          load_id: Number(entityId),
+          type: 'paperwork',
+          title: 'New paperwork',
+          body: docType || file.name,
+        },
+      })
+      .catch(() => {})
+  }
 }
 
 export async function downloadDocument(doc: DocumentMeta): Promise<void> {

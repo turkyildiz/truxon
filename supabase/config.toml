@@ -30,3 +30,10 @@ verify_jwt = true
 
 [functions.admin-users]
 verify_jwt = true
+
+[functions.notify]
+# JWT verified in-function for register; webhook uses shared secret
+verify_jwt = false
+
+[functions.trux-agent]
+verify_jwt = true
