@@ -11,6 +11,7 @@ backups.
 
 ```
 frontend/            React + TypeScript + Tailwind (tablet-first UI)
+mobile/              Flutter companion (driver GPS, loads, paperwork)
 supabase/migrations/ Schema, workflow RPCs, RLS policies, storage bucket
 supabase/functions/  extract-pdf (AI), distance (Google Maps), admin-users
 deploy/backup/       NAS backup + restore-test scripts
@@ -25,6 +26,8 @@ completed → billed) · Dispatch (manual + AI PDF extraction) · Weekly account
 (Mon–Sun, per truck/driver with driver pay) · Invoicing (client-side PDF) ·
 Dashboard · Global search · Documents & audit log on every record · RBAC via
 RLS (admin / dispatcher / driver / accountant / maintenance).
+**Companion app:** see [mobile/README.md](mobile/README.md) and design doc
+[docs/design-trux-companion-app.md](docs/design-trux-companion-app.md) if present.
 
 ## One-time Supabase setup
 
@@ -35,7 +38,7 @@ RLS (admin / dispatcher / driver / accountant / maintenance).
    supabase login                      # or: export SUPABASE_ACCESS_TOKEN=...
    supabase link --project-ref <YOUR_PROJECT_REF>
    supabase db push                    # applies supabase/migrations/*
-   supabase functions deploy extract-pdf distance admin-users
+   supabase functions deploy extract-pdf distance admin-users notify
    supabase secrets set LLM_API_KEY=... GOOGLE_MAPS_API_KEY=...   # optional
    # Optional extraction overrides (defaults: OpenRouter + llama-3.1-8b):
    #   supabase secrets set LLM_BASE_URL=https://api.groq.com/openai/v1 LLM_MODEL=llama-3.3-70b-versatile
