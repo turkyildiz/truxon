@@ -85,18 +85,18 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
         </div>
       }
     >
-      <p className="mb-4 text-sm text-slate-500">{subtitle}</p>
+      <p className="mb-4 text-sm text-muted">{subtitle}</p>
 
-      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-3">
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl bg-surface-2 p-3">
         <label className="text-sm">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Folder (optional)</span>
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">Folder (optional)</span>
           <Input placeholder="e.g. Contracts" value={newFolder} onChange={(e) => setNewFolder(e.target.value)} className="w-44" />
         </label>
         <label className="cursor-pointer rounded-lg bg-navy-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-navy-800">
           {upload.isPending ? 'Uploading…' : '⬆ Upload file'}
           <input ref={fileRef} type="file" className="hidden" onChange={(e) => e.target.files?.[0] && upload.mutate(e.target.files[0])} />
         </label>
-        <span className="text-xs text-slate-400">Up to 100 MB per file.</span>
+        <span className="text-xs text-muted">Up to 100 MB per file.</span>
       </div>
 
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
@@ -117,35 +117,35 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
       {filesQ.isError ? (
         <LoadError error={filesQ.error} onRetry={() => filesQ.refetch()} />
       ) : filesQ.isLoading ? (
-        <p className="py-8 text-center text-slate-500">Loading…</p>
+        <p className="py-8 text-center text-muted">Loading…</p>
       ) : visible.length === 0 ? (
-        <p className="py-8 text-center text-slate-500">No files yet. Upload one above.</p>
+        <p className="py-8 text-center text-muted">No files yet. Upload one above.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left">
+              <tr className="border-b border-line text-left">
                 {['Name', 'Folder', ...(isTeam ? ['Added by'] : []), 'Size', 'Uploaded', ''].map((h) => (
-                  <th key={h} className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th key={h} className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-line">
               {visible.map((f) => (
-                <tr key={f.id} className="hover:bg-slate-50">
+                <tr key={f.id} className="hover:bg-surface-2">
                   <td className="px-3 py-3">
-                    <button onClick={() => download(f)} className="font-medium text-navy-600 hover:underline">
+                    <button onClick={() => download(f)} className="font-medium text-brand hover:underline">
                       {f.filename}
                     </button>
                   </td>
-                  <td className="px-3 py-3 text-slate-500">{f.folder || '—'}</td>
-                  {isTeam && <td className="px-3 py-3 text-slate-500">{f.owner_name ?? '—'}</td>}
-                  <td className="px-3 py-3 text-slate-500">{fileSize(f.size_bytes)}</td>
-                  <td className="px-3 py-3 text-slate-500">{formatDateTime(f.uploaded_at)}</td>
+                  <td className="px-3 py-3 text-muted">{f.folder || '—'}</td>
+                  {isTeam && <td className="px-3 py-3 text-muted">{f.owner_name ?? '—'}</td>}
+                  <td className="px-3 py-3 text-muted">{fileSize(f.size_bytes)}</td>
+                  <td className="px-3 py-3 text-muted">{formatDateTime(f.uploaded_at)}</td>
                   <td className="px-3 py-3 text-right whitespace-nowrap">
-                    <button onClick={() => download(f)} className="mr-3 text-sm font-medium text-navy-600 hover:underline">
+                    <button onClick={() => download(f)} className="mr-3 text-sm font-medium text-brand hover:underline">
                       Download
                     </button>
                     {canDelete(f) && (

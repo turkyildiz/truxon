@@ -28,12 +28,12 @@ export default function PdfDrop({ title, hint, busy, note, onFile }: Props) {
           if (file?.type === 'application/pdf') onFile(file)
         }}
         className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
-          dragOver ? 'border-navy-600 bg-navy-50' : 'border-slate-300'
+          dragOver ? 'border-navy-600 bg-navy-50' : 'border-line'
         }`}
       >
         <div className="text-3xl">📄</div>
         <p className="mt-2 text-sm font-medium">{hint}</p>
-        <p className="text-xs text-slate-500">or</p>
+        <p className="text-xs text-muted">or</p>
         <label className="mt-2 cursor-pointer rounded-lg bg-navy-700 px-4 py-2 text-sm font-medium text-white hover:bg-navy-800">
           {busy ? 'Extracting…' : 'Choose PDF'}
           <input
@@ -43,7 +43,7 @@ export default function PdfDrop({ title, hint, busy, note, onFile }: Props) {
             onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
           />
         </label>
-        {note && <p className="mt-3 text-sm text-navy-700">{note}</p>}
+        {note && <p className="mt-3 text-sm text-brand">{note}</p>}
       </div>
     </Card>
   )

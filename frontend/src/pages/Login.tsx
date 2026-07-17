@@ -28,11 +28,11 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-navy-900 p-4">
-      <form onSubmit={onSubmit} className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl">
+      <form onSubmit={onSubmit} className="w-full max-w-sm rounded-2xl bg-surface p-8 shadow-2xl">
         <div className="mb-6 text-center">
           <div className="text-4xl">🚛</div>
-          <h1 className="mt-2 text-2xl font-bold text-navy-800">Truxon</h1>
-          <p className="text-sm text-slate-500">Transportation Management System</p>
+          <h1 className="mt-2 text-2xl font-bold text-body">Truxon</h1>
+          <p className="text-sm text-muted">Transportation Management System</p>
         </div>
         <div className="space-y-4">
           <Field label="Email">

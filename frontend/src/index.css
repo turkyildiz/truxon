@@ -1,6 +1,23 @@
 @import "tailwindcss";
 
-@theme {
+/* Manual dark mode: toggled by data-theme="dark" on <html>. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Semantic tokens resolve at use-site, so flipping data-theme re-themes the
+   whole app from one place. Utilities: bg-canvas, bg-surface, bg-surface-2,
+   border-line, text-body, text-muted, text-brand, bg-brand, etc. */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-body: var(--body);
+  --color-muted: var(--muted);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-fg: var(--brand-fg);
+
+  /* Navy scale kept for the sidebar + brand chrome (same in both themes). */
   --color-navy-50: #f0f4f8;
   --color-navy-100: #d9e2ec;
   --color-navy-600: #2d4a6f;
@@ -9,11 +26,44 @@
   --color-navy-900: #102540;
 }
 
+:root {
+  --canvas: #eef2f7;
+  --surface: #ffffff;
+  --surface-2: #f6f8fb;
+  --line: #e4e9f0;
+  --body: #1e293b;
+  --muted: #64748b;
+  --brand: #1e3a5f;
+  --brand-hover: #16304f;
+  --brand-fg: #ffffff;
+}
+
+[data-theme="dark"] {
+  --canvas: #0a0f1a;
+  --surface: #131c2e;
+  --surface-2: #1b2740;
+  --line: #26324b;
+  --body: #e6ecf5;
+  --muted: #93a1b8;
+  --brand: #3b82f6;
+  --brand-hover: #2563eb;
+  --brand-fg: #ffffff;
+}
+
 html {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 body {
-  background-color: #f1f5f9;
-  color: #1e293b;
+  background-color: var(--canvas);
+  color: var(--body);
+}
+
+/* Recharts surfaces read CSS vars so charts theme too. */
+.recharts-cartesian-grid line {
+  stroke: var(--line);
 }

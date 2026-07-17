@@ -17,7 +17,7 @@ function StatusStepper({ load, onAdvance, busy }: { load: Load; onAdvance: (stat
           {i > 0 && <div className={`h-0.5 w-4 ${i <= currentIdx ? 'bg-navy-600' : 'bg-slate-300'}`} />}
           <span
             className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-              i < currentIdx ? 'bg-navy-100 text-navy-700' : i === currentIdx ? 'bg-navy-700 text-white' : 'bg-slate-200 text-slate-500'
+              i < currentIdx ? 'bg-navy-100 text-brand' : i === currentIdx ? 'bg-navy-700 text-white' : 'bg-slate-200 text-muted'
             }`}
           >
             {s.replace('_', ' ')}
@@ -103,7 +103,7 @@ export default function LoadDetail() {
   })
 
   if (loadQ.isError) return <LoadError error={loadQ.error} onRetry={() => loadQ.refetch()} />
-  if (!load) return <p className="py-8 text-center text-slate-500">Loading…</p>
+  if (!load) return <p className="py-8 text-center text-muted">Loading…</p>
 
   const editable = load.status !== 'billed'
 
@@ -144,10 +144,10 @@ export default function LoadDetail() {
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-navy-800">{load.load_number}</h1>
-            <p className="text-sm text-slate-500">
+            <h1 className="text-xl font-bold text-body">{load.load_number}</h1>
+            <p className="text-sm text-muted">
               {load.customer_name}
-              {load.reference_number && <span className="ml-2 text-slate-400">· Broker # {load.reference_number}</span>}
+              {load.reference_number && <span className="ml-2 text-muted">· Broker # {load.reference_number}</span>}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -259,34 +259,34 @@ export default function LoadDetail() {
               {itinerary.length > 0 ? (
                 itinerary.map((s, i) => (
                   <div key={s.id ?? i}>
-                    <dt className="text-xs font-semibold uppercase text-slate-500">
+                    <dt className="text-xs font-semibold uppercase text-muted">
                       {s.stop_type === 'pickup' ? 'Pickup' : 'Delivery'}
                       {itinerary.filter((x) => x.stop_type === s.stop_type).length > 1 ? ` #${s.seq}` : ''}
                     </dt>
                     <dd>{[s.facility, s.address].filter(Boolean).join(', ') || '—'}</dd>
-                    <dd className="text-slate-500">{formatDateTime(s.stop_time)}</dd>
-                    {s.reference && <dd className="text-slate-500">{s.stop_type === 'pickup' ? 'PU' : 'Delivery'} # {s.reference}</dd>}
+                    <dd className="text-muted">{formatDateTime(s.stop_time)}</dd>
+                    {s.reference && <dd className="text-muted">{s.stop_type === 'pickup' ? 'PU' : 'Delivery'} # {s.reference}</dd>}
                   </div>
                 ))
               ) : (
                 <>
                   <div>
-                    <dt className="text-xs font-semibold uppercase text-slate-500">Pickup</dt>
+                    <dt className="text-xs font-semibold uppercase text-muted">Pickup</dt>
                     <dd>{load.pickup_address || '—'}</dd>
-                    <dd className="text-slate-500">{formatDateTime(load.pickup_time)}</dd>
-                    {load.pickup_number && <dd className="text-slate-500">PU # {load.pickup_number}</dd>}
+                    <dd className="text-muted">{formatDateTime(load.pickup_time)}</dd>
+                    {load.pickup_number && <dd className="text-muted">PU # {load.pickup_number}</dd>}
                   </div>
                   <div>
-                    <dt className="text-xs font-semibold uppercase text-slate-500">Delivery</dt>
+                    <dt className="text-xs font-semibold uppercase text-muted">Delivery</dt>
                     <dd>{load.delivery_address || '—'}</dd>
-                    <dd className="text-slate-500">{formatDateTime(load.delivery_time)}</dd>
-                    {load.delivery_number && <dd className="text-slate-500">Delivery # {load.delivery_number}</dd>}
+                    <dd className="text-muted">{formatDateTime(load.delivery_time)}</dd>
+                    {load.delivery_number && <dd className="text-muted">Delivery # {load.delivery_number}</dd>}
                   </div>
                 </>
               )}
               {load.special_terms && (
                 <div>
-                  <dt className="text-xs font-semibold uppercase text-slate-500">Special Terms</dt>
+                  <dt className="text-xs font-semibold uppercase text-muted">Special Terms</dt>
                   <dd>{load.special_terms}</dd>
                 </div>
               )}
@@ -295,26 +295,26 @@ export default function LoadDetail() {
           <Card title="Assignment & Money">
             <dl className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <dt className="text-xs font-semibold uppercase text-slate-500">Driver</dt>
+                <dt className="text-xs font-semibold uppercase text-muted">Driver</dt>
                 <dd>{load.driver_name ?? '—'}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase text-slate-500">Truck / Trailer</dt>
+                <dt className="text-xs font-semibold uppercase text-muted">Truck / Trailer</dt>
                 <dd>
                   {load.truck_unit ?? '—'} / {load.trailer_unit ?? '—'}
                 </dd>
-                {load.equipment_type && <dd className="text-slate-500">{load.equipment_type}</dd>}
+                {load.equipment_type && <dd className="text-muted">{load.equipment_type}</dd>}
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase text-slate-500">Rate</dt>
-                <dd className="text-lg font-bold text-navy-800">{money(load.rate)}</dd>
+                <dt className="text-xs font-semibold uppercase text-muted">Rate</dt>
+                <dd className="text-lg font-bold text-body">{money(load.rate)}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase text-slate-500">Miles / RPM</dt>
+                <dt className="text-xs font-semibold uppercase text-muted">Miles / RPM</dt>
                 <dd>
                   {Number(load.miles).toLocaleString()} mi{' '}
-                  {load.rate_per_mile != null && <span className="text-slate-500">(${load.rate_per_mile.toFixed(2)}/mi)</span>}
-                  {Number(load.empty_miles) > 0 && <span className="text-slate-500"> · {Number(load.empty_miles).toLocaleString()} empty</span>}
+                  {load.rate_per_mile != null && <span className="text-muted">(${load.rate_per_mile.toFixed(2)}/mi)</span>}
+                  {Number(load.empty_miles) > 0 && <span className="text-muted"> · {Number(load.empty_miles).toLocaleString()} empty</span>}
                 </dd>
               </div>
             </dl>

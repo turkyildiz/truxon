@@ -75,26 +75,26 @@ export default function DocsNotes({ entityType, entityId, docTypes, className = 
             className="text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-navy-700 file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-white hover:file:bg-navy-800"
           />
         </div>
-        {upload.isPending && <p className="mb-2 text-sm text-slate-500">Uploading…</p>}
+        {upload.isPending && <p className="mb-2 text-sm text-muted">Uploading…</p>}
         {docError && <p className="mb-2 text-sm text-red-600">{docError}</p>}
         {docsQ.isError ? (
           <LoadError error={docsQ.error} onRetry={() => docsQ.refetch()} />
         ) : docs.length === 0 ? (
-          <p className="text-sm text-slate-500">No documents uploaded.</p>
+          <p className="text-sm text-muted">No documents uploaded.</p>
         ) : (
-          <ul className="divide-y divide-slate-100 text-sm">
+          <ul className="divide-y divide-line text-sm">
             {docs.map((d) => (
               <li key={d.id} className="flex items-center justify-between py-2">
                 <div>
-                  <button onClick={() => download(d)} className="font-medium text-navy-600 hover:underline">
+                  <button onClick={() => download(d)} className="font-medium text-brand hover:underline">
                     {d.filename}
                   </button>
-                  <span className="ml-2 text-xs text-slate-400">
+                  <span className="ml-2 text-xs text-muted">
                     {d.doc_type && `${d.doc_type} · `}
                     {(d.size_bytes / 1024).toFixed(0)} KB
                   </span>
                 </div>
-                <span className="text-xs text-slate-400">{formatDateTime(d.uploaded_at)}</span>
+                <span className="text-xs text-muted">{formatDateTime(d.uploaded_at)}</span>
               </li>
             ))}
           </ul>
@@ -118,10 +118,10 @@ export default function DocsNotes({ entityType, entityId, docTypes, className = 
           <LoadError error={activityQ.error} onRetry={() => activityQ.refetch()} />
         ) : (
           <ul className="max-h-80 space-y-2 overflow-y-auto text-sm">
-            {activity.length === 0 && <li className="text-slate-500">No notes or activity yet.</li>}
+            {activity.length === 0 && <li className="text-muted">No notes or activity yet.</li>}
             {activity.map((a) => (
-              <li key={a.id} className={`rounded-lg p-2.5 ${a.action === 'note' ? 'bg-amber-50' : 'bg-slate-50'}`}>
-                <div className="flex justify-between text-xs text-slate-500">
+              <li key={a.id} className={`rounded-lg p-2.5 ${a.action === 'note' ? 'bg-amber-50' : 'bg-surface-2'}`}>
+                <div className="flex justify-between text-xs text-muted">
                   <span className="font-semibold">
                     {a.action === 'note' ? '📝 note' : a.action.replace('_', ' ')} — {a.user_name ?? 'system'}
                   </span>

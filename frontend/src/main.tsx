@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import './index.css'
+import { ThemeProvider } from './theme'
 import { AuthProvider, homePathForRole, moduleForPath, roleCanAccess, useAuth } from './auth'
 import Layout from './components/Layout'
 import Landing from './pages/Landing'
@@ -46,6 +47,7 @@ function ModuleRoute({ children }: { children: React.ReactNode }) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+    <ThemeProvider>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
@@ -82,5 +84,6 @@ createRoot(document.getElementById('root')!).render(
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
+    </ThemeProvider>
   </StrictMode>,
 )

@@ -55,7 +55,7 @@ export default function Settings() {
     return (
       <div className="mx-auto max-w-2xl">
         <Card title="Company Settings">
-          <p className="py-8 text-center text-slate-500">Loading…</p>
+          <p className="py-8 text-center text-muted">Loading…</p>
         </Card>
       </div>
     )
@@ -64,7 +64,7 @@ export default function Settings() {
   return (
     <div className="mx-auto max-w-2xl">
       <Card title="Company Settings">
-        <p className="mb-5 text-sm text-slate-500">
+        <p className="mb-5 text-sm text-muted">
           This information appears on your invoices and reports.
         </p>
         <form onSubmit={onSubmit} className="space-y-4">

@@ -18,7 +18,7 @@ function ReportTable({ title, rows, isDriver }: { title: string; rows: WeeklyRow
   return (
     <Card title={title}>
       {rows.length === 0 ? (
-        <p className="py-6 text-center text-sm text-slate-500">No completed loads this week.</p>
+        <p className="py-6 text-center text-sm text-muted">No completed loads this week.</p>
       ) : (
         <Table headers={[isDriver ? 'Driver' : 'Truck', 'Loads', 'Miles', ...(isDriver ? ['Empty Mi.'] : []), 'Revenue', 'Avg $/Mile', ...(isDriver ? ['Driver Pay'] : [])]}>
           {rows.map((r) => (
@@ -29,7 +29,7 @@ function ReportTable({ title, rows, isDriver }: { title: string; rows: WeeklyRow
               {isDriver && <td className="px-3 py-3">{Number(r.empty_miles ?? 0).toLocaleString()}</td>}
               <td className="px-3 py-3">{money(r.revenue)}</td>
               <td className="px-3 py-3">{r.avg_rate_per_mile != null ? `$${Number(r.avg_rate_per_mile).toFixed(2)}` : '—'}</td>
-              {isDriver && <td className="px-3 py-3 font-semibold text-navy-700">{money(r.driver_pay ?? null)}</td>}
+              {isDriver && <td className="px-3 py-3 font-semibold text-brand">{money(r.driver_pay ?? null)}</td>}
             </tr>
           ))}
         </Table>
@@ -50,7 +50,7 @@ export default function Reports() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-navy-800">Weekly Accounting Report</h1>
+        <h1 className="text-xl font-bold text-body">Weekly Accounting Report</h1>
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={() => setWeekOf(shiftWeek(weekOf, -1))}>
             ← Prev
@@ -72,24 +72,24 @@ export default function Reports() {
       {reportQ.isError ? (
         <LoadError error={reportQ.error} onRetry={() => reportQ.refetch()} />
       ) : isLoading || !data ? (
-        <p className="py-8 text-center text-slate-500">Loading…</p>
+        <p className="py-8 text-center text-muted">Loading…</p>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <Card>
-              <div className="text-xs font-semibold uppercase text-slate-500">Loads Completed</div>
+              <div className="text-xs font-semibold uppercase text-muted">Loads Completed</div>
               <div className="mt-1 text-2xl font-bold">{data.totals.loads}</div>
             </Card>
             <Card>
-              <div className="text-xs font-semibold uppercase text-slate-500">Total Miles</div>
+              <div className="text-xs font-semibold uppercase text-muted">Total Miles</div>
               <div className="mt-1 text-2xl font-bold">{Number(data.totals.miles).toLocaleString()}</div>
             </Card>
             <Card>
-              <div className="text-xs font-semibold uppercase text-slate-500">Total Revenue</div>
-              <div className="mt-1 text-2xl font-bold text-navy-700">{money(data.totals.revenue)}</div>
+              <div className="text-xs font-semibold uppercase text-muted">Total Revenue</div>
+              <div className="mt-1 text-2xl font-bold text-brand">{money(data.totals.revenue)}</div>
             </Card>
             <Card>
-              <div className="text-xs font-semibold uppercase text-slate-500">Avg Revenue / Mile</div>
+              <div className="text-xs font-semibold uppercase text-muted">Avg Revenue / Mile</div>
               <div className="mt-1 text-2xl font-bold">
                 {data.totals.avg_rate_per_mile != null ? `$${Number(data.totals.avg_rate_per_mile).toFixed(2)}` : '—'}
               </div>

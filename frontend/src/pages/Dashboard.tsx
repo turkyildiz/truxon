@@ -12,7 +12,7 @@ import type { TrendPoint } from '../types'
 const DASHBOARD_ROLES = ['admin', 'dispatcher', 'accountant']
 
 const STATUS_PILL_COLORS: Record<string, string> = {
-  pending: 'bg-slate-100 text-slate-600',
+  pending: 'bg-slate-100 text-muted',
   assigned: 'bg-blue-100 text-blue-700',
   in_transit: 'bg-amber-100 text-amber-700',
   delivered: 'bg-teal-100 text-teal-700',
@@ -80,7 +80,7 @@ function PeriodSelect({ value, onChange }: { value: 'weekly' | 'monthly'; onChan
 
 function LegendChip({ color, label }: { color: string; label: string }) {
   return (
-    <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+    <span className="flex items-center gap-1.5 text-xs font-medium text-muted">
       <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />
       {label}
     </span>
@@ -106,7 +106,7 @@ export default function Dashboard() {
   if (!canView) {
     return (
       <Card title={`Welcome, ${user?.full_name || user?.username}`}>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           You're signed in as <span className="font-medium capitalize">{user?.role}</span>. Use the menu to reach your modules — company-wide
           dashboards are limited to office staff.
         </p>
@@ -114,7 +114,7 @@ export default function Dashboard() {
     )
   }
   if (summaryQ.isError) return <LoadError error={summaryQ.error} onRetry={() => summaryQ.refetch()} />
-  if (isLoading || !data) return <p className="py-8 text-center text-slate-500">Loading dashboard…</p>
+  if (isLoading || !data) return <p className="py-8 text-center text-muted">Loading dashboard…</p>
 
   const trend: TrendPoint[] = (period === 'weekly' ? data.trend_weekly : data.trend_monthly) ?? []
   const statusPills = Object.entries(data.status_counts).filter(([, v]) => v > 0)
@@ -122,7 +122,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-navy-800">Dashboard</h1>
+        <h1 className="text-xl font-bold text-body">Dashboard</h1>
         <div className="flex gap-2">
           <Button onClick={() => navigate('/dispatch')}>+ New Load</Button>
           <Button variant="secondary" onClick={() => navigate('/reports')}>
@@ -168,14 +168,14 @@ export default function Dashboard() {
       </div>
 
       {/* Fleet strip: availability + live load statuses */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl bg-white px-5 py-3 shadow-sm">
-        <span className="text-sm font-semibold text-navy-800">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl bg-surface px-5 py-3 shadow-sm">
+        <span className="text-sm font-semibold text-body">
           🚛 {data.available_trucks} truck{data.available_trucks === 1 ? '' : 's'} available
         </span>
-        <span className="text-sm font-semibold text-navy-800">🪪 {data.active_drivers} active drivers</span>
+        <span className="text-sm font-semibold text-body">🪪 {data.active_drivers} active drivers</span>
         <span className="ml-auto flex flex-wrap items-center gap-1.5">
           {statusPills.map(([status, n]) => (
-            <span key={status} className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${STATUS_PILL_COLORS[status] ?? 'bg-slate-100 text-slate-600'}`}>
+            <span key={status} className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${STATUS_PILL_COLORS[status] ?? 'bg-slate-100 text-muted'}`}>
               {status.replace('_', ' ')} {n}
             </span>
           ))}
@@ -238,7 +238,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="Top Customers (90 days)" actions={<LegendChip color="#10b981" label="Revenue" />}>
           {data.top_customers.length === 0 ? (
-            <p className="py-16 text-center text-sm text-slate-500">No completed loads in the last 90 days.</p>
+            <p className="py-16 text-center text-sm text-muted">No completed loads in the last 90 days.</p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data.top_customers.map((c) => ({ ...c, short: shortName(c.name) }))}>
@@ -253,7 +253,7 @@ export default function Dashboard() {
         </Card>
         <Card title="Driver Performance (30 days)" actions={<LegendChip color="#f59e0b" label="Miles" />}>
           {data.driver_perf.length === 0 ? (
-            <p className="py-16 text-center text-sm text-slate-500">No completed loads in the last 30 days.</p>
+            <p className="py-16 text-center text-sm text-muted">No completed loads in the last 30 days.</p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data.driver_perf.map((d) => ({ ...d, short: shortName(d.name) }))}>
@@ -273,7 +273,7 @@ export default function Dashboard() {
 
       {data.expiring_licenses.length > 0 && (
         <Card title="⚠️ Licenses Expiring Within 30 Days">
-          <ul className="divide-y divide-slate-100 text-sm">
+          <ul className="divide-y divide-line text-sm">
             {data.expiring_licenses.map((d) => (
               <li key={d.id} className="flex justify-between py-2">
                 <span className="font-medium">{d.full_name}</span>
@@ -286,23 +286,23 @@ export default function Dashboard() {
 
       <Card title="Active Loads">
         {data.active_loads.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-500">No loads currently assigned or in transit.</p>
+          <p className="py-6 text-center text-sm text-muted">No loads currently assigned or in transit.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left">
+                <tr className="border-b border-line text-left">
                   {['Load #', 'Customer', 'Route', 'Driver', 'Pickup', 'Status'].map((h) => (
-                    <th key={h} className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th key={h} className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {data.active_loads.map((l) => (
-                  <tr key={l.id} className="cursor-pointer hover:bg-slate-50" onClick={() => navigate(`/loads/${l.id}`)}>
-                    <td className="px-3 py-3 font-medium text-navy-700">
+                  <tr key={l.id} className="cursor-pointer hover:bg-surface-2" onClick={() => navigate(`/loads/${l.id}`)}>
+                    <td className="px-3 py-3 font-medium text-brand">
                       <Link to={`/loads/${l.id}`} onClick={(e) => e.stopPropagation()}>
                         {l.load_number}
                       </Link>
@@ -312,7 +312,7 @@ export default function Dashboard() {
                       {l.pickup_address?.split(',')[0]} → {l.delivery_address?.split(',')[0]}
                     </td>
                     <td className="px-3 py-3">{l.driver_name ?? '—'}</td>
-                    <td className="px-3 py-3 text-slate-500">{formatDateTime(l.pickup_time)}</td>
+                    <td className="px-3 py-3 text-muted">{formatDateTime(l.pickup_time)}</td>
                     <td className="px-3 py-3">
                       <Badge status={l.status} />
                     </td>

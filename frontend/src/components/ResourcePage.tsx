@@ -173,15 +173,15 @@ export default function ResourcePage<T extends { id: number | string }>({
       }
     >
       {isLoading ? (
-        <p className="py-8 text-center text-slate-500">Loading…</p>
+        <p className="py-8 text-center text-muted">Loading…</p>
       ) : listQ.isError ? (
         <LoadError error={listQ.error} onRetry={() => listQ.refetch()} />
       ) : items.length === 0 ? (
-        <p className="py-8 text-center text-slate-500">No records yet.</p>
+        <p className="py-8 text-center text-muted">No records yet.</p>
       ) : (
         <Table headers={[...columns.map((c) => c.header), '']}>
           {items.map((item) => (
-            <tr key={item.id} className="hover:bg-slate-50">
+            <tr key={item.id} className="hover:bg-surface-2">
               {columns.map((c, i) => (
                 <td key={i} className="px-3 py-3">
                   {c.render(item)}
@@ -189,11 +189,11 @@ export default function ResourcePage<T extends { id: number | string }>({
               ))}
               <td className="px-3 py-3 text-right whitespace-nowrap">
                 {docs && (
-                  <button onClick={() => setDocsFor(item)} className="mr-3 text-sm font-medium text-navy-600 hover:underline">
+                  <button onClick={() => setDocsFor(item)} className="mr-3 text-sm font-medium text-brand hover:underline">
                     Docs
                   </button>
                 )}
-                <button onClick={() => openEdit(item)} className="text-sm font-medium text-navy-600 hover:underline">
+                <button onClick={() => openEdit(item)} className="text-sm font-medium text-brand hover:underline">
                   Edit
                 </button>
               </td>

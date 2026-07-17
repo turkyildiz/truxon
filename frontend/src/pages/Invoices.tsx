@@ -76,16 +76,16 @@ export default function Invoices() {
     <Card title="Invoices" actions={<Button onClick={() => setCreating(true)}>+ Generate Invoice</Button>}>
       {pageError && <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{pageError}</p>}
       {isLoading ? (
-        <p className="py-8 text-center text-slate-500">Loading…</p>
+        <p className="py-8 text-center text-muted">Loading…</p>
       ) : invoicesQ.isError ? (
         <LoadError error={invoicesQ.error} onRetry={() => invoicesQ.refetch()} />
       ) : invoices.length === 0 ? (
-        <p className="py-8 text-center text-slate-500">No invoices yet. Complete a load, then generate one.</p>
+        <p className="py-8 text-center text-muted">No invoices yet. Complete a load, then generate one.</p>
       ) : (
         <Table headers={['Invoice #', 'Customer', 'Date', 'Loads', 'Total', 'Status', '']}>
           {invoices.map((inv) => (
-            <tr key={inv.id} className="hover:bg-slate-50">
-              <td className="px-3 py-3 font-medium text-navy-700">{inv.invoice_number}</td>
+            <tr key={inv.id} className="hover:bg-surface-2">
+              <td className="px-3 py-3 font-medium text-brand">{inv.invoice_number}</td>
               <td className="px-3 py-3">{inv.customer_name}</td>
               <td className="px-3 py-3">{formatDate(inv.invoice_date)}</td>
               <td className="px-3 py-3">{inv.load_count}</td>
@@ -94,7 +94,7 @@ export default function Invoices() {
                 <Badge status={inv.status} />
               </td>
               <td className="px-3 py-3 text-right whitespace-nowrap">
-                <button onClick={() => pdf(inv.id)} className="mr-3 text-sm font-medium text-navy-600 hover:underline">
+                <button onClick={() => pdf(inv.id)} className="mr-3 text-sm font-medium text-brand hover:underline">
                   PDF
                 </button>
                 {inv.status === 'draft' && (
@@ -156,17 +156,17 @@ export default function Invoices() {
 
           {customerId && (
             <div>
-              <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Completed loads ready to bill</div>
+              <div className="mb-2 text-xs font-semibold uppercase text-muted">Completed loads ready to bill</div>
               {billableLoads.length === 0 ? (
-                <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">No completed, un-billed loads for this customer.</p>
+                <p className="rounded-lg bg-surface-2 p-4 text-sm text-muted">No completed, un-billed loads for this customer.</p>
               ) : (
                 <ul className="max-h-64 space-y-1 overflow-y-auto">
                   {billableLoads.map((l) => (
                     <li key={l.id}>
-                      <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-3 text-sm hover:bg-slate-50">
+                      <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-line p-3 text-sm hover:bg-surface-2">
                         <input type="checkbox" checked={selected.has(l.id)} onChange={() => toggle(l.id)} className="h-4 w-4" />
                         <span className="font-medium">{l.load_number}</span>
-                        <span className="flex-1 truncate text-slate-500">
+                        <span className="flex-1 truncate text-muted">
                           {l.pickup_address?.split(',')[0]} → {l.delivery_address?.split(',')[0]}
                         </span>
                         <span className="font-semibold">{money(l.rate)}</span>
@@ -177,8 +177,8 @@ export default function Invoices() {
               )}
               {selected.size > 0 && (
                 <div className="mt-3 text-right text-sm">
-                  <span className="text-slate-500">{selected.size} load(s) — total </span>
-                  <span className="text-lg font-bold text-navy-700">{money(total)}</span>
+                  <span className="text-muted">{selected.size} load(s) — total </span>
+                  <span className="text-lg font-bold text-brand">{money(total)}</span>
                 </div>
               )}
             </div>

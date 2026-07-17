@@ -27,7 +27,7 @@ export default function Drivers() {
         { header: 'Pay/Mile', render: (d) => `$${Number(d.pay_per_mile).toFixed(2)}` },
         {
           header: 'Login',
-          render: (d) => (d.user_id ? <span className="text-sm text-slate-600">Linked</span> : <span className="text-slate-400">—</span>),
+          render: (d) => (d.user_id ? <span className="text-sm text-muted">Linked</span> : <span className="text-muted">—</span>),
         },
         { header: 'Status', render: (d) => <Badge status={d.status} /> },
       ]}

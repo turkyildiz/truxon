@@ -41,7 +41,7 @@ const STEPS = [
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-white text-slate-800">
+    <div className="min-h-screen bg-surface text-body">
       {/* Nav */}
       <header className="sticky top-0 z-20 border-b border-white/10 bg-navy-900/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
@@ -109,31 +109,31 @@ export default function Landing() {
 
       {/* Features */}
       <section id="features" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-        <h2 className="text-center text-3xl font-bold text-navy-800 sm:text-4xl">Everything a carrier needs. Nothing it doesn't.</h2>
-        <p className="mx-auto mt-3 max-w-2xl text-center text-slate-500">
+        <h2 className="text-center text-3xl font-bold text-body sm:text-4xl">Everything a carrier needs. Nothing it doesn't.</h2>
+        <p className="mx-auto mt-3 max-w-2xl text-center text-muted">
           Every module talks to the others — assign a truck and its status updates, complete a load and it's ready to bill.
         </p>
         <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
-            <div key={f.title} className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition-shadow hover:shadow-md">
+            <div key={f.title} className="rounded-2xl border border-line bg-surface p-7 shadow-sm transition-shadow hover:shadow-md">
               <div className="text-3xl">{f.icon}</div>
-              <h3 className="mt-4 text-lg font-semibold text-navy-800">{f.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">{f.text}</p>
+              <h3 className="mt-4 text-lg font-semibold text-body">{f.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted">{f.text}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* How it works */}
-      <section id="how" className="bg-slate-50 py-20">
+      <section id="how" className="bg-surface-2 py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <h2 className="text-center text-3xl font-bold text-navy-800 sm:text-4xl">From email attachment to paid invoice</h2>
+          <h2 className="text-center text-3xl font-bold text-body sm:text-4xl">From email attachment to paid invoice</h2>
           <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-3">
             {STEPS.map((s) => (
-              <div key={s.n} className="relative rounded-2xl bg-white p-8 shadow-sm">
+              <div key={s.n} className="relative rounded-2xl bg-surface p-8 shadow-sm">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-lg font-bold text-white">{s.n}</div>
-                <h3 className="mt-4 text-lg font-semibold text-navy-800">{s.title}</h3>
-                <p className="mt-2 text-sm text-slate-500">{s.text}</p>
+                <h3 className="mt-4 text-lg font-semibold text-body">{s.title}</h3>
+                <p className="mt-2 text-sm text-muted">{s.text}</p>
               </div>
             ))}
           </div>
@@ -149,8 +149,8 @@ export default function Landing() {
 
       {/* CTA / Contact */}
       <section id="contact" className="mx-auto max-w-6xl px-4 py-20 text-center sm:px-6">
-        <h2 className="text-3xl font-bold text-navy-800 sm:text-4xl">Ready to see it on your loads?</h2>
-        <p className="mx-auto mt-3 max-w-xl text-slate-500">
+        <h2 className="text-3xl font-bold text-body sm:text-4xl">Ready to see it on your loads?</h2>
+        <p className="mx-auto mt-3 max-w-xl text-muted">
           Get a walkthrough with your own rate confirmations and see the difference on day one.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
@@ -160,24 +160,24 @@ export default function Landing() {
           >
             Request a Demo
           </a>
-          <Link to="/login" className="rounded-lg border border-slate-300 px-8 py-3.5 text-base font-semibold text-navy-700 transition-colors hover:bg-slate-50">
+          <Link to="/login" className="rounded-lg border border-line px-8 py-3.5 text-base font-semibold text-brand transition-colors hover:bg-surface-2">
             Existing customer? Log in
           </Link>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-slate-50">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 text-sm text-slate-500 sm:flex-row sm:px-6">
+      <footer className="border-t border-line bg-surface-2">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 text-sm text-muted sm:flex-row sm:px-6">
           <div className="flex items-center gap-2">
             <span className="text-xl">🚛</span>
-            <span className="font-semibold text-navy-800">Truxon</span>
+            <span className="font-semibold text-body">Truxon</span>
             <span>© {new Date().getFullYear()}</span>
           </div>
           <div className="flex gap-6">
-            <a href="#features" className="hover:text-navy-700">Features</a>
-            <a href="#contact" className="hover:text-navy-700">Contact</a>
-            <Link to="/login" className="hover:text-navy-700">Log in</Link>
+            <a href="#features" className="hover:text-brand">Features</a>
+            <a href="#contact" className="hover:text-brand">Contact</a>
+            <Link to="/login" className="hover:text-brand">Log in</Link>
           </div>
         </div>
       </footer>

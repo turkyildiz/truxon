@@ -49,7 +49,7 @@ export default function StopsEditor({ stops, onChange, onRouteBlur }: Props) {
         return (
           <div key={g.type}>
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted">
                 {g.label} {ofType.length > 1 ? `(${ofType.length} stops)` : ''}
               </span>
               <Button type="button" variant="secondary" className="!py-1 text-xs" onClick={() => add(g.type)}>
@@ -58,9 +58,9 @@ export default function StopsEditor({ stops, onChange, onRouteBlur }: Props) {
             </div>
             <div className="space-y-3">
               {ofType.map(({ s, i }, n) => (
-                <div key={i} className="rounded-xl border border-slate-200 p-3">
+                <div key={i} className="rounded-xl border border-line p-3">
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-navy-700">
+                    <span className="text-xs font-semibold text-brand">
                       {g.label} {ofType.length > 1 ? `#${n + 1}` : ''}
                     </span>
                     {ofType.length > 1 && (

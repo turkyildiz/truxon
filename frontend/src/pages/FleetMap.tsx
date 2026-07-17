@@ -99,7 +99,7 @@ function MapCanvas({ pins }: { pins: FleetPin[] }) {
   }, [pins])
 
   if (!MAPS_KEY) return null
-  return <div ref={ref} className="mb-4 h-80 w-full overflow-hidden rounded-xl border border-slate-200" />
+  return <div ref={ref} className="mb-4 h-80 w-full overflow-hidden rounded-xl border border-line" />
 }
 
 export default function FleetMap() {
@@ -112,22 +112,22 @@ export default function FleetMap() {
   return (
     <Card title="Live fleet">
       {isLoading ? (
-        <p className="py-6 text-center text-slate-500">Loading positions…</p>
+        <p className="py-6 text-center text-muted">Loading positions…</p>
       ) : error ? (
-        <p className="py-6 text-center text-sm text-slate-500">Fleet map unavailable (apply companion migration + link drivers).</p>
+        <p className="py-6 text-center text-sm text-muted">Fleet map unavailable (apply companion migration + link drivers).</p>
       ) : pins.length === 0 ? (
-        <p className="py-6 text-center text-slate-500">No active GPS pins yet. Drivers go on duty or start a load in the companion app.</p>
+        <p className="py-6 text-center text-muted">No active GPS pins yet. Drivers go on duty or start a load in the companion app.</p>
       ) : (
         <>
           <MapCanvas pins={pins} />
           {!MAPS_KEY && (
-            <p className="mb-3 text-xs text-slate-500">
+            <p className="mb-3 text-xs text-muted">
               Set <code className="rounded bg-slate-100 px-1">VITE_GOOGLE_MAPS_JS_KEY</code> (browser key, referrer-restricted) for the map canvas.
             </p>
           )}
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="border-b text-xs uppercase text-slate-500">
+              <thead className="border-b text-xs uppercase text-muted">
                 <tr>
                   <th className="px-2 py-2">Driver</th>
                   <th className="px-2 py-2">Truck</th>
@@ -140,14 +140,14 @@ export default function FleetMap() {
                 {pins.map((p) => {
                   const age = ageLabel(p.recorded_at)
                   return (
-                    <tr key={p.driver_id} className="border-b border-slate-100">
+                    <tr key={p.driver_id} className="border-b border-line">
                       <td className="px-2 py-2 font-medium">{p.driver_name}</td>
                       <td className="px-2 py-2">{p.truck_unit ?? '—'}</td>
                       <td className="px-2 py-2">{p.load_number ?? '—'}</td>
                       <td className="px-2 py-2 font-mono text-xs">
                         {p.lat.toFixed(4)}, {p.lng.toFixed(4)}
                       </td>
-                      <td className={`px-2 py-2 ${age.stale ? 'font-semibold text-amber-700' : 'text-slate-500'}`}>{age.text}</td>
+                      <td className={`px-2 py-2 ${age.stale ? 'font-semibold text-amber-700' : 'text-muted'}`}>{age.text}</td>
                     </tr>
                   )
                 })}

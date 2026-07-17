@@ -105,7 +105,7 @@ export default function TruxChat({ onClose }: { onClose?: () => void }) {
   const suggestions = SUGGESTIONS[user?.role ?? ''] ?? []
 
   return (
-    <div className="flex h-full flex-col rounded-xl bg-white shadow-2xl ring-1 ring-slate-200">
+    <div className="flex h-full flex-col rounded-xl bg-surface shadow-2xl ring-1 ring-slate-200">
       <div className="flex items-center justify-between rounded-t-xl bg-navy-900 px-4 py-3 text-white">
         <div className="flex items-center gap-2">
           <span className="text-lg">🤖</span>
@@ -118,16 +118,16 @@ export default function TruxChat({ onClose }: { onClose?: () => void }) {
           </button>
         )}
       </div>
-      <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto bg-slate-50 p-3 text-sm">
+      <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto bg-surface-2 p-3 text-sm">
         {log.length === 0 && (
           <div className="space-y-2">
-            <p className="text-slate-500">Ask Trux about your work. Any action it proposes needs your confirmation.</p>
+            <p className="text-muted">Ask Trux about your work. Any action it proposes needs your confirmation.</p>
             {suggestions.map((s) => (
               <button
                 key={s}
                 onClick={() => send.mutate(s)}
                 disabled={send.isPending}
-                className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-slate-700 hover:border-navy-600 hover:text-navy-700"
+                className="block w-full rounded-lg border border-line bg-surface px-3 py-2 text-left text-body hover:border-navy-600 hover:text-brand"
               >
                 {s}
               </button>
@@ -138,7 +138,7 @@ export default function TruxChat({ onClose }: { onClose?: () => void }) {
           <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
             <div
               className={`inline-block max-w-[95%] rounded-lg px-3 py-2 text-left whitespace-pre-wrap ${
-                m.role === 'user' ? 'bg-navy-700 text-white' : 'border border-slate-200 bg-white text-slate-800'
+                m.role === 'user' ? 'bg-navy-700 text-white' : 'border border-line bg-surface text-body'
               }`}
             >
               {m.content}
@@ -158,7 +158,7 @@ export default function TruxChat({ onClose }: { onClose?: () => void }) {
             ))}
           </div>
         ))}
-        {send.isPending && <p className="text-slate-400">Trux is thinking…</p>}
+        {send.isPending && <p className="text-muted">Trux is thinking…</p>}
       </div>
       {error && <p className="px-3 pt-2 text-sm text-red-600">{error}</p>}
       <form onSubmit={onSubmit} className="flex gap-2 p-3">

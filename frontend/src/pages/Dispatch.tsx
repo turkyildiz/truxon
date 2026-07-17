@@ -208,17 +208,17 @@ export default function Dispatch() {
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
           className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
-            dragOver ? 'border-navy-600 bg-navy-50' : 'border-slate-300'
+            dragOver ? 'border-navy-600 bg-navy-50' : 'border-line'
           }`}
         >
           <div className="text-3xl">📄</div>
           <p className="mt-2 text-sm font-medium">Drop a rate confirmation / load tender PDF here</p>
-          <p className="text-xs text-slate-500">or</p>
+          <p className="text-xs text-muted">or</p>
           <label className="mt-2 cursor-pointer rounded-lg bg-navy-700 px-4 py-2 text-sm font-medium text-white hover:bg-navy-800">
             {extract.isPending ? 'Extracting…' : 'Choose PDF'}
             <input type="file" accept="application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && extract.mutate(e.target.files[0])} />
           </label>
-          {aiNote && <p className="mt-3 text-sm text-navy-700">{aiNote}</p>}
+          {aiNote && <p className="mt-3 text-sm text-brand">{aiNote}</p>}
         </div>
       </Card>
 
@@ -281,7 +281,7 @@ export default function Dispatch() {
               <Field label="Empty Mi." className="w-24">
                 <Input type="number" step="0.1" value={form.empty_miles} onChange={(e) => setForm({ ...form, empty_miles: e.target.value })} />
               </Field>
-              {rpm && <div className="pb-3 text-sm font-semibold text-navy-700">${rpm}/mi</div>}
+              {rpm && <div className="pb-3 text-sm font-semibold text-brand">${rpm}/mi</div>}
             </div>
             <div className="flex items-end gap-3 pb-1">
               <Button

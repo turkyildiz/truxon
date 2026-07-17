@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { ROLE_MODULES, useAuth } from '../auth'
 import { globalSearch } from '../data'
 import { errorMessage, supabase } from '../supabase'
+import { useTheme } from '../theme'
 import type { SearchResults } from '../types'
 import { TruxLauncher } from './TruxChat'
 import { Button, Field, Input, Modal } from './ui'
@@ -144,26 +145,26 @@ function GlobalSearch() {
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Search loads, customers, drivers, trucks…"
-        className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm focus:border-navy-600 focus:outline-none"
+        className="w-full rounded-lg border border-line bg-surface px-4 py-2 text-sm text-body placeholder:text-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
       />
       {failed && (
-        <div className="absolute top-full z-40 mt-1 w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-red-600 shadow-lg">
+        <div className="absolute top-full z-40 mt-1 w-full rounded-lg border border-line bg-surface p-3 text-sm text-red-600 shadow-lg">
           Search failed — check your connection and keep typing to retry.
         </div>
       )}
       {results && (
-        <div className="absolute top-full z-40 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg">
-          {sections.every((s) => s.items.length === 0) && <div className="p-3 text-sm text-slate-500">No results</div>}
+        <div className="absolute top-full z-40 mt-1 w-full rounded-lg border border-line bg-surface shadow-lg">
+          {sections.every((s) => s.items.length === 0) && <div className="p-3 text-sm text-muted">No results</div>}
           {sections.map(
             (s) =>
               s.items.length > 0 && (
-                <div key={s.title} className="border-b border-slate-100 last:border-0">
-                  <div className="px-3 pt-2 text-xs font-semibold uppercase text-slate-400">{s.title}</div>
+                <div key={s.title} className="border-b border-line last:border-0">
+                  <div className="px-3 pt-2 text-xs font-semibold uppercase text-muted">{s.title}</div>
                   {s.items.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => go(s.path(item.id))}
-                      className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                      className="block w-full px-3 py-2 text-left text-sm text-body hover:bg-surface-2"
                     >
                       {item.label}
                     </button>
@@ -179,6 +180,7 @@ function GlobalSearch() {
 
 export default function Layout() {
   const { user, logout } = useAuth()
+  const { theme, toggle } = useTheme()
   const [menuOpen, setMenuOpen] = useState(false)
   const [pwOpen, setPwOpen] = useState(false)
   const allowed = ROLE_MODULES[user?.role ?? 'driver'] ?? []
@@ -215,25 +217,32 @@ export default function Layout() {
       {menuOpen && <div className="fixed inset-0 z-20 bg-black/30 lg:hidden" onClick={() => setMenuOpen(false)} />}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-slate-200 bg-white px-4 py-3">
-          <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm lg:hidden" onClick={() => setMenuOpen(true)}>
+        <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-line bg-surface px-4 py-3">
+          <button className="rounded-lg border border-line px-3 py-2 text-sm lg:hidden" onClick={() => setMenuOpen(true)}>
             ☰
           </button>
           {/* The global_search RPC is gated to office roles — don't show a box that can only fail. */}
           {['admin', 'dispatcher', 'accountant'].includes(user?.role ?? '') && <GlobalSearch />}
           <div className="ml-auto flex items-center gap-3">
             <div className="hidden text-right sm:block">
-              <div className="text-sm font-medium">{user?.full_name || user?.username}</div>
-              <div className="text-xs capitalize text-slate-500">{user?.role}</div>
+              <div className="text-sm font-medium text-body">{user?.full_name || user?.username}</div>
+              <div className="text-xs capitalize text-muted">{user?.role}</div>
             </div>
+            <button
+              onClick={toggle}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="rounded-lg border border-line px-3 py-2 text-sm hover:bg-surface-2"
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
             <button
               onClick={() => setPwOpen(true)}
               title="Change password"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+              className="rounded-lg border border-line px-3 py-2 text-sm hover:bg-surface-2"
             >
               🔑
             </button>
-            <button onClick={logout} className="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
+            <button onClick={logout} className="rounded-lg border border-line px-3 py-2 text-sm text-body hover:bg-surface-2">
               Sign out
             </button>
           </div>
