@@ -91,6 +91,21 @@ export async function fleetPositionsSnapshot(): Promise<FleetPin[]> {
   return (data as FleetPin[]) ?? []
 }
 
+/** Recent breadcrumb trail for one driver (staff-readable via vehicle_positions RLS). */
+export async function driverTrail(driverId: number): Promise<{ lat: number; lng: number }[]> {
+  const data = unwrap(
+    await supabase
+      .from('vehicle_positions')
+      .select('lat, lng, recorded_at')
+      .eq('driver_id', driverId)
+      .order('recorded_at', { ascending: false })
+      .limit(60),
+  )
+  return ((data as { lat: number; lng: number }[]) ?? [])
+    .map((p) => ({ lat: p.lat, lng: p.lng }))
+    .reverse()
+}
+
 export async function createDriver(payload: Row): Promise<Driver> {
   return unwrap(await supabase.from('drivers').insert(payload).select().single())
 }
