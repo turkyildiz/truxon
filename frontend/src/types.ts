@@ -43,6 +43,8 @@ export interface Driver {
   pay_per_empty_mile: number
   notes: string
   status: 'active' | 'inactive' | 'terminated'
+  /** Linked auth profile (role must be driver). */
+  user_id?: string | null
 }
 
 export interface Equipment {

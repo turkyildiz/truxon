@@ -1,0 +1,200 @@
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/api.dart';
+
+class LoadsScreen extends StatefulWidget {
+  const LoadsScreen({super.key, required this.api, this.onTrackingHint});
+
+  final CompanionApi api;
+  final void Function(bool hasActiveLoad)? onTrackingHint;
+
+  @override
+  State<LoadsScreen> createState() => _LoadsScreenState();
+}
+
+class _LoadsScreenState extends State<LoadsScreen> {
+  List<DriverLoad> _loads = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await _replayOutbox();
+      final loads = await widget.api.myLoads();
+      final active = loads.any((l) => l.status == 'assigned' || l.status == 'in_transit');
+      widget.onTrackingHint?.call(active);
+      setState(() => _loads = loads);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _replayOutbox() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('status_outbox');
+    final items = OfflineOutbox.decode(raw);
+    if (items.isEmpty) return;
+    final remaining = <Map<String, dynamic>>[];
+    for (final item in items) {
+      try {
+        await widget.api.changeStatus(item['load_id'] as int, item['status'] as String);
+      } catch (_) {
+        remaining.add(item);
+      }
+    }
+    await prefs.setString('status_outbox', OfflineOutbox.encode(remaining));
+  }
+
+  Future<void> _queueOrSendStatus(DriverLoad load, String next) async {
+    try {
+      await widget.api.changeStatus(load.id, next);
+      await _refresh();
+    } catch (e) {
+      final prefs = await SharedPreferences.getInstance();
+      final items = OfflineOutbox.decode(prefs.getString('status_outbox'));
+      items.add({'load_id': load.id, 'status': next, 'queued_at': DateTime.now().toIso8601String()});
+      await prefs.setString('status_outbox', OfflineOutbox.encode(items));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Queued offline: $next ($e)')),
+        );
+      }
+    }
+  }
+
+  String? _nextStatus(String status) {
+    if (status == 'assigned') return 'in_transit';
+    if (status == 'in_transit') return 'delivered';
+    return null;
+  }
+
+  String _label(String status) {
+    if (status == 'assigned') return 'Start trip (In transit)';
+    if (status == 'in_transit') return 'Mark delivered';
+    return status;
+  }
+
+  Future<void> _openDocs(DriverLoad load) async {
+    try {
+      final docs = await widget.api.listDocuments(load.id);
+      if (!mounted) return;
+      if (docs.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No documents')));
+        return;
+      }
+      await showModalBottomSheet(
+        context: context,
+        builder: (ctx) => ListView(
+          children: docs.map((d) {
+            return ListTile(
+              title: Text((d['filename'] ?? d['doc_type'] ?? 'file') as String),
+              subtitle: Text((d['doc_type'] ?? '') as String),
+              onTap: () async {
+                final path = d['storage_path'] as String?;
+                if (path == null) return;
+                final url = await widget.api.signedDocUrl(path);
+                if (url != null) await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+              },
+            );
+          }).toList(),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_error!, textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            FilledButton(onPressed: _refresh, child: const Text('Retry')),
+          ],
+        ),
+      );
+    }
+    if (_loads.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _refresh,
+        child: ListView(
+          children: const [
+            SizedBox(height: 120),
+            Center(child: Text('No assigned loads. Ask dispatch to link your login to a driver record.')),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(12),
+        itemCount: _loads.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (context, i) {
+          final load = _loads[i];
+          final next = _nextStatus(load.status);
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(load.loadNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                      Chip(label: Text(load.status)),
+                    ],
+                  ),
+                  if (load.customerName != null) Text(load.customerName!),
+                  const SizedBox(height: 6),
+                  Text('PU: ${load.pickup}'),
+                  Text('DEL: ${load.delivery}'),
+                  if (load.truckUnit != null) Text('Truck: ${load.truckUnit}'),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      if (next != null)
+                        FilledButton(
+                          onPressed: () => _queueOrSendStatus(load, next),
+                          child: Text(_label(load.status)),
+                        ),
+                      OutlinedButton(
+                        onPressed: () => _openDocs(load),
+                        child: const Text('Paperwork'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}

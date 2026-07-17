@@ -1,6 +1,6 @@
 import ResourcePage from '../components/ResourcePage'
 import { Badge, formatDate } from '../components/ui'
-import { createDriver, listDrivers, updateDriver } from '../data'
+import { createDriver, listDrivers, listLinkableDriverProfiles, updateDriver } from '../data'
 import type { Driver } from '../types'
 
 export default function Drivers() {
@@ -25,6 +25,10 @@ export default function Drivers() {
         },
         { header: 'Hired', render: (d) => formatDate(d.hire_date) },
         { header: 'Pay/Mile', render: (d) => `$${Number(d.pay_per_mile).toFixed(2)}` },
+        {
+          header: 'Login',
+          render: (d) => (d.user_id ? <span className="text-sm text-slate-600">Linked</span> : <span className="text-slate-400">—</span>),
+        },
         { header: 'Status', render: (d) => <Badge status={d.status} /> },
       ]}
       fields={[
@@ -52,10 +56,11 @@ export default function Drivers() {
             { value: 'terminated', label: 'Terminated' },
           ],
         },
+        { name: 'user_id', label: 'Linked login (driver role)', type: 'select' },
         { name: 'notes', label: 'Notes (medical, drug tests…)', type: 'textarea', full: true },
       ]}
       docs={{ entityType: 'driver', docTypes: ['License', 'Medical Card', 'Employment', 'Other'], label: (d) => d.full_name }}
-      defaults={{ full_name: '', phone: '', email: '', address: '', city: '', state: '', license_number: '', license_expiration: '', date_of_birth: '', hire_date: '', pay_per_mile: '0', empty_miles_paid: false, pay_per_empty_mile: '0', status: 'active', notes: '' }}
+      defaults={{ full_name: '', phone: '', email: '', address: '', city: '', state: '', license_number: '', license_expiration: '', date_of_birth: '', hire_date: '', pay_per_mile: '0', empty_miles_paid: false, pay_per_empty_mile: '0', status: 'active', user_id: '', notes: '' }}
       toForm={(d) => ({
         full_name: d.full_name,
         phone: d.phone,
@@ -71,8 +76,18 @@ export default function Drivers() {
         empty_miles_paid: d.empty_miles_paid,
         pay_per_empty_mile: d.pay_per_empty_mile,
         status: d.status,
+        user_id: d.user_id ?? '',
         notes: d.notes,
       })}
+      fieldOptionsLoader={async (item) => {
+        const profiles = await listLinkableDriverProfiles(item?.user_id ?? null)
+        return {
+          user_id: profiles.map((p) => ({
+            value: p.id,
+            label: `${p.username}${p.full_name ? ` (${p.full_name})` : ''}`,
+          })),
+        }
+      }}
     />
   )
 }

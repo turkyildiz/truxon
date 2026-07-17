@@ -50,6 +50,8 @@ interface Props<T extends { id: number | string }> {
    * onPrefillConsumed. */
   prefill?: Record<string, unknown> | null
   onPrefillConsumed?: () => void
+  /** Load dynamic select options when opening create/edit. */
+  fieldOptionsLoader?: (item: T | null) => Promise<Record<string, { value: string; label: string }[]>>
 }
 
 export default function ResourcePage<T extends { id: number | string }>({
@@ -67,6 +69,7 @@ export default function ResourcePage<T extends { id: number | string }>({
   docs,
   prefill,
   onPrefillConsumed,
+  fieldOptionsLoader,
 }: Props<T>) {
   const qc = useQueryClient()
   const [params] = useSearchParams()
@@ -77,6 +80,7 @@ export default function ResourcePage<T extends { id: number | string }>({
   const [docsFor, setDocsFor] = useState<T | null>(null)
   const [form, setForm] = useState<Record<string, unknown>>({})
   const [error, setError] = useState('')
+  const [dynamicOptions, setDynamicOptions] = useState<Record<string, { value: string; label: string }[]>>({})
 
   // Global search deep-links here with ?q=…; pick it up even when the page
   // is already mounted.
@@ -116,22 +120,37 @@ export default function ResourcePage<T extends { id: number | string }>({
     onError: (err) => setError(errorMessage(err)),
   })
 
+  async function loadOptions(item: T | null) {
+    if (!fieldOptionsLoader) {
+      setDynamicOptions({})
+      return
+    }
+    try {
+      setDynamicOptions(await fieldOptionsLoader(item))
+    } catch {
+      setDynamicOptions({})
+    }
+  }
+
   function openCreate() {
     setForm({ ...defaults })
     setCreating(true)
     setError('')
+    void loadOptions(null)
   }
 
   function openEdit(item: T) {
     setForm(toForm(item))
     setEditing(item)
     setError('')
+    void loadOptions(item)
   }
 
   function close() {
     setEditing(null)
     setCreating(false)
     setError('')
+    setDynamicOptions({})
   }
 
   function onSubmit(e: FormEvent) {
@@ -197,7 +216,7 @@ export default function ResourcePage<T extends { id: number | string }>({
                 {f.type === 'select' ? (
                   <Select value={String(form[f.name] ?? '')} onChange={(e) => setForm({ ...form, [f.name]: e.target.value })} required={f.required}>
                     {!f.required && <option value="">—</option>}
-                    {f.options?.map((o) => (
+                    {(dynamicOptions[f.name] ?? f.options)?.map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
                       </option>

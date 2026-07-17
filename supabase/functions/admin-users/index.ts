@@ -2,11 +2,13 @@
 // role key, which must never reach the browser — so it lives here.
 //
 //   GET    → list users (profiles + email)
-//   POST   {email, password, username?, full_name?, role}   → create user
-//   PATCH  {id, full_name?, password?, role?, is_active?}   → update user
+//   POST   {email, password, username?, full_name?, role, link_driver_id?}
+//   PATCH  {id, full_name?, password?, role?, is_active?}
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { corsResponse, getCaller, json } from '../_shared/auth.ts'
+
+const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver', 'accountant', 'maintenance'])
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
@@ -33,9 +35,25 @@ Deno.serve(async (req) => {
   }
 
   if (req.method === 'POST') {
-    const { email, password, username, full_name, role } = await req.json()
+    const body = await req.json()
+    const { email, password, username, full_name, role, link_driver_id } = body
     if (!email || !password || !role) return json({ error: 'email, password and role are required' }, 422)
+    if (!VALID_ROLES.has(String(role))) return json({ error: 'Invalid role' }, 422)
     if (String(password).length < 8) return json({ error: 'Password must be at least 8 characters' }, 422)
+    if (link_driver_id != null && role !== 'driver') {
+      return json({ error: 'link_driver_id requires role=driver' }, 422)
+    }
+
+    if (link_driver_id != null) {
+      const { data: drv, error: dErr } = await admin
+        .from('drivers')
+        .select('id, user_id')
+        .eq('id', link_driver_id)
+        .maybeSingle()
+      if (dErr) return json({ error: dErr.message }, 400)
+      if (!drv) return json({ error: 'Driver not found' }, 404)
+      if (drv.user_id) return json({ error: 'Driver already linked to a login' }, 409)
+    }
 
     const { data, error } = await admin.auth.admin.createUser({
       email,
@@ -44,6 +62,18 @@ Deno.serve(async (req) => {
       user_metadata: { username: username || email.split('@')[0], full_name: full_name ?? '', role },
     })
     if (error) return json({ error: error.message }, 400)
+
+    if (link_driver_id != null && data.user) {
+      const { error: linkErr } = await admin
+        .from('drivers')
+        .update({ user_id: data.user.id })
+        .eq('id', link_driver_id)
+      if (linkErr) {
+        await admin.auth.admin.deleteUser(data.user.id).catch(() => {})
+        return json({ error: `User created but driver link failed: ${linkErr.message}` }, 400)
+      }
+    }
+
     return json({ id: data.user.id }, 201)
   }
 
@@ -51,13 +81,38 @@ Deno.serve(async (req) => {
     const { id, full_name, password, role, is_active } = await req.json()
     if (!id) return json({ error: 'id is required' }, 422)
 
+    if (role !== undefined && !VALID_ROLES.has(String(role))) {
+      return json({ error: 'Invalid role' }, 422)
+    }
+
+    if (role !== undefined || is_active === false) {
+      const { data: target } = await admin.from('profiles').select('role, is_active').eq('id', id).maybeSingle()
+      if (target?.role === 'admin' && target.is_active) {
+        const demoting = role !== undefined && role !== 'admin'
+        const deactivating = is_active === false
+        if (demoting || deactivating) {
+          const { count } = await admin
+            .from('profiles')
+            .select('id', { count: 'exact', head: true })
+            .eq('role', 'admin')
+            .eq('is_active', true)
+          if ((count ?? 0) <= 1) {
+            return json({ error: 'Cannot demote or deactivate the last remaining admin' }, 400)
+          }
+        }
+      }
+    }
+
+    if (id === caller.userId && is_active === false) {
+      return json({ error: 'Cannot deactivate your own account' }, 400)
+    }
+
     if (password) {
       if (String(password).length < 8) return json({ error: 'Password must be at least 8 characters' }, 422)
       const { error } = await admin.auth.admin.updateUserById(id, { password })
       if (error) return json({ error: error.message }, 400)
     }
     if (is_active !== undefined) {
-      // Disable sign-in for deactivated accounts (100-year ban) and revoke sessions.
       const { error } = await admin.auth.admin.updateUserById(id, {
         ban_duration: is_active ? 'none' : '876000h',
       })

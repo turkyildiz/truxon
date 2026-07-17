@@ -42,9 +42,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') setUser(null)
-      // SIGNED_IN is handled by login() so the UI waits for the profile.
-      if (event === 'TOKEN_REFRESHED' && !session) setUser(null)
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+        return
+      }
+      // Re-fetch profile so demotions / deactivations take effect without full reload.
+      if ((event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session?.user.id) {
+        void fetchProfile(session.user.id)
+          .then((profile) => {
+            if (!profile || !profile.is_active) {
+              void supabase.auth.signOut()
+              setUser(null)
+            } else {
+              setUser(profile)
+            }
+          })
+          .catch(() => {
+            /* keep prior profile on transient errors */
+          })
+      } else if (event === 'TOKEN_REFRESHED' && !session) {
+        setUser(null)
+      }
     })
     return () => sub.subscription.unsubscribe()
   }, [])
@@ -83,4 +101,40 @@ export const ROLE_MODULES: Record<string, string[]> = {
   accountant: ['dashboard', 'loads', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', ...DRIVES],
   maintenance: ['trucks', 'trailers', 'maintenance', ...DRIVES],
   driver: ['dashboard', ...DRIVES],
+}
+
+/** Map app route prefixes to ROLE_MODULES keys. */
+export const ROUTE_MODULE: { prefix: string; module: string }[] = [
+  { prefix: '/dashboard', module: 'dashboard' },
+  { prefix: '/loads', module: 'loads' },
+  { prefix: '/dispatch', module: 'dispatch' },
+  { prefix: '/customers', module: 'customers' },
+  { prefix: '/drivers', module: 'drivers' },
+  { prefix: '/trucks', module: 'trucks' },
+  { prefix: '/trailers', module: 'trailers' },
+  { prefix: '/maintenance', module: 'maintenance' },
+  { prefix: '/reports', module: 'reports' },
+  { prefix: '/invoices', module: 'invoices' },
+  { prefix: '/personal-drive', module: 'personal_drive' },
+  { prefix: '/team-drive', module: 'team_drive' },
+  { prefix: '/users', module: 'users' },
+  { prefix: '/settings', module: 'settings' },
+]
+
+export function moduleForPath(pathname: string): string | null {
+  const hit = ROUTE_MODULE.find((r) => pathname === r.prefix || pathname.startsWith(r.prefix + '/'))
+  return hit?.module ?? null
+}
+
+export function roleCanAccess(role: string, module: string): boolean {
+  if (role === 'admin') return true
+  return (ROLE_MODULES[role] ?? []).includes(module)
+}
+
+export function homePathForRole(role: string): string {
+  const mods = ROLE_MODULES[role] ?? ['dashboard']
+  const first = mods[0] ?? 'dashboard'
+  if (first === 'personal_drive') return '/personal-drive'
+  if (first === 'team_drive') return '/team-drive'
+  return `/${first}`
 }
