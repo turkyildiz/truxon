@@ -63,3 +63,26 @@ This Mac clone has **no** `.env.local` / Supabase access token. Frontend merged 
 - URL: `https://okoeeyxxvzypjiumraxq.supabase.co`
 - Anon key lives in your machine’s `frontend/.env.local` (gitignored); restored from prior stress harness on this Mac if present.
 - Still need **SUPABASE_ACCESS_TOKEN** (Dashboard → Account → Access Tokens) to run `go-live.sh`.
+
+## Work machine (recommended tomorrow)
+
+This Mac does **not** have your Supabase CLI login. The Linux/work box historically had:
+
+- `/home/turkyildiz/TRUXON/frontend/.env.local`
+- Possibly an existing `supabase login` session
+
+**On the work machine:**
+
+```bash
+cd /path/to/truxon   # e.g. ~/TRUXON or git clone
+git pull origin main
+# if CLI not logged in yet:
+supabase login      # opens browser once; creates sbp session on that machine
+
+./scripts/go-live-from-work-machine.sh
+# optional smoke (admin email/password):
+node scripts/post-deploy-smoke.mjs you@email.com 'password'
+```
+
+`go-live-from-work-machine.sh` auto-loads `.env.local` from common paths and defaults project ref to `okoeeyxxvzypjiumraxq`.
+
