@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 100" width="720" height="200" role="img" aria-label="Truxon logo">
+  
+  <g transform="translate(6,18)">
+  <path d="M12 20 L26 32 L12 44" fill="none" stroke="#8fa8ff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M26 20 L40 32 L26 44" fill="none" stroke="#6088ff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M40 20 L54 32 L40 44" fill="none" stroke="#3f6bff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
+  </g>
+  <text x="92" y="65" font-size="52" letter-spacing="-1.6" fill="#2b2f36">truxon</text>
+</svg>

@@ -30,7 +30,7 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-navy-900 p-4">
       <form onSubmit={onSubmit} className="w-full max-w-sm rounded-2xl bg-surface p-8 shadow-2xl">
         <div className="mb-6 text-center">
-          <div className="text-4xl">🚛</div>
+          <img src="/brand/truxon-icon-color.svg" alt="Truxon" className="mx-auto h-14 w-14" />
           <h1 className="mt-2 text-2xl font-bold text-body">Truxon</h1>
           <p className="text-sm text-muted">Transportation Management System</p>
         </div>

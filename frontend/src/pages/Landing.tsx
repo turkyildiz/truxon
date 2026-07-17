@@ -46,8 +46,7 @@ export default function Landing() {
       <header className="sticky top-0 z-20 border-b border-white/10 bg-navy-900/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
           <div className="flex items-center gap-2 text-white">
-            <span className="text-2xl">🚛</span>
-            <span className="text-xl font-bold tracking-wide">Truxon</span>
+            <img src="/brand/truxon-primary-white.png" alt="Truxon" className="h-7 w-auto" />
             <span className="ml-1 hidden rounded-full bg-white/10 px-2 py-0.5 text-xs font-medium text-navy-100 sm:inline">TMS</span>
           </div>
           <nav className="hidden items-center gap-8 text-sm font-medium text-navy-100 md:flex">
@@ -170,7 +169,7 @@ export default function Landing() {
       <footer className="border-t border-line bg-surface-2">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 text-sm text-muted sm:flex-row sm:px-6">
           <div className="flex items-center gap-2">
-            <span className="text-xl">🚛</span>
+            <img src="/brand/truxon-icon-color.svg" alt="Truxon" className="h-6 w-6" />
             <span className="font-semibold text-body">Truxon</span>
             <span>© {new Date().getFullYear()}</span>
           </div>

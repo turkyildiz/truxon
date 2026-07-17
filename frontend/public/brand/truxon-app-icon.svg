@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="512" height="512" role="img" aria-label="Truxon app icon">
+  <rect x="0" y="0" width="128" height="128" rx="30" fill="#2b2f36"></rect>
+  <g transform="translate(32,32)">
+  <path d="M12 20 L26 32 L12 44" fill="none" stroke="#5f7ff0" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M26 20 L40 32 L26 44" fill="none" stroke="#88a3ff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M40 20 L54 32 L40 44" fill="none" stroke="#b7c8ff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
+  </g>
+</svg>

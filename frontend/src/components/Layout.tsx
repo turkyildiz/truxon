@@ -193,9 +193,8 @@ export default function Layout() {
       <aside
         className={`fixed inset-y-0 left-0 z-30 w-60 transform bg-navy-900 text-white transition-transform lg:static lg:translate-x-0 ${menuOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        <div className="flex items-center gap-2 px-5 py-5">
-          <span className="text-2xl">🚛</span>
-          <span className="text-xl font-bold tracking-wide">Truxon</span>
+        <div className="flex items-center px-5 py-5">
+          <img src="/brand/truxon-primary-white.png" alt="Truxon" className="h-8 w-auto" />
         </div>
         <nav className="mt-2 space-y-1 px-3">
           {items.map((item) => (
