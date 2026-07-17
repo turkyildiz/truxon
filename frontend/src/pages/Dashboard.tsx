@@ -25,18 +25,30 @@ function pctChange(current: number, prev: number): number | null {
   return ((current - prev) / prev) * 100
 }
 
+function TrendBadge({ change, vs, noDataLabel }: { change: number | null; vs: string; noDataLabel: string }) {
+  if (change == null) return <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-medium text-white/70">{noDataLabel}</span>
+  return (
+    <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
+      {change >= 0 ? '+' : ''}
+      {change.toFixed(1)}% {vs}
+    </span>
+  )
+}
+
 function KpiCard({
   label,
   value,
   icon,
   gradient,
   change,
+  changeYoY,
 }: {
   label: string
   value: string
   icon: string
   gradient: string
   change: number | null
+  changeYoY: number | null
 }) {
   return (
     <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} p-5 text-white shadow-md`}>
@@ -45,15 +57,9 @@ function KpiCard({
         <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-xl">{icon}</div>
       </div>
       <div className="mt-1 text-3xl font-extrabold tracking-tight">{value}</div>
-      <div className="mt-2 flex justify-end">
-        {change != null ? (
-          <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
-            {change >= 0 ? '+' : ''}
-            {change.toFixed(1)}% vs last wk to-date
-          </span>
-        ) : (
-          <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-medium text-white/70">no prior week</span>
-        )}
+      <div className="mt-2 flex flex-wrap justify-end gap-1.5">
+        <TrendBadge change={change} vs="vs last wk" noDataLabel="no prior week" />
+        <TrendBadge change={changeYoY} vs="vs last yr" noDataLabel="no data last yr" />
       </div>
     </div>
   )
@@ -133,6 +139,7 @@ export default function Dashboard() {
           icon="💰"
           gradient="from-blue-500 to-blue-700"
           change={pctChange(data.week_revenue, data.prev_week?.revenue ?? 0)}
+          changeYoY={pctChange(data.week_revenue, data.prev_year_week?.revenue ?? 0)}
         />
         <KpiCard
           label="Week Miles"
@@ -140,6 +147,7 @@ export default function Dashboard() {
           icon="🛣️"
           gradient="from-amber-400 to-orange-600"
           change={pctChange(Number(data.week_miles), Number(data.prev_week?.miles ?? 0))}
+          changeYoY={pctChange(Number(data.week_miles), Number(data.prev_year_week?.miles ?? 0))}
         />
         <KpiCard
           label="Week Loads"
@@ -147,6 +155,7 @@ export default function Dashboard() {
           icon="📦"
           gradient="from-emerald-400 to-green-600"
           change={pctChange(data.week_loads, data.prev_week?.loads ?? 0)}
+          changeYoY={pctChange(data.week_loads, data.prev_year_week?.loads ?? 0)}
         />
         <KpiCard
           label="Avg Rate / Mile"
@@ -154,6 +163,7 @@ export default function Dashboard() {
           icon="📈"
           gradient="from-orange-500 to-red-600"
           change={pctChange(Number(data.week_avg_rate_per_mile ?? 0), Number(data.prev_week?.avg_rate_per_mile ?? 0))}
+          changeYoY={pctChange(Number(data.week_avg_rate_per_mile ?? 0), Number(data.prev_year_week?.avg_rate_per_mile ?? 0))}
         />
       </div>
 

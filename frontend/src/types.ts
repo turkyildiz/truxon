@@ -184,6 +184,7 @@ export interface DashboardSummary {
   week_loads: number
   week_avg_rate_per_mile: number | null
   prev_week: { revenue: number; miles: number; loads: number; avg_rate_per_mile: number | null }
+  prev_year_week: { revenue: number; miles: number; loads: number; avg_rate_per_mile: number | null }
   available_trucks: number
   active_drivers: number
   status_counts: Record<string, number>
