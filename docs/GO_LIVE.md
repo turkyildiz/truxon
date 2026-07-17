@@ -15,7 +15,7 @@ Create `~/truckson-live.env` (chmod 600):
 
 ```bash
 export SUPABASE_ACCESS_TOKEN=sbp_...          # Account → Access Tokens
-export SUPABASE_PROJECT_REF=abcdefghijklmn    # Project Settings → General
+export SUPABASE_PROJECT_REF=okoeeyxxvzypjiumraxq  # production Truxon project
 export XAI_API_KEY=xai-...                    # preferred LLM (Trux)
 # or: export OPENAI_API_KEY=... / ANTHROPIC_API_KEY=...
 export GOOGLE_MAPS_API_KEY=...                # distance edge function
@@ -56,3 +56,10 @@ This Mac clone has **no** `.env.local` / Supabase access token. Frontend merged 
 - Functions: redeploy previous git SHA of function folders.
 - DB: do not edit applied migrations; add a fix migration.
 - Frontend: Vercel → promote previous deployment.
+
+
+## Known production project
+
+- URL: `https://okoeeyxxvzypjiumraxq.supabase.co`
+- Anon key lives in your machine’s `frontend/.env.local` (gitignored); restored from prior stress harness on this Mac if present.
+- Still need **SUPABASE_ACCESS_TOKEN** (Dashboard → Account → Access Tokens) to run `go-live.sh`.
