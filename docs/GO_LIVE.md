@@ -1,5 +1,33 @@
 # Go-live checklist (companion + Trux agent)
 
+## Trux email door (trux@truxon.com) — owner setup
+
+Code is deployed (`trux-inbox` polls every 2 min via pg_cron and no-ops until
+configured). To activate:
+
+1. **M365 admin center → Teams & groups → Shared mailboxes → Add**:
+   `trux@truxon.com` (free, no license). truxon.com must be a verified domain
+   with MX in M365 (GoDaddy DNS change if mail isn't there yet).
+2. **Azure portal → App registrations → New** ("Trux", single tenant).
+3. App → **API permissions → Microsoft Graph → Application permissions** →
+   add `Mail.ReadWrite` + `Mail.Send` → **Grant admin consent**.
+4. **Certificates & secrets → New client secret**.
+5. Supabase → Edge Functions → Secrets: set `MSGRAPH_TENANT_ID`,
+   `MSGRAPH_CLIENT_ID`, `MSGRAPH_CLIENT_SECRET`.
+   (Optional `TRUX_MAILBOX` if not trux@truxon.com.)
+6. **Recommended** — scope the app to only the Trux mailbox (Exchange Online
+   PowerShell):
+   ```powershell
+   New-ApplicationAccessPolicy -AppId <CLIENT_ID> -PolicyScopeGroupId trux@truxon.com \
+     -AccessRight RestrictAccess -Description "Trux mailbox only"
+   ```
+
+Behavior: only mail from active admin/dispatcher/accountant accounts (matched
+to Truxon logins, Exchange SPF/DKIM verdict honored) is acted on; actions run
+AS the sender (RLS + audit); PDF attachments are parsed as data only; Trux
+replies with what it did, including load numbers. Log: `trux_inbox_log`
+(admin-visible).
+
 **Code status:** companion Phase 1 is on `main` (PR #3). Agent + deploy tooling land in the follow-up PR.
 
 ## What auto-deploys
