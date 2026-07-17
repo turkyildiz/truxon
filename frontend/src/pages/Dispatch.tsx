@@ -6,6 +6,7 @@ import { Button, Card, Field, Input, Select, Textarea } from '../components/ui'
 import { calculateDistance, createCustomer, createLoad, extractPdf, listCustomers, listDrivers, trailersApi, trucksApi, type ExtractedStop } from '../data'
 import { errorMessage } from '../supabase'
 import FleetMap from './FleetMap'
+import TruxChat from '../components/TruxChat'
 
 const EMPTY_FORM = {
   customer_id: '',
@@ -199,6 +200,7 @@ export default function Dispatch() {
   return (
     <div className="space-y-4">
       <FleetMap />
+      <TruxChat />
       <Card title="AI-Assisted Dispatch">
         <div
           onDragOver={(e) => {

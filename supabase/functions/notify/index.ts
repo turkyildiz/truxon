@@ -164,9 +164,19 @@ Deno.serve(async (req) => {
     return json({ ok: true })
   }
 
-  // ---------- send / notify_load (service or webhook) ----------
+  // ---------- send / notify_load (service, webhook, or staff JWT for notify_load) ----------
   if (action === 'send' || action === 'notify_load') {
-    if (!isServiceRole(req) && !webhookOk(req, body)) {
+    const staffCaller = action === 'notify_load' ? await getCaller(req) : null
+    const staffOk =
+      staffCaller &&
+      !(staffCaller instanceof Response) &&
+      ['admin', 'dispatcher', 'accountant'].includes(staffCaller.role)
+
+    if (!isServiceRole(req) && !webhookOk(req, body) && !staffOk) {
+      return json({ error: 'Unauthorized' }, 401)
+    }
+    // send to arbitrary user_id stays service/webhook only
+    if (action === 'send' && !isServiceRole(req) && !webhookOk(req, body)) {
       return json({ error: 'Unauthorized' }, 401)
     }
 
