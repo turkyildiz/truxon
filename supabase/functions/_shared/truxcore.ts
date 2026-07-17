@@ -332,6 +332,8 @@ export interface TruxRunOpts {
   mode: 'propose' | 'auto'
   /** Extra system prompt context, e.g. the email channel preamble. */
   channelNote?: string
+  /** Reply used when the model produces nothing (door-appropriate wording). */
+  fallbackReply?: string
   deadlineMs?: number
 }
 
@@ -517,7 +519,7 @@ ${mode === 'propose'
   if (!assistantText.trim()) {
     assistantText = executed.length
       ? 'Done: ' + executed.map((e) => `${e.tool}${e.error ? ` FAILED (${e.error})` : ''}`).join(', ')
-      : 'I could not complete that request. Try rephrasing or check LLM API keys.'
+      : opts.fallbackReply ?? 'I could not complete that request. Try rephrasing or check LLM API keys.'
   }
 
   await svc.from('trux_messages').insert({
