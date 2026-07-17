@@ -148,3 +148,14 @@ password manager.
 Truxon serves one carrier (Aida). Multi-tenant (`company_id` + tenant-scoped
 RLS) is deliberate future scope, to be built when a second company onboards —
 not a gap.
+
+## Watchdog
+
+`watchdog` edge function, pg_cron every 5 min (`truxon-watchdog` job). Checks:
+inbox poll freshness, trux_inbox_log failures (1h), stale unread mail in
+Inbox/Junk (>12 min), each edge function's CORS preflight, LLM provider
+reachability, Graph token validity (catches client-secret expiry — renews
+7/2028). State in `watchdog_state` (admin-readable). Alerts email FROM
+trux@truxon.com to WATCHDOG_ALERT_TO (default owner gmail) on failure and
+recovery, 60-min re-alert cooldown. Planned layer 2: outside-in ping from the
+UGREEN NAS to catch full-platform outage (add when next touching the NAS).

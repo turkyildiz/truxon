@@ -360,12 +360,20 @@ export async function runTrux(opts: TruxRunOpts): Promise<TruxRunResult> {
     await svc.rpc('llm_reserve_spend', { p_provider: 'agent', p_cents: 2 })
   } catch { /* budget optional */ }
 
-  const { data: history } = await svc
+  // Newest 12 turns only, older ones clipped hard — replaying a long email
+  // thread (each turn embedding a 6k-char document) burns the provider's
+  // tokens-per-minute budget. The final entry is the current message: keep it
+  // intact so the attached document survives.
+  const { data: historyDesc } = await svc
     .from('trux_messages')
     .select('role, content')
     .eq('session_id', sessionId)
-    .order('id', { ascending: true })
-    .limit(40)
+    .order('id', { ascending: false })
+    .limit(12)
+  const history = (historyDesc ?? []).reverse().map((h, i, arr) => ({
+    role: h.role,
+    content: (h.content as string).slice(0, i === arr.length - 1 ? 9000 : 1500),
+  }))
 
   const system = `You are Trux, the operating assistant inside Truxon TMS for Aida Logistics.
 You are acting for a verified ${role}. Today is ${new Date().toISOString().slice(0, 10)}.
@@ -396,13 +404,15 @@ ${mode === 'propose'
   const maxRounds = mode === 'auto' ? 5 : 3
 
   for (let round = 0; round < maxRounds && Date.now() < deadline; round++) {
-    // Small models occasionally emit malformed tool calls (400 tool_use_failed)
-    // — one retry usually lands.
+    // Retry once: malformed tool calls (400) recover after a beat; 429s need
+    // to wait out the provider's per-minute token window.
     let completion
     try {
       completion = await completeChat({ messages, tools })
     } catch (e) {
-      await new Promise((r) => setTimeout(r, 1200))
+      const wait = String(e).includes('429') ? 25_000 : 1_200
+      if (Date.now() + wait + 5_000 > deadline) throw e
+      await new Promise((r) => setTimeout(r, wait))
       completion = await completeChat({ messages, tools })
     }
     lastProvider = completion.provider

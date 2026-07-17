@@ -20,40 +20,13 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { extractText, getDocumentProxy } from 'npm:unpdf@0.12.1'
 import { json } from '../_shared/auth.ts'
+import { graph, graphConfigured, graphToken, TRUX_MAILBOX as MAILBOX } from '../_shared/msgraph.ts'
 import { runTrux, type Sb } from '../_shared/truxcore.ts'
 
-const MAILBOX = Deno.env.get('TRUX_MAILBOX') ?? 'trux@truxon.com'
-const GRAPH = 'https://graph.microsoft.com/v1.0'
 const EMAIL_ROLES = ['admin', 'dispatcher', 'accountant']
 
 function svcClient(): Sb {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-}
-
-async function graphToken(): Promise<string> {
-  const tenant = Deno.env.get('MSGRAPH_TENANT_ID')
-  const id = Deno.env.get('MSGRAPH_CLIENT_ID')
-  const secret = Deno.env.get('MSGRAPH_CLIENT_SECRET')
-  if (!tenant || !id || !secret) throw new Error('not_configured')
-  const res = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: id,
-      client_secret: secret,
-      scope: 'https://graph.microsoft.com/.default',
-      grant_type: 'client_credentials',
-    }),
-  })
-  if (!res.ok) throw new Error(`Graph token failed: ${res.status} ${(await res.text()).slice(0, 300)}`)
-  return (await res.json()).access_token
-}
-
-async function graph(tok: string, path: string, init?: RequestInit): Promise<Response> {
-  return await fetch(`${GRAPH}${path}`, {
-    ...init,
-    headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-  })
 }
 
 /** Drop quoted reply history so the model only sees the new text. */
