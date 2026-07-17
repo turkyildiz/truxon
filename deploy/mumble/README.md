@@ -30,23 +30,36 @@ Rotate anytime by editing the project and redeploying.
 | **Office dispatchers** (same LAN as the NAS) | ✅ works now | connect to `NAS_LAN_IP:64738` |
 | **Drivers on tablets over LTE** (remote) | ⛔ not yet | see below |
 
-**The one owner decision for remote drivers:** the NAS is only reachable from
-the office LAN today. For drivers on the road, the server must be reachable from
-the internet. Options, best first:
+**Chosen: Tailscale VPN.** Drivers join a private network instead of us
+exposing any port to the internet. Server-side is **deployed** on the NAS
+(Project `truxon-tailscale`, host mode — see `tailscale-compose.yml`). It's
+verified working but **stopped, waiting on an auth key** — the container's boot
+supervisor kills interactive browser login after 60s, so it needs a key.
 
-1. **VPN (recommended, most secure):** run WireGuard/Tailscale so tablets join
-   the private network and reach `NAS_LAN_IP:64738` — nothing exposed publicly.
-   Tailscale has a UGOS/Docker option and is the cleanest for a fleet.
-2. **Port-forward (simplest):** on the office router, forward **64738 TCP *and*
-   UDP** to the NAS's LAN IP, and use a **DDNS** hostname (the NAS has built-in
-   DDNS under Control Panel → External Access; note the UGREEN `*.ug.link`
-   relay is HTTP-only and will **not** carry Mumble's port — you need real
-   port-forwarding + a DDNS A-record or your office's static IP).
-   Security: set a strong server join password (done) and consider limiting
-   source IPs if your carrier allows.
+### Finish Tailscale (owner, ~5 min)
 
-I did **not** touch the router — exposing a port to the internet is your call.
-Tell me which path you want and I'll write the exact steps (or set up Tailscale).
+1. **Create a free Tailscale account** at https://login.tailscale.com (sign in
+   with Google/Microsoft/email). Free plan covers up to 100 devices — plenty.
+2. **Generate an auth key:** admin console → **Settings → Keys → Generate auth
+   key**. Make it **Reusable** and **Pre-approved** (and consider **Ephemeral:
+   off** so the NAS stays registered). Copy it (`tskey-auth-…`).
+3. **Add it to the NAS project:** UGOS → Docker → Project `truxon-tailscale` →
+   edit → in the container's `environment` list add:
+   `TS_AUTHKEY=tskey-auth-…` → **Deploy**. The container will start, authenticate,
+   and the NAS appears in your Tailscale admin console as **aida-nas** with a
+   `100.x.y.z` tailnet IP. Note that IP.
+4. **Put each device on the tailnet:** install the **Tailscale app** on every
+   driver tablet and dispatcher machine, sign in to the same account (or use a
+   reusable key). They all get `100.x` IPs and can reach the NAS.
+5. **Point Mumla/Mumble at the NAS tailnet IP:** host = `100.x.y.z` (the NAS's
+   Tailscale IP), port 64738, server join password. Done — remote drivers now
+   reach Mumble over the VPN, encrypted, nothing exposed publicly.
+
+(Office dispatchers on the LAN can keep using `NAS_LAN_IP:64738` — both work.)
+
+I set the whole thing up to this point; only the account + key are yours to
+create (I don't handle credentials). Tell me when the key's in and I'll verify
+the NAS shows up on the tailnet and Mumble answers on its 100.x address.
 
 ---
 

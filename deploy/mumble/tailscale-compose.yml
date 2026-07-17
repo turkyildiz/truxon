@@ -1,0 +1,31 @@
+# Tailscale on the UGREEN NAS — private VPN so remote driver tablets reach the
+# Mumble server without exposing any port to the internet.
+# Deployed via UGOS Docker → Project "truxon-tailscale" (2026-07-17).
+#
+# STATUS: container deployed and verified (host mode + /dev/net/tun work — it
+# reached Tailscale and produced a login URL). Currently STOPPED, waiting on an
+# auth key. Interactive browser login does NOT work in this container (its boot
+# supervisor kills the login after 60s) — use an AUTH KEY, per README.
+#
+# To finish: add TS_AUTHKEY (owner generates in Tailscale admin console) to the
+# environment list below on the NAS project, then redeploy/start.
+services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: truxon-tailscale
+    network_mode: host          # so the NAS host (and Mumble's published port) is on the tailnet
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+      - TS_HOSTNAME=aida-nas
+      # - TS_AUTHKEY=tskey-auth-xxxxx   # ← owner adds this, then redeploy
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+    restart: unless-stopped
+volumes:
+  tailscale-state:
