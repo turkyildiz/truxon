@@ -23,7 +23,7 @@ services:
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=false
       - TS_HOSTNAME=aida-nas
-      # - TS_AUTHKEY=tskey-auth-xxxxx   # ← owner adds this, then redeploy
+      # - TS_AUTHKEY=tskey-auth-...   # DONE 2026-07-17: NAS live on tailnet as aida-nas (100.89.140.98)
     volumes:
       - tailscale-state:/var/lib/tailscale
     restart: unless-stopped

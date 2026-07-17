@@ -36,7 +36,20 @@ exposing any port to the internet. Server-side is **deployed** on the NAS
 verified working but **stopped, waiting on an auth key** — the container's boot
 supervisor kills interactive browser login after 60s, so it needs a key.
 
-### Finish Tailscale (owner, ~5 min)
+### ✅ DONE (2026-07-17): NAS is on the tailnet
+`aida-nas` = tailnet IP **`100.89.140.98`**, status Connected (owner's account
+turkyildiz@gmail.com, free plan). **Mumble is reachable at `100.89.140.98:64738`
+from any tailnet device.** The auth key used (reusable, pre-approved) was pasted
+in chat — revoke it in the Tailscale console (Settings → Keys) once the tablets
+are onboarded, since tablets just sign into the Tailscale app directly.
+
+### Remaining: put each device on the tailnet + point Mumla at it
+1. Install the **Tailscale app** on every driver tablet + dispatcher machine,
+   sign in with the same account (turkyildiz@gmail.com). Each gets a `100.x` IP.
+2. In **Mumla** (tablets) / **Mumble** (desktop): host = `100.89.140.98`,
+   port 64738, server join password. Map push-to-talk to a big button.
+
+### (Original completion steps, for reference)
 
 1. **Create a free Tailscale account** at https://login.tailscale.com (sign in
    with Google/Microsoft/email). Free plan covers up to 100 devices — plenty.
