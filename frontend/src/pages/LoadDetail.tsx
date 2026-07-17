@@ -14,10 +14,10 @@ function StatusStepper({ load, onAdvance, busy }: { load: Load; onAdvance: (stat
     <div className="flex flex-wrap items-center gap-2">
       {LOAD_STATUSES.map((s, i) => (
         <div key={s} className="flex items-center gap-2">
-          {i > 0 && <div className={`h-0.5 w-4 ${i <= currentIdx ? 'bg-navy-600' : 'bg-slate-300'}`} />}
+          {i > 0 && <div className={`h-0.5 w-4 ${i <= currentIdx ? 'bg-brand' : 'bg-line'}`} />}
           <span
             className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-              i < currentIdx ? 'bg-navy-100 text-brand' : i === currentIdx ? 'bg-navy-700 text-white' : 'bg-slate-200 text-muted'
+              i < currentIdx ? 'bg-brand/15 text-brand' : i === currentIdx ? 'bg-brand text-brand-fg' : 'bg-surface-2 text-muted'
             }`}
           >
             {s.replace('_', ' ')}
@@ -168,7 +168,7 @@ export default function LoadDetail() {
       {editForm ? (
         <Card title="Edit Load">
           {sourceQueries.some((q) => q.isError) && (
-            <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            <p className="mb-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-300">
               Some dropdown options failed to load — check your connection and{' '}
               <button type="button" className="font-medium underline" onClick={() => sourceQueries.forEach((q) => q.isError && q.refetch())}>
                 retry

@@ -74,7 +74,7 @@ export default function Invoices() {
 
   return (
     <Card title="Invoices" actions={<Button onClick={() => setCreating(true)}>+ Generate Invoice</Button>}>
-      {pageError && <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{pageError}</p>}
+      {pageError && <p className="mb-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-300">{pageError}</p>}
       {isLoading ? (
         <p className="py-8 text-center text-muted">Loading…</p>
       ) : invoicesQ.isError ? (

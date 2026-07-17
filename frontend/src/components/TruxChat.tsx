@@ -144,7 +144,7 @@ export default function TruxChat({ onClose }: { onClose?: () => void }) {
               {m.content}
             </div>
             {m.proposals?.map((p) => (
-              <div key={p.token} className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-left">
+              <div key={p.token} className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-left">
                 <div className="font-medium break-all text-amber-900">{p.summary}</div>
                 <div className="mt-2 flex gap-2">
                   <Button type="button" onClick={() => confirm.mutate(p.token)} disabled={confirm.isPending}>

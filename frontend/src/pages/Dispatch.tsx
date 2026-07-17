@@ -208,7 +208,7 @@ export default function Dispatch() {
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
           className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
-            dragOver ? 'border-navy-600 bg-navy-50' : 'border-line'
+            dragOver ? 'border-brand bg-brand/10' : 'border-line'
           }`}
         >
           <div className="text-3xl">📄</div>
@@ -224,7 +224,7 @@ export default function Dispatch() {
 
       <Card title="Load Details">
         {sourceQueries.some((q) => q.isError) && (
-          <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          <p className="mb-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-300">
             Some dropdown options failed to load — check your connection and{' '}
             <button type="button" className="font-medium underline" onClick={() => sourceQueries.forEach((q) => q.isError && q.refetch())}>
               retry
@@ -253,7 +253,7 @@ export default function Dispatch() {
                 </Select>
               </Field>
               {pendingCustomer && (
-                <p className="mt-1.5 rounded-lg bg-amber-50 p-2 text-sm text-amber-800">
+                <p className="mt-1.5 rounded-lg bg-amber-500/10 p-2 text-sm text-amber-700 dark:text-amber-300">
                   "{pendingCustomer}" isn't in your customer list —{' '}
                   <button
                     type="button"

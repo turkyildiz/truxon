@@ -12,12 +12,12 @@ import type { TrendPoint } from '../types'
 const DASHBOARD_ROLES = ['admin', 'dispatcher', 'accountant']
 
 const STATUS_PILL_COLORS: Record<string, string> = {
-  pending: 'bg-slate-100 text-muted',
-  assigned: 'bg-blue-100 text-blue-700',
-  in_transit: 'bg-amber-100 text-amber-700',
-  delivered: 'bg-teal-100 text-teal-700',
-  completed: 'bg-green-100 text-green-700',
-  billed: 'bg-purple-100 text-purple-700',
+  pending: 'bg-slate-500/15 text-muted',
+  assigned: 'bg-blue-500/15 text-blue-600 dark:text-blue-300',
+  in_transit: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  delivered: 'bg-teal-500/15 text-teal-600 dark:text-teal-300',
+  completed: 'bg-green-500/15 text-green-700 dark:text-green-300',
+  billed: 'bg-purple-500/15 text-purple-600 dark:text-purple-300',
 }
 
 function pctChange(current: number, prev: number): number | null {
@@ -175,7 +175,7 @@ export default function Dashboard() {
         <span className="text-sm font-semibold text-body">🪪 {data.active_drivers} active drivers</span>
         <span className="ml-auto flex flex-wrap items-center gap-1.5">
           {statusPills.map(([status, n]) => (
-            <span key={status} className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${STATUS_PILL_COLORS[status] ?? 'bg-slate-100 text-muted'}`}>
+            <span key={status} className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${STATUS_PILL_COLORS[status] ?? 'bg-slate-500/15 text-muted'}`}>
               {status.replace('_', ' ')} {n}
             </span>
           ))}
@@ -193,8 +193,8 @@ export default function Dashboard() {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-            <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+            <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} />
+            <YAxis tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
             <Tooltip formatter={(v) => money(Number(v))} />
             <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#2563eb" strokeWidth={2.5} fill="url(#gradRevenue)" />
           </AreaChart>
@@ -225,8 +225,8 @@ export default function Dashboard() {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-            <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={(v) => Number(v).toLocaleString()} />
+            <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} />
+            <YAxis tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} tickFormatter={(v) => Number(v).toLocaleString()} />
             <Tooltip formatter={(v) => Number(v).toLocaleString()} />
             <Area type="monotone" dataKey="miles" name="Total miles" stroke="#059669" strokeWidth={2.5} fill="url(#gradMiles)" />
             <Area type="monotone" dataKey="empty_miles" name="Empty miles" stroke="#d97706" strokeWidth={2.5} fill="url(#gradEmpty)" />
@@ -243,8 +243,8 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data.top_customers.map((c) => ({ ...c, short: shortName(c.name) }))}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="short" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} interval={0} />
-                <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                <XAxis dataKey="short" tick={{ fontSize: 11, fill: "var(--muted)" }} tickLine={false} axisLine={false} interval={0} />
+                <YAxis tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                 <Tooltip formatter={(v) => money(Number(v))} labelFormatter={(_, p) => p?.[0]?.payload?.name ?? ''} />
                 <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={42} />
               </BarChart>
@@ -258,8 +258,8 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data.driver_perf.map((d) => ({ ...d, short: shortName(d.name) }))}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="short" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} interval={0} />
-                <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={(v) => Number(v).toLocaleString()} />
+                <XAxis dataKey="short" tick={{ fontSize: 11, fill: "var(--muted)" }} tickLine={false} axisLine={false} interval={0} />
+                <YAxis tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} tickFormatter={(v) => Number(v).toLocaleString()} />
                 <Tooltip
                   formatter={(v, name) => (name === 'Miles' ? Number(v).toLocaleString() : money(Number(v)))}
                   labelFormatter={(_, p) => p?.[0]?.payload?.name ?? ''}

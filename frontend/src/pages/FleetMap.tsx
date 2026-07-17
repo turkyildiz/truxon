@@ -122,7 +122,7 @@ export default function FleetMap() {
           <MapCanvas pins={pins} />
           {!MAPS_KEY && (
             <p className="mb-3 text-xs text-muted">
-              Set <code className="rounded bg-slate-100 px-1">VITE_GOOGLE_MAPS_JS_KEY</code> (browser key, referrer-restricted) for the map canvas.
+              Set <code className="rounded bg-surface-2 px-1">VITE_GOOGLE_MAPS_JS_KEY</code> (browser key, referrer-restricted) for the map canvas.
             </p>
           )}
           <div className="overflow-x-auto">

@@ -28,7 +28,7 @@ export default function PdfDrop({ title, hint, busy, note, onFile }: Props) {
           if (file?.type === 'application/pdf') onFile(file)
         }}
         className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
-          dragOver ? 'border-navy-600 bg-navy-50' : 'border-line'
+          dragOver ? 'border-brand bg-brand/10' : 'border-line'
         }`}
       >
         <div className="text-3xl">📄</div>

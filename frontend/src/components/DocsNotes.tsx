@@ -120,7 +120,7 @@ export default function DocsNotes({ entityType, entityId, docTypes, className = 
           <ul className="max-h-80 space-y-2 overflow-y-auto text-sm">
             {activity.length === 0 && <li className="text-muted">No notes or activity yet.</li>}
             {activity.map((a) => (
-              <li key={a.id} className={`rounded-lg p-2.5 ${a.action === 'note' ? 'bg-amber-50' : 'bg-surface-2'}`}>
+              <li key={a.id} className={`rounded-lg p-2.5 ${a.action === 'note' ? 'bg-amber-500/10' : 'bg-surface-2'}`}>
                 <div className="flex justify-between text-xs text-muted">
                   <span className="font-semibold">
                     {a.action === 'note' ? '📝 note' : a.action.replace('_', ' ')} — {a.user_name ?? 'system'}
