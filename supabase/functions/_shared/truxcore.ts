@@ -447,7 +447,8 @@ ${mode === 'propose'
     } catch (e) {
       const msg = String(e)
       let wait = 1_200
-      if (msg.includes('429')) {
+      // Rate limited (429) or provider overloaded (Anthropic 529) — back off.
+      if (/\b(429|529)\b|overloaded|rate.?limit/i.test(msg)) {
         const m = msg.match(/try again in ([\d.]+)\s*(ms|s)/i)
         wait = m ? Math.ceil(parseFloat(m[1]) * (m[2].toLowerCase() === 'ms' ? 1 : 1000)) + 800 : 20_000
       }

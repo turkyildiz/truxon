@@ -125,15 +125,24 @@ async function runChecks(svc: ReturnType<typeof svcClient>): Promise<CheckResult
     }
   }
 
-  // --- LLM provider reachable ---
+  // --- Trux's active LLM provider reachable ---
+  // Anthropic key present => that's Trux's brain; otherwise the Groq/LLM key.
   try {
-    const key = Deno.env.get('LLM_API_KEY')
-    const baseUrl = Deno.env.get('LLM_BASE_URL') ?? 'https://api.groq.com/openai/v1'
-    if (!key) {
-      results.push({ name: 'llm_provider', ok: false, detail: 'LLM_API_KEY not set' })
+    const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
+    if (anthropicKey) {
+      const r = await fetch('https://api.anthropic.com/v1/models', {
+        headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01' },
+      })
+      results.push({ name: 'llm_provider', ok: r.ok, detail: `anthropic status ${r.status}` })
     } else {
-      const r = await fetch(`${baseUrl.replace(/\/$/, '')}/models`, { headers: { Authorization: `Bearer ${key}` } })
-      results.push({ name: 'llm_provider', ok: r.ok, detail: `status ${r.status}` })
+      const key = Deno.env.get('LLM_API_KEY')
+      const baseUrl = Deno.env.get('LLM_BASE_URL') ?? 'https://api.groq.com/openai/v1'
+      if (!key) {
+        results.push({ name: 'llm_provider', ok: false, detail: 'no LLM key set' })
+      } else {
+        const r = await fetch(`${baseUrl.replace(/\/$/, '')}/models`, { headers: { Authorization: `Bearer ${key}` } })
+        results.push({ name: 'llm_provider', ok: r.ok, detail: `groq status ${r.status}` })
+      }
     }
   } catch (e) {
     results.push({ name: 'llm_provider', ok: false, detail: e instanceof Error ? e.message : String(e) })

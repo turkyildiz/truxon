@@ -23,27 +23,21 @@ function env(name: string, fallback = ''): string {
 }
 
 export function pickProvider(): { provider: 'xai' | 'openai' | 'anthropic'; model: string; apiKey: string; baseUrl?: string } {
-  // Cost preference: xAI Grok default → OpenAI → Anthropic
-  if (env('XAI_API_KEY') || (env('LLM_API_KEY') && (env('LLM_BASE_URL').includes('x.ai') || !env('LLM_BASE_URL')))) {
-    const key = env('XAI_API_KEY') || env('LLM_API_KEY')
-    if (key) {
-      return {
-        provider: 'xai',
-        model: env('LLM_MODEL', 'grok-4.5') || env('XAI_MODEL', 'grok-4.5'),
-        apiKey: key,
-        baseUrl: env('LLM_BASE_URL', 'https://api.x.ai/v1'),
-      }
-    }
+  // Anthropic first: setting ANTHROPIC_API_KEY is the one-secret switch that
+  // moves Trux onto Claude. extract-pdf is independent (it uses LLM_API_KEY
+  // directly, not this picker), so vision/extraction stays on Groq.
+  if (env('ANTHROPIC_API_KEY')) {
+    return { provider: 'anthropic', model: env('ANTHROPIC_MODEL', 'claude-haiku-4-5-20251001'), apiKey: env('ANTHROPIC_API_KEY') }
+  }
+  if (env('XAI_API_KEY')) {
+    return { provider: 'xai', model: env('XAI_MODEL', 'grok-4.5'), apiKey: env('XAI_API_KEY'), baseUrl: env('XAI_BASE_URL', 'https://api.x.ai/v1') }
   }
   if (env('OPENAI_API_KEY')) {
     return { provider: 'openai', model: env('OPENAI_MODEL', 'gpt-4o-mini'), apiKey: env('OPENAI_API_KEY'), baseUrl: 'https://api.openai.com/v1' }
   }
-  if (env('ANTHROPIC_API_KEY')) {
-    return { provider: 'anthropic', model: env('ANTHROPIC_MODEL', 'claude-sonnet-4-20250514'), apiKey: env('ANTHROPIC_API_KEY') }
-  }
-  // Last resort: OpenRouter-style LLM_* used by extract-pdf.
-  // TRUX_MODEL (agent-only) overrides LLM_MODEL here so the Trux agent can run
-  // a stronger tool-calling model without touching extract-pdf's extraction model.
+  // Fallback: OpenRouter/Groq-style LLM_* (also used by extract-pdf).
+  // TRUX_MODEL (agent-only) overrides LLM_MODEL so the agent can run a stronger
+  // tool-calling model without touching extract-pdf's extraction model.
   if (env('LLM_API_KEY')) {
     return {
       provider: 'openai',
@@ -52,7 +46,7 @@ export function pickProvider(): { provider: 'xai' | 'openai' | 'anthropic'; mode
       baseUrl: env('LLM_BASE_URL', 'https://openrouter.ai/api/v1'),
     }
   }
-  throw new Error('No LLM API key configured (XAI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / LLM_API_KEY)')
+  throw new Error('No LLM API key configured (ANTHROPIC_API_KEY / XAI_API_KEY / OPENAI_API_KEY / LLM_API_KEY)')
 }
 
 export async function completeChat(opts: {
@@ -132,14 +126,26 @@ async function completeAnthropic(
   tools?: ToolDef[],
 ): Promise<CompleteResult> {
   const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n')
-  const rest = messages.filter((m) => m.role !== 'system').map((m) => ({
-    role: m.role === 'assistant' ? 'assistant' : 'user',
-    content: m.content,
-  }))
+  const mapped = messages
+    .filter((m) => m.role !== 'system')
+    .map((m) => ({ role: (m.role === 'assistant' ? 'assistant' : 'user') as 'assistant' | 'user', content: m.content }))
+
+  // Anthropic requires the first turn to be `user` and forbids two consecutive
+  // same-role messages. Our tool loop stringifies tool calls/results as plain
+  // turns, which can produce user→user runs — collapse them and drop a leading
+  // assistant so the transcript is always valid.
+  const rest: { role: 'assistant' | 'user'; content: string }[] = []
+  for (const m of mapped) {
+    if (rest.length === 0 && m.role === 'assistant') continue
+    const prev = rest[rest.length - 1]
+    if (prev && prev.role === m.role) prev.content += '\n\n' + m.content
+    else rest.push({ ...m })
+  }
+  if (rest.length === 0) rest.push({ role: 'user', content: '(no message)' })
 
   const body: Record<string, unknown> = {
     model,
-    max_tokens: 2048,
+    max_tokens: 4096,
     system: system || 'You are Trux, a trucking TMS assistant.',
     messages: rest,
   }
