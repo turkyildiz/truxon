@@ -1,0 +1,26 @@
+# Truxon PTT — Murmur (Mumble) voice server.
+# Deployed on the UGREEN NAS via UGOS Docker → Project "truxon-mumble"
+# (2026-07-17). This file is the source of truth; the NAS project holds a copy.
+#
+# Passwords below are placeholders — the LIVE values are in the project on the
+# NAS and recorded (for the owner) in deploy/mumble/README.md's credential note,
+# NOT committed here. Rotate by editing the NAS project env + `docker compose up -d`.
+services:
+  murmur:
+    image: mumblevoip/mumble-server:latest
+    container_name: truxon-mumble
+    restart: unless-stopped
+    ports:
+      - "64738:64738/tcp"   # control channel
+      - "64738:64738/udp"   # voice
+    environment:
+      - MUMBLE_SUPERUSER_PASSWORD=__SET_ON_NAS__
+      - MUMBLE_CONFIG_serverpassword=__SET_ON_NAS__   # join password (all clients need it)
+      - MUMBLE_CONFIG_welcometext=Aida Logistics Dispatch - push to talk. Keep it clear for dispatch.
+      - MUMBLE_CONFIG_registername=Aida Dispatch
+      - MUMBLE_CONFIG_users=100
+      - MUMBLE_CONFIG_bandwidth=72000
+    volumes:
+      - mumble-data:/data
+volumes:
+  mumble-data:
