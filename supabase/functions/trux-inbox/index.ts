@@ -231,12 +231,19 @@ Deno.serve(async (req) => {
         }
       }
       const isPdf = (a: Record<string, any>) => (/pdf$/i.test(a.contentType ?? '') || /\.pdf$/i.test(a.name ?? '')) && a.contentBytes && (a.size ?? 0) <= 10 * 1024 * 1024
-      if (m.hasAttachments) {
-        const aRes = await graph(tok, `/users/${encodeURIComponent(MAILBOX)}/messages/${m.id}/attachments?$select=id,name,contentType,size,contentBytes`)
+      let attDiag = `hasAtt:${m.hasAttachments}`
+      // Always list attachments — Gmail inline-attached files sometimes arrive
+      // with hasAttachments=false but still appear in the attachments list.
+      {
+        const aRes = await graph(tok, `/users/${encodeURIComponent(MAILBOX)}/messages/${m.id}/attachments?$select=id,name,contentType,size,isInline,contentBytes`)
         if (aRes.ok) {
-          for (const a of ((await aRes.json()).value ?? []) as Record<string, any>[]) {
+          const atts = ((await aRes.json()).value ?? []) as Record<string, any>[]
+          attDiag += ' [' + atts.map((a) => `${a.name ?? '?'}|${a.contentType ?? '?'}|${a.size ?? 0}|${(a['@odata.type'] ?? '').split('.').pop()}`).join(', ') + ']'
+          for (const a of atts) {
             if (isPdf(a)) {
               await readPdf(a)
+            } else if ((a['@odata.type'] ?? '').includes('referenceAttachment')) {
+              attachmentBlock += `\n\n[Attachment "${a.name}" arrived as a cloud-storage LINK (e.g. Google Drive), not a real file — ask the sender to attach the actual PDF file instead of a link.]`
             } else if ((a['@odata.type'] ?? '').includes('itemAttachment')) {
               // A forwarded email: expand it and pull PDFs nested inside.
               const nRes = await graph(
@@ -276,7 +283,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({ comment: run.reply + signature }),
       })
       await markRead()
-      await finish('processed', `pdfs: ${pdfCount}; executed: ${run.executed.map((e) => e.tool + (e.error ? ' FAILED' : '')).join(', ') || 'none'}; reply ${replyRes.status}`, sessionId)
+      await finish('processed', `pdfs: ${pdfCount}; ${attDiag}; executed: ${run.executed.map((e) => e.tool + (e.error ? ' FAILED' : '')).join(', ') || 'none'}; reply ${replyRes.status}`, sessionId)
       results.push({ id: m.id, from: fromEmail, executed: run.executed.length, replied: replyRes.ok })
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
