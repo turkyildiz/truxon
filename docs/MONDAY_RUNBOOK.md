@@ -18,7 +18,16 @@ all `supabase` commands from `/home/turkyildiz/TRUXON`.
 
 ## B. Finish the DND alarm (blocked last week by the Supabase outage)
 The push pipeline is built and half-verified (token registers; `notify` sends
-200). We never saw it ring. Do these in order:
+200). We never saw it ring. **First redeploy `notify`** — over the weekend I
+changed it to send urgent pushes **data-only**, so the app always renders the
+full-screen DND alarm itself (the most likely fix), plus it now logs the FCM
+result:
+```bash
+cd /home/turkyildiz/TRUXON && SUPABASE_ACCESS_TOKEN=… \
+  ~/.local/bin/supabase functions deploy notify --project-ref okoeeyxxvzypjiumraxq
+```
+Also reinstall the latest APK (`~/Desktop/TruxCompanion-v1.apk`) — it has the
+matching client-side alarm handling. Then, in order:
 1. **On both tablets:** Settings → Apps → Trux Companion → **Notifications** →
    master toggle ON, and the **Dispatch alarms** channel ON + set to *Make sound*.
    (Android silently drops all pushes if notifications are off — prime suspect.)
@@ -34,17 +43,18 @@ The push pipeline is built and half-verified (token registers; `notify` sends
 4. Install the **hardened alarm APK** I staged this weekend (see §E) — it makes
    the client side belt-and-suspenders and should remove the display-side doubt.
 
-## C. Turn on OTA self-update (so no more USB installs)
-One-time, needs your GitHub login (I can't auth as you):
-```bash
-~/dev-tools/gh auth login          # GitHub.com → HTTPS → browser
-~/dev-tools/gh repo create turkyildiz/truxon-releases --public --add-readme
-```
-Then publish the first release:
-```bash
-cd /home/turkyildiz/TRUXON/mobile && ./publish-release.sh "First OTA release"
-```
-After that, every future update: `./publish-release.sh "notes"` — tablets self-update. (Details: `mobile/RELEASES.md`.)
+## C. OTA self-update — ✅ DONE (Sat 2026-07-18, verified live)
+Repo `turkyildiz/truxon-releases` created; first release **v1.0.0+2**
+published and verified end to end (manifest resolves, APK downloads 200,
+valid 56.4MB APK). No more USB installs.
+- **Every future update:** `cd mobile && ./publish-release.sh "what changed"`
+  — bumps the build, builds the APK, publishes the release. Tablets offer it
+  on next launch. (Details: `mobile/RELEASES.md`.)
+- Note: any tablet still on the hand-installed Desktop APK (`+1`) will be
+  offered `+2` automatically on next launch — a free live proof OTA works.
+- A publish-time bug was found and fixed: the asset must be *named*
+  `TruxCompanion.apk` (the `gh path#Label` syntax only sets a label, not the
+  filename), else the download 404s. Fixed in `publish-release.sh`.
 
 ## D. Set a real release signing key (before all 14 trucks)
 The APK is debug-signed today; OTA updates must keep one stable key or Android
