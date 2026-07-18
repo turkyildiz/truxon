@@ -26,7 +26,7 @@ result:
 cd /home/turkyildiz/TRUXON && SUPABASE_ACCESS_TOKEN=… \
   ~/.local/bin/supabase functions deploy notify --project-ref okoeeyxxvzypjiumraxq
 ```
-Also reinstall the latest APK (`~/Desktop/TruxCompanion-v1.apk`) — it has the
+Also reinstall the latest APK (`~/Desktop/TruxCompanion-release-v3.apk`) — it has the
 matching client-side alarm handling. Then, in order:
 1. **On both tablets:** Settings → Apps → Trux Companion → **Notifications** →
    master toggle ON, and the **Dispatch alarms** channel ON + set to *Make sound*.
@@ -56,11 +56,20 @@ valid 56.4MB APK). No more USB installs.
   `TruxCompanion.apk` (the `gh path#Label` syntax only sets a label, not the
   filename), else the download 404s. Fixed in `publish-release.sh`.
 
-## D. Set a real release signing key (before all 14 trucks)
-The APK is debug-signed today; OTA updates must keep one stable key or Android
-rejects them. When ready, tell me and I'll wire a keystore + `build-apk.sh` in
-one pass. Do this **before** wide rollout so the signing key never changes under
-installed apps.
+## D. Release signing key — ✅ DONE (Sat 2026-07-18)
+Permanent release keystore created and wired; `v1.0.0+3` published +
+verified release-signed (cert SHA-256 `b156c185…`, APK Sig Scheme v2).
+- Keystore: `mobile/android/truxon-release.jks` (gitignored). Password: in
+  your password manager — **it can never change** or OTA breaks. If the
+  machine is ever lost, the keystore file + that password are the only way to
+  keep updating installed apps — **back both up** (the .jks is NOT in git).
+- Config: `mobile/android/key.properties` (gitignored) → read by
+  `build.gradle.kts`. Recreate with `mobile/setup-release-key.sh` if needed.
+- **Fleet crossover:** the 2 tablets currently on the old *debug-signed* APK
+  cannot OTA to a release-signed build (Android blocks signature changes), so
+  Monday's reinstall (§B/§E) must be `~/Desktop/TruxCompanion-release-v3.apk`.
+  After that one manual install, every future update is OTA and stays on this
+  key.
 
 ## E. Roll out to tablets
 Use **`docs/tablet-provisioning.md`** (printable version was shared as an
