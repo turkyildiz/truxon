@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../i18n.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -49,18 +50,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   Image.asset('assets/truxon-icon.png', height: 72),
                   const SizedBox(height: 10),
                   Text('Truxon', style: Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold)),
-                  Text('Companion', style: Theme.of(context).textTheme.titleMedium),
+                  Text(tr('companion'), style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 32),
                   TextField(
                     controller: _email,
-                    decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: tr('email'), border: const OutlineInputBorder()),
                     keyboardType: TextInputType.emailAddress,
                     autocorrect: false,
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _password,
-                    decoration: const InputDecoration(labelText: 'Password', border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: tr('password'), border: const OutlineInputBorder()),
                     obscureText: true,
                     onSubmitted: (_) => _login(),
                   ),
@@ -71,7 +72,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 20),
                   FilledButton(
                     onPressed: _busy ? null : _login,
-                    child: Text(_busy ? 'Signing in…' : 'Sign in'),
+                    child: Text(_busy ? tr('signingIn') : tr('signIn')),
+                  ),
+                  const SizedBox(height: 20),
+                  DropdownButton<String>(
+                    value: appLocale.value,
+                    isExpanded: true,
+                    onChanged: (v) {
+                      if (v != null) setLocale(v);
+                    },
+                    items: [
+                      for (final l in kLangs)
+                        DropdownMenuItem(value: l.code, child: Text('${l.label}${l.beta ? ' (β)' : ''}')),
+                    ],
                   ),
                 ],
               ),

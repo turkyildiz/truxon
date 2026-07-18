@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import '../i18n.dart';
 import '../services/alarms.dart';
 import '../services/api.dart';
 import '../services/push.dart';
@@ -89,16 +90,16 @@ class _HomeShellState extends State<HomeShell> {
         : <Widget>[VoiceScreen(api: _api), RadioScreen(username: name), _aboutTab(role, name)];
 
     final dests = isDriver
-        ? const [
-            NavigationDestination(icon: Icon(Icons.local_shipping), label: 'Loads'),
-            NavigationDestination(icon: Icon(Icons.mic_none), label: 'Trux'),
-            NavigationDestination(icon: Icon(Icons.record_voice_over), label: 'Radio'),
-            NavigationDestination(icon: Icon(Icons.info_outline), label: 'About'),
+        ? [
+            NavigationDestination(icon: const Icon(Icons.local_shipping), label: tr('loads')),
+            NavigationDestination(icon: const Icon(Icons.mic_none), label: tr('trux')),
+            NavigationDestination(icon: const Icon(Icons.record_voice_over), label: tr('radio')),
+            NavigationDestination(icon: const Icon(Icons.info_outline), label: tr('about')),
           ]
-        : const [
-            NavigationDestination(icon: Icon(Icons.mic_none), label: 'Trux'),
-            NavigationDestination(icon: Icon(Icons.record_voice_over), label: 'Radio'),
-            NavigationDestination(icon: Icon(Icons.info_outline), label: 'About'),
+        : [
+            NavigationDestination(icon: const Icon(Icons.mic_none), label: tr('trux')),
+            NavigationDestination(icon: const Icon(Icons.record_voice_over), label: tr('radio')),
+            NavigationDestination(icon: const Icon(Icons.info_outline), label: tr('about')),
           ];
 
     final safeTab = _tab.clamp(0, tabs.length - 1);
@@ -133,20 +134,20 @@ class _HomeShellState extends State<HomeShell> {
             color: Colors.red.withValues(alpha: 0.12),
             child: ListTile(
               leading: const Icon(Icons.location_off, color: Colors.red),
-              title: const Text('Location is required'),
+              title: Text(tr('locationRequired')),
               subtitle: const Text(
                 'Enable "Allow all the time" so dispatch can see the truck.'),
               trailing: FilledButton(
                 onPressed: _startTracking,
-                child: const Text('Enable'),
+                child: Text(tr('enable')),
               ),
             ),
           )
         else
           ListTile(
             leading: const Icon(Icons.gps_fixed, color: Colors.green),
-            title: const Text('Sharing location'),
-            subtitle: const Text('Always on — dispatch can see the truck 24/7'),
+            title: Text(tr('sharingLocation')),
+            subtitle: Text(tr('alwaysOn')),
           ),
         const Divider(height: 1),
         Expanded(child: LoadsScreen(api: _api, onTrackingHint: _onTrackingHint)),

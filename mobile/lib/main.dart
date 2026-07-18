@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config.dart';
+import 'i18n.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_shell.dart';
 import 'services/alarms.dart';
@@ -18,6 +19,7 @@ Future<void> main() async {
   // Background tracking service comms + the DND-bypass alarm channel.
   FlutterForegroundTask.initCommunicationPort();
   await Alarms.init();
+  await loadLocale();
 
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
@@ -32,7 +34,11 @@ Future<void> main() async {
     SessionStore.saveAccessToken(data.session?.accessToken);
   });
 
-  runApp(const TruxCompanionApp());
+  // Rebuild the whole app when the language changes.
+  runApp(ValueListenableBuilder<String>(
+    valueListenable: appLocale,
+    builder: (_, __, ___) => const TruxCompanionApp(),
+  ));
 }
 
 class TruxCompanionApp extends StatelessWidget {
