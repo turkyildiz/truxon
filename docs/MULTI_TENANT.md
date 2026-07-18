@@ -84,11 +84,15 @@ transaction and ROLLS BACK (non-destructive). Run once a DB is available:
 ```bash
 psql "$BRANCH_DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/multitenant_isolation_test.sql
 ```
-**Blocked locally 2026-07-18:** this workstation has no Docker/Postgres (both
-need a root install) and Supabase **branching requires the Pro plan** ($25/mo),
-which we did not enable. So the live 2-tenant run is deferred until either a
-container runtime is installed or the project is briefly on Pro. Until it runs
-green, treat phase-3 as syntax-verified but not behavior-verified.
+**✅ VERIFIED 2026-07-18 — ALL ISOLATION TESTS PASSED.** Ran on a real Supabase
+preview branch (Pro enabled briefly, branch created, all 4 multi-tenant
+migrations applied via `supabase db push`, test run via node-pg over the IPv4
+session pooler, branch then deleted). Confirmed live with two tenants: table
+RLS isolation; `dashboard_summary` scoped (A=$1000 / B=$2000, no bleed);
+`global_search` scoped; per-tenant numbering with both tenants holding
+`load_number DUP-0001` and no collision; and write-RPC ownership (tenant A
+cannot `change_load_status`/`create_invoice` on tenant B's rows). Phase 1–4 are
+now behavior-verified, not just syntax-verified.
 
 ## Deploy runbook (do WITH a test DB — do not rush this)
 1. **Create a Supabase preview branch** (Dashboard → Branches; needs Pro) so you
