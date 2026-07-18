@@ -4,6 +4,8 @@ export interface Caller {
   client: SupabaseClient
   userId: string
   role: string
+  tenantId: number | null
+  superAdmin: boolean
 }
 
 const CORS_HEADERS = {
@@ -35,10 +37,16 @@ export async function getCaller(req: Request): Promise<Caller | Response> {
 
   const { data: profile } = await client
     .from('profiles')
-    .select('role, is_active')
+    .select('role, is_active, tenant_id, super_admin')
     .eq('id', userData.user.id)
     .single()
   if (!profile?.is_active) return json({ error: 'Account disabled' }, 403)
 
-  return { client, userId: userData.user.id, role: profile.role }
+  return {
+    client,
+    userId: userData.user.id,
+    role: profile.role,
+    tenantId: profile.tenant_id ?? null,
+    superAdmin: profile.super_admin ?? false,
+  }
 }

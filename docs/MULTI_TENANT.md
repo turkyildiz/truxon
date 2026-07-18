@@ -60,19 +60,29 @@ tenant ownership check (writes):
   `driver_list_documents` · `driver_change_load_status` · `driver_set_duty` ·
   `driver_add_document`
 
-**New-user path:** `admin-users` edge function must set `tenant_id` on the new
-profile (to the creating admin's tenant, or a chosen tenant for a platform
-super-admin). `handle_new_user` should default `tenant_id` to the inviter's
-tenant. Without this, new users get `tenant_id = null` and see nothing.
+## App layer — ✅ DONE (phase-5 migration + edge fns + UI, 2026-07-18)
+- **New-user tenant stamping:** `handle_new_user` now reads `tenant_id` from user
+  metadata; `admin-users` supplies it (creating admin's tenant, or a chosen
+  tenant for a super-admin). New users land in the right tenant, not null.
+- **admin-users is now tenant-scoped:** GET lists only the caller's tenant;
+  POST stamps the new user's tenant; PATCH refuses foreign-tenant ids; the
+  last-admin guard is per tenant. (It previously leaked across tenants because
+  the service role bypasses RLS.)
+- **Platform super-admin:** `super_admin` flag on profiles + `my_is_super_admin()`;
+  `create_tenant()` RPC (super-admin only); RLS on `tenants` (a normal user sees
+  only their own). New `create-tenant` edge function creates a company + its
+  first admin. Frontend: super-admin-only **Tenants** page (`/tenants`, gated in
+  the router + nav) to onboard a company.
+- Still optional/nice-to-have: per-tenant name/logo in the header; confirm
+  storage bucket policies gate on tenant (buckets are already RLS/owner-scoped).
 
-## App changes still needed
-- **Platform super-admin** surface to create tenants and their first admin user.
-  (A `super_admin` flag on profiles that a service-role edge function checks —
-  restrictive RLS keeps normal admins inside their own tenant.)
-- `admin-users` create path passes `tenant_id`.
-- Optional: tenant name/logo in the header (company branding per tenant).
-- Storage paths + `documents`/drive buckets are already RLS-scoped; confirm the
-  bucket policies also gate on tenant once RPCs are filtered.
+### ⚠️ Bootstrapping the first super-admin (one-time, manual)
+No super-admin exists until one is set by hand (there's no super-admin yet to
+create one). After deploying, run once against prod:
+```sql
+update public.profiles set super_admin = true
+ where id = (select id from auth.users where email = 'turkyildiz@gmail.com');
+```
 
 ## Isolation test (written, awaiting a DB to run)
 `supabase/tests/multitenant_isolation_test.sql` seeds a 2nd tenant + a probe
@@ -94,11 +104,28 @@ RLS isolation; `dashboard_summary` scoped (A=$1000 / B=$2000, no bleed);
 cannot `change_load_status`/`create_invoice` on tenant B's rows). Phase 1–4 are
 now behavior-verified, not just syntax-verified.
 
-## Deploy runbook (do WITH a test DB — do not rush this)
-1. **Create a Supabase preview branch** (Dashboard → Branches; needs Pro) so you
-   have a throwaway copy of prod.
-2. On the branch, apply all three migrations: `supabase db push`.
-3. Run the isolation test above; confirm `ALL ISOLATION TESTS PASSED`.
+## Verified on a branch (2026-07-18)
+A second branch (`mt-verify`) applied ALL FIVE migrations and ran both suites
+green: `multitenant_isolation_test.sql` (phases 1–4) and
+`multitenant_onboarding_test.sql` (phase 5 — tenant stamping, super-admin-only
+`create_tenant`, tenants RLS). Frontend `npm run build` passes with the new
+Tenants page. Edge functions (`admin-users`, `create-tenant`) are written and
+DB-verified but NOT yet deployed (the classifier blocks Claude from
+`functions deploy`; that's an owner step).
+
+## Deploy runbook (turn multi-tenancy on — still gated by the owner)
+Everything below is staged on the `multi-tenant` branch. To go live:
+1. (Optional but recommended) Re-run the branch verification: create a preview
+   branch, `supabase db push`, run both test SQL files, confirm all PASS.
+2. Merge `multi-tenant` → `main`.
+3. Apply migrations to prod: `supabase db push` (adds phases 1–5; zero behavior
+   change with one tenant).
+4. Deploy edge functions: `supabase functions deploy admin-users create-tenant`.
+5. Bootstrap the first super-admin (SQL above).
+6. As super-admin, open **Tenants → New company** to onboard tenant #2, then
+   verify with a probe login. Old flow (single tenant) is unchanged throughout.
+
+### Legacy manual test steps (still valid for a full end-to-end check)
 4. Create a **second tenant** + a probe user in each tenant. Verify:
    - each user sees ONLY their tenant's loads/customers/drivers (UI + direct RPC),
    - a new load in tenant B is invisible to tenant A,

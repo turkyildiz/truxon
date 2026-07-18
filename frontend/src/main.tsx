@@ -21,6 +21,7 @@ import Maintenance from './pages/Maintenance'
 import Reports from './pages/Reports'
 import Invoices from './pages/Invoices'
 import Users from './pages/Users'
+import Tenants from './pages/Tenants'
 import Settings from './pages/Settings'
 import Drive from './pages/Drive'
 
@@ -32,6 +33,13 @@ function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   if (loading) return <div className="flex min-h-screen items-center justify-center text-slate-500">Loading…</div>
   if (!user) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
+
+/** Platform super-admin guard for /tenants — the flag is orthogonal to role. */
+function SuperAdmin({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
+  if (!user?.super_admin) return <Navigate to={homePathForRole(user?.role ?? 'driver')} replace />
   return <>{children}</>
 }
 
@@ -80,6 +88,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/personal-drive" element={<Drive drive="personal" />} />
               <Route path="/team-drive" element={<Drive drive="team" />} />
               <Route path="/users" element={<Users />} />
+              <Route path="/tenants" element={<SuperAdmin><Tenants /></SuperAdmin>} />
               <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

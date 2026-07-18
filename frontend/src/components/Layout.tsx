@@ -188,7 +188,11 @@ export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [pwOpen, setPwOpen] = useState(false)
   const allowed = ROLE_MODULES[user?.role ?? 'driver'] ?? []
-  const items = NAV_ITEMS.filter((i) => allowed.includes(i.key))
+  const items = [
+    ...NAV_ITEMS.filter((i) => allowed.includes(i.key)),
+    // Platform super-admin gets the cross-tenant onboarding surface.
+    ...(user?.super_admin ? [{ key: 'tenants', to: '/tenants', label: 'Tenants', icon: '🏛️' }] : []),
+  ]
 
   return (
     <div className="flex min-h-screen">

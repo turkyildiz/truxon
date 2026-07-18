@@ -16,6 +16,7 @@ import type {
   MaintenanceRecord,
   Profile,
   SearchResults,
+  Tenant,
   WeeklyReport,
 } from './types'
 
@@ -468,6 +469,28 @@ export async function createUser(payload: Row): Promise<void> {
 
 export async function updateUser(id: string, payload: Row): Promise<void> {
   await invokeAdminUsers({ method: 'PATCH', body: { id, ...payload } })
+}
+
+// ---------- Tenants (platform super-admin) ----------
+
+export async function listTenants(): Promise<Tenant[]> {
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('id, name, slug, is_active, created_at')
+    .order('name')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as Tenant[]
+}
+
+/** Create a new company + its first admin. Super-admin only (enforced server-side). */
+export async function createTenant(payload: {
+  name: string
+  slug: string
+  admin_email: string
+  admin_password: string
+  admin_full_name?: string
+}): Promise<{ tenant: Tenant; admin_user_id: string }> {
+  return invokeFunction('create-tenant', { method: 'POST', body: payload })
 }
 
 // ---------- Personal / Team drives ----------

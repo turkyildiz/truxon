@@ -7,6 +7,16 @@ export interface Profile {
   role: Role
   is_active: boolean
   email?: string
+  tenant_id?: number | null
+  super_admin?: boolean
+}
+
+export interface Tenant {
+  id: number
+  name: string
+  slug: string
+  is_active: boolean
+  created_at: string
 }
 
 export interface Customer {

@@ -23,10 +23,15 @@ Deno.serve(async (req) => {
   )
 
   if (req.method === 'GET') {
-    const { data: profiles, error } = await admin
+    // Tenant isolation: a normal admin sees only their tenant's users; a
+    // platform super-admin sees everyone. (Service role bypasses RLS, so this
+    // filter is enforced here.)
+    let query = admin
       .from('profiles')
-      .select('id, username, full_name, role, is_active, created_at')
+      .select('id, username, full_name, role, is_active, created_at, tenant_id')
       .order('username')
+    if (!caller.superAdmin) query = query.eq('tenant_id', caller.tenantId)
+    const { data: profiles, error } = await query
     if (error) return json({ error: error.message }, 500)
 
     const { data: usersData } = await admin.auth.admin.listUsers({ perPage: 1000 })
@@ -44,14 +49,20 @@ Deno.serve(async (req) => {
       return json({ error: 'link_driver_id requires role=driver' }, 422)
     }
 
+    // Which tenant does the new user belong to? A normal admin can only create
+    // inside their own tenant; a super-admin may target any tenant via body.
+    const newTenantId = caller.superAdmin ? (body.tenant_id ?? caller.tenantId) : caller.tenantId
+    if (newTenantId == null) return json({ error: 'No tenant context for new user' }, 400)
+
     if (link_driver_id != null) {
       const { data: drv, error: dErr } = await admin
         .from('drivers')
-        .select('id, user_id')
+        .select('id, user_id, tenant_id')
         .eq('id', link_driver_id)
         .maybeSingle()
       if (dErr) return json({ error: dErr.message }, 400)
       if (!drv) return json({ error: 'Driver not found' }, 404)
+      if (drv.tenant_id !== newTenantId) return json({ error: 'Driver belongs to a different tenant' }, 400)
       if (drv.user_id) return json({ error: 'Driver already linked to a login' }, 409)
     }
 
@@ -59,7 +70,13 @@ Deno.serve(async (req) => {
       email,
       password,
       email_confirm: true,
-      user_metadata: { username: username || email.split('@')[0], full_name: full_name ?? '', role },
+      // tenant_id flows into the profile via handle_new_user (phase 5 trigger).
+      user_metadata: {
+        username: username || email.split('@')[0],
+        full_name: full_name ?? '',
+        role,
+        tenant_id: String(newTenantId),
+      },
     })
     if (error) return json({ error: error.message }, 400)
 
@@ -85,17 +102,30 @@ Deno.serve(async (req) => {
       return json({ error: 'Invalid role' }, 422)
     }
 
+    // Tenant isolation: a normal admin may only touch users in their own
+    // tenant. Fetch the target once and gate on it.
+    const { data: target } = await admin
+      .from('profiles')
+      .select('role, is_active, tenant_id')
+      .eq('id', id)
+      .maybeSingle()
+    if (!target) return json({ error: 'User not found' }, 404)
+    if (!caller.superAdmin && target.tenant_id !== caller.tenantId) {
+      return json({ error: 'User not found' }, 404)
+    }
+
     if (role !== undefined || is_active === false) {
-      const { data: target } = await admin.from('profiles').select('role, is_active').eq('id', id).maybeSingle()
-      if (target?.role === 'admin' && target.is_active) {
+      if (target.role === 'admin' && target.is_active) {
         const demoting = role !== undefined && role !== 'admin'
         const deactivating = is_active === false
         if (demoting || deactivating) {
+          // Last-admin guard is per tenant.
           const { count } = await admin
             .from('profiles')
             .select('id', { count: 'exact', head: true })
             .eq('role', 'admin')
             .eq('is_active', true)
+            .eq('tenant_id', target.tenant_id)
           if ((count ?? 0) <= 1) {
             return json({ error: 'Cannot demote or deactivate the last remaining admin' }, 400)
           }
