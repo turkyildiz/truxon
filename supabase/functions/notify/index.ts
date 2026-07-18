@@ -109,26 +109,23 @@ async function sendFcm(
   // intent client-side) and flag data.alarm so the FCM background handler can
   // raise a full-screen alarm even when the app is killed. On iOS we send an
   // interruption-level "time-sensitive"/critical push with the alarm sound.
-  const payload: Record<string, unknown> = {
-    token: deviceToken,
-    notification: { title, body },
-    data: { ...(data ?? {}), ...(urgent ? { alarm: '1', channel: 'dispatch_alarm' } : {}) },
-  }
+  const payload: Record<string, unknown> = { token: deviceToken }
   if (urgent) {
-    payload.android = {
-      priority: 'high',
-      notification: {
-        channel_id: 'dispatch_alarm',
-        sound: 'default',
-        notification_priority: 'PRIORITY_MAX',
-        default_vibrate_timings: true,
-      },
-    }
+    // DATA-ONLY on Android: no top-level/android `notification`, so the system
+    // never auto-displays a plain notification. The app's FCM handler always
+    // fires — foreground (onMessage) and background/killed (onBackgroundMessage,
+    // kept alive by the tracking foreground service) — and renders the
+    // full-screen `dispatch_alarm` alarm itself. title/body ride in `data`.
+    payload.data = { ...(data ?? {}), alarm: '1', channel: 'dispatch_alarm', title, body }
+    payload.android = { priority: 'high' }
+    // iOS still gets a real alert (data-only wouldn't alarm on iOS).
     payload.apns = {
       headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
-      payload: { aps: { sound: 'default', 'interruption-level': 'time-sensitive' } },
+      payload: { aps: { alert: { title, body }, sound: 'default', 'interruption-level': 'time-sensitive' } },
     }
   } else {
+    payload.notification = { title, body }
+    payload.data = data ?? {}
     payload.android = { priority: 'high' }
   }
   const res = await fetch(

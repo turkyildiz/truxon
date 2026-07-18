@@ -46,8 +46,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('TRUX', style: Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
+                  Image.asset('assets/truxon-icon.png', height: 72),
+                  const SizedBox(height: 10),
+                  Text('Truxon', style: Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold)),
                   Text('Companion', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 32),
                   TextField(

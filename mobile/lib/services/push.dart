@@ -13,6 +13,11 @@ import 'api.dart';
 /// configured on the build (no google-services.json), [PushService.init]
 /// no-ops and the rest of the app works unchanged.
 
+String _title(RemoteMessage m) =>
+    m.data['title'] as String? ?? m.notification?.title ?? 'Dispatch';
+String _body(RemoteMessage m) =>
+    m.data['body'] as String? ?? m.notification?.body ?? 'Urgent message';
+
 @pragma('vm:entry-point')
 Future<void> firebaseBgHandler(RemoteMessage message) async {
   try {
@@ -21,11 +26,7 @@ Future<void> firebaseBgHandler(RemoteMessage message) async {
     return;
   }
   if (message.data['alarm'] == '1') {
-    await Alarms.showAlarm(
-      message.notification?.title ?? 'Dispatch',
-      message.notification?.body ?? 'Urgent message',
-      payload: jsonEncode(message.data),
-    );
+    await Alarms.showAlarm(_title(message), _body(message), payload: jsonEncode(message.data));
   }
 }
 
@@ -47,11 +48,7 @@ class PushService {
 
     FirebaseMessaging.onMessage.listen((m) {
       if (m.data['alarm'] == '1') {
-        Alarms.showAlarm(
-          m.notification?.title ?? 'Dispatch',
-          m.notification?.body ?? 'Urgent message',
-          payload: jsonEncode(m.data),
-        );
+        Alarms.showAlarm(_title(m), _body(m), payload: jsonEncode(m.data));
       }
     });
 
