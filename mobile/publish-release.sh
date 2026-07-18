@@ -29,7 +29,12 @@ echo "==> version ${name}+${newcode} (versionCode ${newcode})"
 source "$HOME/dev-tools/truxon-env.sh"
 export PATH="$HOME/dev-tools/flutter/bin:$PATH"
 ./build-apk.sh release
-APK="build/app/outputs/flutter-apk/app-release.apk"
+# Give the asset its FINAL filename. `gh release create path#Label` only sets a
+# display label, NOT the download filename — the /latest/download/ URL always
+# uses the real basename. So the file must actually be named TruxCompanion.apk,
+# or latest.json's apkUrl 404s and OTA silently fails.
+cp "build/app/outputs/flutter-apk/app-release.apk" "build/app/outputs/flutter-apk/TruxCompanion.apk"
+APK="build/app/outputs/flutter-apk/TruxCompanion.apk"
 
 # 3) latest.json — apkUrl uses the stable /latest/ path so it always points here
 APKURL="https://github.com/${REPO}/releases/latest/download/TruxCompanion.apk"
@@ -40,8 +45,8 @@ JSON
 # 4) publish the GitHub release with both assets
 TAG="v${name}+${newcode}"
 "$GH" release create "$TAG" \
-  "${APK}#TruxCompanion.apk" \
-  "/tmp/latest.json#latest.json" \
+  "${APK}" \
+  "/tmp/latest.json" \
   --repo "$REPO" --title "$TAG" --notes "$NOTES"
 
 echo "==> published ${TAG}. Tablets will offer this on next launch."
