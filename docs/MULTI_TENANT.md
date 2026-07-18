@@ -36,16 +36,20 @@ restrictive policies do NOT protect data returned through them. Each of these
 must get an explicit `... where tenant_id = public.my_tenant_id()` (reads) or a
 tenant ownership check (writes):
 
-**Reads / aggregates (leak all tenants' data until filtered):**
-- `dashboard_summary` · `weekly_report` · `global_search` · `fleet_positions_snapshot`
+**✅ DONE — phase-3 migration `20260718000003_multitenant_rpcs.sql` (2026-07-18):**
+- **Reads / aggregates** now tenant-filtered: `dashboard_summary` ·
+  `weekly_report` · `global_search` · `fleet_positions_snapshot`.
+- **Per-tenant numbering** fixed. NOTE: the numbering was worse than first
+  thought — `load_number`/`invoice_number` were **globally UNIQUE**, so a 2nd
+  tenant would collide on `INV-YYYY-0001`. Phase-3 swaps those for composite
+  `unique (tenant_id, number)` and adds an atomic per-tenant counter table
+  (`tenant_number_counters`) driving `next_load_number`/`next_invoice_number`.
+- Validated: all 3 migrations + 12 PL/pgSQL bodies parse clean against the real
+  Postgres grammar (libpg_query). **Not yet run live** — see test section below.
 
-**Per-tenant numbering (otherwise load#/invoice# collide across tenants):**
-- `next_load_number` · `next_invoice_number` — change the counter to be per
-  `tenant_id` (e.g. key the sequence/`max()` on tenant).
-
-**Writes (could act on another tenant's row if handed a foreign id):**
+**⏳ STILL TODO — write RPCs (could act on another tenant's row if handed a foreign id):**
 - `create_invoice` · `void_invoice` · `set_invoice_status` · `change_load_status`
-  · `ingest_vehicle_positions`
+  · `ingest_vehicle_positions` — add a tenant ownership check on the target id.
 
 **Driver RPCs (already user-scoped via `my_driver_id`; verify, low risk):**
 - `driver_my_loads` · `driver_get_load` · `driver_load_dto` ·
@@ -66,11 +70,27 @@ tenant. Without this, new users get `tenant_id = null` and see nothing.
 - Storage paths + `documents`/drive buckets are already RLS-scoped; confirm the
   bucket policies also gate on tenant once RPCs are filtered.
 
+## Isolation test (written, awaiting a DB to run)
+`supabase/tests/multitenant_isolation_test.sql` seeds a 2nd tenant + a probe
+admin in each tenant + one row of every business table per tenant, then
+impersonates each probe (via `request.jwt.claims`) and asserts: table RLS
+isolation, RPC scoping (`dashboard_summary`/`global_search`/etc.), and
+per-tenant numbering with no unique-constraint collision. It runs in ONE
+transaction and ROLLS BACK (non-destructive). Run once a DB is available:
+```bash
+psql "$BRANCH_DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/multitenant_isolation_test.sql
+```
+**Blocked locally 2026-07-18:** this workstation has no Docker/Postgres (both
+need a root install) and Supabase **branching requires the Pro plan** ($25/mo),
+which we did not enable. So the live 2-tenant run is deferred until either a
+container runtime is installed or the project is briefly on Pro. Until it runs
+green, treat phase-3 as syntax-verified but not behavior-verified.
+
 ## Deploy runbook (do WITH a test DB — do not rush this)
-1. **Create a Supabase preview branch** (Dashboard → Branches) so you have a
-   throwaway copy of prod.
-2. On the branch, apply both migrations: `supabase db push`.
-3. Add the RPC tenant filters (above) + per-tenant numbering on the branch.
+1. **Create a Supabase preview branch** (Dashboard → Branches; needs Pro) so you
+   have a throwaway copy of prod.
+2. On the branch, apply all three migrations: `supabase db push`.
+3. Run the isolation test above; confirm `ALL ISOLATION TESTS PASSED`.
 4. Create a **second tenant** + a probe user in each tenant. Verify:
    - each user sees ONLY their tenant's loads/customers/drivers (UI + direct RPC),
    - a new load in tenant B is invisible to tenant A,
