@@ -83,6 +83,8 @@ declare
   a_fleet jsonb; b_fleet jsonb;
   a_search jsonb;
   a_ln text; b_ln text;
+  b_load_id bigint;
+  leaked boolean;
 begin
   -- 1) table RLS: each sees exactly 1 load, and it's THEIRS
   perform pg_temp.act_as('11111111-1111-1111-1111-111111111111');
@@ -131,7 +133,33 @@ begin
   perform pg_temp.act_as('22222222-2222-2222-2222-222222222222');
   insert into public.loads (customer_id, load_number, status, rate, miles, delivery_time)
     values ((select id from public.customers where company_name='ACME B'), 'DUP-0001', 'pending', 1, 1, now());
-  raise notice 'PASS 4/4  per-tenant numbering (both tenants hold load_number DUP-0001, no collision)';
+  raise notice 'PASS 4/5  per-tenant numbering (both tenants hold load_number DUP-0001, no collision)';
+
+  -- 5) write RPCs must refuse a foreign tenant's id (they bypass RLS)
+  perform pg_temp.act_as_admin();
+  select l.id into b_load_id
+    from public.loads l join public.tenants t on t.id = l.tenant_id
+   where t.slug = 'beta' and l.load_number = 'DUP-0001' limit 1;
+
+  perform pg_temp.act_as('11111111-1111-1111-1111-111111111111');  -- tenant A
+  leaked := true;
+  begin
+    perform public.change_load_status(b_load_id, 'assigned');  -- B's load
+  exception when others then
+    if sqlerrm like '%not found%' then leaked := false; else raise; end if;
+  end;
+  if leaked then raise exception 'SECURITY FAIL: tenant A mutated tenant B load % via change_load_status', b_load_id; end if;
+
+  leaked := true;
+  begin
+    perform public.create_invoice(
+      (select c.id from public.customers c join public.tenants t on t.id=c.tenant_id where t.slug='beta' limit 1),
+      array[b_load_id]);  -- B's load + B's customer, called as A
+  exception when others then
+    if sqlerrm like '%not found%' then leaked := false; else raise; end if;
+  end;
+  if leaked then raise exception 'SECURITY FAIL: tenant A invoiced tenant B load % via create_invoice', b_load_id; end if;
+  raise notice 'PASS 5/5  write-RPC ownership (A cannot change_load_status / create_invoice on B''s rows)';
 
   raise notice '======================================';
   raise notice 'ALL ISOLATION TESTS PASSED';

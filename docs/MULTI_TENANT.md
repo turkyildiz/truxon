@@ -47,9 +47,13 @@ tenant ownership check (writes):
 - Validated: all 3 migrations + 12 PL/pgSQL bodies parse clean against the real
   Postgres grammar (libpg_query). **Not yet run live** — see test section below.
 
-**⏳ STILL TODO — write RPCs (could act on another tenant's row if handed a foreign id):**
+**✅ DONE — write RPCs, phase-4 migration `20260718000004_multitenant_write_rpcs.sql`:**
 - `create_invoice` · `void_invoice` · `set_invoice_status` · `change_load_status`
-  · `ingest_vehicle_positions` — add a tenant ownership check on the target id.
+  now AND `tenant_id = my_tenant_id()` on their id lookup, so a foreign id →
+  "not found" instead of a cross-tenant mutation. `ingest_vehicle_positions`
+  needed no change — it only writes the caller's own driver (`my_driver_id()`).
+- The isolation test now also asserts A cannot `change_load_status` /
+  `create_invoice` on B's rows.
 
 **Driver RPCs (already user-scoped via `my_driver_id`; verify, low risk):**
 - `driver_my_loads` · `driver_get_load` · `driver_load_dto` ·
