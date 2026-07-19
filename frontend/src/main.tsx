@@ -12,6 +12,8 @@ import PageLoader from './components/PageLoader'
 // pull in (recharts, leaflet, jspdf, pdfjs…) no longer weigh down the initial
 // load. Layout/PageLoader stay static so the shell renders instantly.
 const Landing = lazy(() => import('./pages/Landing'))
+const Privacy = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Privacy })))
+const Terms = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Terms })))
 const Login = lazy(() => import('./pages/Login'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Trux = lazy(() => import('./pages/Trux'))
@@ -64,6 +66,8 @@ createRoot(document.getElementById('root')!).render(
           <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Landing />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
             <Route path="/login" element={<Login />} />
             <Route
               element={
