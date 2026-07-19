@@ -66,24 +66,41 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
   )
 }
 
-const NAV_ITEMS: { key: string; to: string; label: string; icon: string }[] = [
-  { key: 'dashboard', to: '/dashboard', label: 'Dashboard', icon: '📊' },
-  { key: 'track', to: '/track', label: 'Track & Trace', icon: '📍' },
-  { key: 'loads', to: '/loads', label: 'Loads', icon: '📦' },
-  { key: 'dispatch', to: '/dispatch', label: 'Dispatch', icon: '🚚' },
-  { key: 'customers', to: '/customers', label: 'Customers', icon: '🏢' },
-  { key: 'drivers', to: '/drivers', label: 'Drivers', icon: '🪪' },
-  { key: 'trucks', to: '/trucks', label: 'Trucks', icon: '🚛' },
-  { key: 'trailers', to: '/trailers', label: 'Trailers', icon: '🚋' },
-  { key: 'maintenance', to: '/maintenance', label: 'Maintenance', icon: '🔧' },
-  { key: 'reports', to: '/reports', label: 'Accounting', icon: '🧾' },
-  { key: 'invoices', to: '/invoices', label: 'Invoices', icon: '💵' },
-  { key: 'fuel', to: '/fuel', label: 'Fuel', icon: '⛽' },
-  { key: 'tolls', to: '/tolls', label: 'Tolls', icon: '🛣️' },
-  { key: 'personal_drive', to: '/personal-drive', label: 'Personal Drive', icon: '📁' },
-  { key: 'team_drive', to: '/team-drive', label: 'Team Drive', icon: '🗂️' },
-  { key: 'users', to: '/users', label: 'Users', icon: '👤' },
-  { key: 'settings', to: '/settings', label: 'Settings', icon: '⚙️' },
+type NavItem = { key: string; to: string; label: string; icon: string }
+
+// Grouped so the sidebar reads as a few sections instead of one long list.
+// `title: null` is the ungrouped top item (Dashboard). Role filtering still
+// happens per item by key; a group with no visible items is hidden entirely.
+const NAV_GROUPS: { title: string | null; items: NavItem[] }[] = [
+  { title: null, items: [
+    { key: 'dashboard', to: '/dashboard', label: 'Dashboard', icon: '📊' },
+  ] },
+  { title: 'Operations', items: [
+    { key: 'track', to: '/track', label: 'Track & Trace', icon: '📍' },
+    { key: 'loads', to: '/loads', label: 'Loads', icon: '📦' },
+    { key: 'dispatch', to: '/dispatch', label: 'Dispatch', icon: '🚚' },
+    { key: 'customers', to: '/customers', label: 'Customers', icon: '🏢' },
+  ] },
+  { title: 'Fleet', items: [
+    { key: 'drivers', to: '/drivers', label: 'Drivers', icon: '🪪' },
+    { key: 'trucks', to: '/trucks', label: 'Trucks', icon: '🚛' },
+    { key: 'trailers', to: '/trailers', label: 'Trailers', icon: '🚋' },
+    { key: 'maintenance', to: '/maintenance', label: 'Maintenance', icon: '🔧' },
+  ] },
+  { title: 'Accounting', items: [
+    { key: 'reports', to: '/reports', label: 'Weekly Report', icon: '🧾' },
+    { key: 'invoices', to: '/invoices', label: 'Invoices', icon: '💵' },
+    { key: 'fuel', to: '/fuel', label: 'Fuel', icon: '⛽' },
+    { key: 'tolls', to: '/tolls', label: 'Tolls', icon: '🛣️' },
+  ] },
+  { title: 'Files', items: [
+    { key: 'personal_drive', to: '/personal-drive', label: 'Personal Drive', icon: '📁' },
+    { key: 'team_drive', to: '/team-drive', label: 'Team Drive', icon: '🗂️' },
+  ] },
+  { title: 'Admin', items: [
+    { key: 'users', to: '/users', label: 'Users', icon: '👤' },
+    { key: 'settings', to: '/settings', label: 'Settings', icon: '⚙️' },
+  ] },
 ]
 
 function GlobalSearch() {
@@ -236,7 +253,16 @@ export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [pwOpen, setPwOpen] = useState(false)
   const allowed = ROLE_MODULES[user?.role ?? 'driver'] ?? []
-  const items = NAV_ITEMS.filter((i) => allowed.includes(i.key))
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('truxon-nav-collapsed') || '{}') } catch { return {} }
+  })
+  function toggleGroup(title: string) {
+    setCollapsed((c) => {
+      const next = { ...c, [title]: !c[title] }
+      localStorage.setItem('truxon-nav-collapsed', JSON.stringify(next))
+      return next
+    })
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -248,21 +274,42 @@ export default function Layout() {
           <img src="/brand/truxon-primary-white.png" alt="Truxon" className="h-8 w-auto" />
         </div>
         <nav className="mt-2 space-y-1 px-3">
-          {items.map((item) => (
-            <NavLink
-              key={item.key}
-              to={item.to}
-              onClick={() => setMenuOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                  isActive ? 'bg-navy-700 text-white' : 'text-navy-100 hover:bg-navy-800'
-                }`
-              }
-            >
-              <span>{item.icon}</span>
-              {item.label}
-            </NavLink>
-          ))}
+          {NAV_GROUPS.map((group, gi) => {
+            const groupItems = group.items.filter((i) => allowed.includes(i.key))
+            if (groupItems.length === 0) return null
+            // The group holding the current page always stays open so you can
+            // see where you are, even if it was collapsed.
+            const hasActive = groupItems.some((i) => location.pathname.startsWith(i.to))
+            const isCollapsed = group.title != null && !!collapsed[group.title] && !hasActive
+            return (
+              <div key={group.title ?? `g${gi}`} className={group.title ? 'pt-3' : ''}>
+                {group.title && (
+                  <button
+                    onClick={() => toggleGroup(group.title!)}
+                    className="flex w-full items-center justify-between px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-navy-300 hover:text-white"
+                  >
+                    <span>{group.title}</span>
+                    <span className="text-[10px] leading-none">{isCollapsed ? '▸' : '▾'}</span>
+                  </button>
+                )}
+                {!isCollapsed && groupItems.map((item) => (
+                  <NavLink
+                    key={item.key}
+                    to={item.to}
+                    onClick={() => setMenuOpen(false)}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                        isActive ? 'bg-navy-700 text-white' : 'text-navy-100 hover:bg-navy-800'
+                      }`
+                    }
+                  >
+                    <span>{item.icon}</span>
+                    {item.label}
+                  </NavLink>
+                ))}
+              </div>
+            )
+          })}
         </nav>
       </aside>
       {menuOpen && <div className="fixed inset-0 z-20 bg-black/30 lg:hidden" onClick={() => setMenuOpen(false)} />}
