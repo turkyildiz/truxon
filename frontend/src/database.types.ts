@@ -359,6 +359,117 @@ export type Database = {
           },
         ]
       }
+      fuel_transactions: {
+        Row: {
+          amount: number
+          card_last_four: string | null
+          description: string
+          discount: number | null
+          driver_id: number | null
+          driver_name: string
+          fuel_type: string
+          gallons: number | null
+          id: number
+          imported_at: string
+          merchant: string
+          merchant_category: string
+          merchant_city: string
+          merchant_state: string
+          merchant_zip: string
+          net_of_discount: number | null
+          posted_date: string | null
+          price_per_gallon: number | null
+          prompted_odometer: number | null
+          raw: Json
+          status: string
+          tag: string
+          telematics_odometer: number | null
+          transaction_time: string
+          truck_id: number | null
+          updated_at: string
+          uuid: string
+          vehicle_name: string
+          vin: string
+        }
+        Insert: {
+          amount?: number
+          card_last_four?: string | null
+          description?: string
+          discount?: number | null
+          driver_id?: number | null
+          driver_name?: string
+          fuel_type?: string
+          gallons?: number | null
+          id?: never
+          imported_at?: string
+          merchant?: string
+          merchant_category?: string
+          merchant_city?: string
+          merchant_state?: string
+          merchant_zip?: string
+          net_of_discount?: number | null
+          posted_date?: string | null
+          price_per_gallon?: number | null
+          prompted_odometer?: number | null
+          raw?: Json
+          status?: string
+          tag?: string
+          telematics_odometer?: number | null
+          transaction_time: string
+          truck_id?: number | null
+          updated_at?: string
+          uuid: string
+          vehicle_name?: string
+          vin?: string
+        }
+        Update: {
+          amount?: number
+          card_last_four?: string | null
+          description?: string
+          discount?: number | null
+          driver_id?: number | null
+          driver_name?: string
+          fuel_type?: string
+          gallons?: number | null
+          id?: never
+          imported_at?: string
+          merchant?: string
+          merchant_category?: string
+          merchant_city?: string
+          merchant_state?: string
+          merchant_zip?: string
+          net_of_discount?: number | null
+          posted_date?: string | null
+          price_per_gallon?: number | null
+          prompted_odometer?: number | null
+          raw?: Json
+          status?: string
+          tag?: string
+          telematics_odometer?: number | null
+          transaction_time?: string
+          truck_id?: number | null
+          updated_at?: string
+          uuid?: string
+          vehicle_name?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fuel_transactions_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_transactions_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           created_at: string
@@ -1213,6 +1324,132 @@ export type Database = {
           },
         ]
       }
+      watchdog_heartbeats: {
+        Row: {
+          detail: string
+          last_seen: string
+          source: string
+        }
+        Insert: {
+          detail?: string
+          last_seen?: string
+          source: string
+        }
+        Update: {
+          detail?: string
+          last_seen?: string
+          source?: string
+        }
+        Relationships: []
+      }
+      watchdog_incidents: {
+        Row: {
+          check_name: string
+          detail: string
+          id: number
+          opened_at: string
+          remediation_count: number
+          resolved_at: string | null
+          severity: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          check_name: string
+          detail?: string
+          id?: never
+          opened_at?: string
+          remediation_count?: number
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          check_name?: string
+          detail?: string
+          id?: never
+          opened_at?: string
+          remediation_count?: number
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      watchdog_remediations: {
+        Row: {
+          action_key: string
+          after_state: Json | null
+          approval_token: string | null
+          before_state: Json | null
+          check_name: string
+          created_at: string
+          decided_at: string | null
+          detail: string
+          expires_at: string | null
+          id: number
+          incident_id: number | null
+          params: Json
+          proposed_at: string
+          revert_of: number | null
+          status: string
+          tier: string
+        }
+        Insert: {
+          action_key: string
+          after_state?: Json | null
+          approval_token?: string | null
+          before_state?: Json | null
+          check_name: string
+          created_at?: string
+          decided_at?: string | null
+          detail?: string
+          expires_at?: string | null
+          id?: never
+          incident_id?: number | null
+          params?: Json
+          proposed_at?: string
+          revert_of?: number | null
+          status?: string
+          tier: string
+        }
+        Update: {
+          action_key?: string
+          after_state?: Json | null
+          approval_token?: string | null
+          before_state?: Json | null
+          check_name?: string
+          created_at?: string
+          decided_at?: string | null
+          detail?: string
+          expires_at?: string | null
+          id?: never
+          incident_id?: number | null
+          params?: Json
+          proposed_at?: string
+          revert_of?: number | null
+          status?: string
+          tier?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watchdog_remediations_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "watchdog_incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "watchdog_remediations_revert_of_fkey"
+            columns: ["revert_of"]
+            isOneToOne: false
+            referencedRelation: "watchdog_remediations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       watchdog_state: {
         Row: {
           check_name: string
@@ -1396,7 +1633,27 @@ export type Database = {
         }
       }
       fleet_positions_snapshot: { Args: never; Returns: Json }
+      fuel_by_truck: {
+        Args: { p_end: string; p_start: string }
+        Returns: {
+          gallons: number
+          spend: number
+          transactions: number
+          truck_id: number
+          unit_number: string
+        }[]
+      }
+      fuel_ifta_summary: {
+        Args: { p_end: string; p_start: string }
+        Returns: {
+          gallons: number
+          jurisdiction: string
+          spend: number
+          transactions: number
+        }[]
+      }
       global_search: { Args: { q: string }; Returns: Json }
+      import_fuel_transactions: { Args: { p_rows: Json }; Returns: Json }
       ingest_vehicle_positions: { Args: { p_points: Json }; Returns: Json }
       llm_reserve_spend: {
         Args: { p_cents: number; p_provider: string }
@@ -1488,6 +1745,34 @@ export type Database = {
         }
       }
       void_invoice: { Args: { p_invoice_id: number }; Returns: undefined }
+      watchdog_action_count: {
+        Args: { p_action_key: string; p_since_minutes: number }
+        Returns: number
+      }
+      watchdog_db_probes: {
+        Args: { p_backup_stale_hours?: number; p_gps_stale_min?: number }
+        Returns: Json
+      }
+      watchdog_incident_feed: {
+        Args: { p_limit?: number }
+        Returns: {
+          check_name: string
+          detail: string
+          id: number
+          opened_at: string
+          remediation_count: number
+          resolved_at: string | null
+          severity: string
+          status: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "watchdog_incidents"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       weekly_report: { Args: { p_week_of?: string }; Returns: Json }
     }
     Enums: {

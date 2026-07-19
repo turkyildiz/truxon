@@ -8,3 +8,8 @@ node_modules
 
 # Firebase config (per build machine; not committed)
 mobile/android/app/google-services.json
+
+# Fuel fetcher: secrets + persisted AtoB browser session (never commit)
+deploy/fuel/fuel.env
+deploy/fuel/.atob-profile/
+deploy/fuel/fuel.log

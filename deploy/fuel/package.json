@@ -1,0 +1,14 @@
+{
+  "name": "truxon-fuel-fetcher",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Scheduled AtoB fuel-card CSV fetcher → Truxon fuel-import",
+  "scripts": {
+    "login": "node fetch-atob.mjs --login",
+    "fetch": "node fetch-atob.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}
