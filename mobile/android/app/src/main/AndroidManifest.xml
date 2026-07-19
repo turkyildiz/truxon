@@ -27,9 +27,13 @@
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
 
+    <!-- allowBackup=false keeps app data (auth token, GPS queue) out of Google
+         auto-backup and device-to-device transfer — none of it has any
+         business leaving this tablet. -->
     <application
         android:label="Trux Companion"
         android:name="${applicationName}"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"

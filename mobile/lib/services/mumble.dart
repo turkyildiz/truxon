@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config.dart';
+import 'diag.dart';
 
 /// Feature 5 — push-to-talk with dispatch via Mumble/Mumla.
 ///
@@ -26,7 +27,9 @@ class MumbleRadio {
       if (await canLaunchUrl(uri)) {
         return await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
-    } catch (_) {}
+    } catch (e) {
+      Diag.log('radio: mumble launch failed: $e');
+    }
     return false;
   }
 

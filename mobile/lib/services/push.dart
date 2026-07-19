@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'alarms.dart';
 import 'api.dart';
+import 'diag.dart';
 
 /// Feature 6 (delivery side) — receive urgent dispatch pushes and turn the
 /// ones flagged `alarm=1` (see the `notify` edge function) into DND-piercing
@@ -22,7 +23,8 @@ String _body(RemoteMessage m) =>
 Future<void> firebaseBgHandler(RemoteMessage message) async {
   try {
     await Firebase.initializeApp();
-  } catch (_) {
+  } catch (e) {
+    Diag.log('push: bg handler init failed: $e');
     return;
   }
   if (message.data['alarm'] == '1') {
@@ -37,8 +39,9 @@ class PushService {
     try {
       await Firebase.initializeApp();
       available = true;
-    } catch (_) {
+    } catch (e) {
       available = false; // Firebase not wired on this build — skip push.
+      Diag.log('push: firebase unavailable: $e');
       return;
     }
 
@@ -56,9 +59,14 @@ class PushService {
     try {
       final token = await messaging.getToken();
       if (token != null) await api.registerPushToken(token, platform);
-    } catch (_) {/* no token yet */}
+    } catch (e) {
+      // No token yet — FCM retries via onTokenRefresh.
+      Diag.log('push: token registration failed: $e');
+    }
     messaging.onTokenRefresh.listen((t) {
-      api.registerPushToken(t, platform).catchError((_) {});
+      api.registerPushToken(t, platform).catchError((Object e) {
+        Diag.log('push: token re-registration failed: $e');
+      });
     });
   }
 }

@@ -1,5 +1,5 @@
 name: truxon_companion
-description: "A new Flutter project."
+description: "Truxon driver companion — loads & status updates, photo POD, dispatch radio, Trux voice assistant, and always-on GPS tracking for the Truxon TMS."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

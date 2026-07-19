@@ -4,6 +4,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import '../config.dart';
 import 'api.dart';
+import 'diag.dart';
 
 enum VoiceState { idle, listening, thinking, speaking }
 
@@ -47,8 +48,9 @@ class TruxVoiceController extends ChangeNotifier {
       await _selectBritishVoice();
       _tts.setCompletionHandler(_onSpeakDone);
       _voiceReady = true;
-    } catch (_) {
+    } catch (e) {
       _voiceReady = false;
+      Diag.log('voice: tts init failed: $e');
     }
     // STT.
     try {
@@ -56,8 +58,9 @@ class TruxVoiceController extends ChangeNotifier {
         onStatus: _onSttStatus,
         onError: (e) => _onSttStatus('notListening'),
       );
-    } catch (_) {
+    } catch (e) {
       _sttReady = false;
+      Diag.log('voice: stt init failed: $e');
     }
     notifyListeners();
   }
@@ -190,7 +193,10 @@ class TruxVoiceController extends ChangeNotifier {
   Future<void> reject(Map<String, dynamic> proposal) async {
     try {
       await _api.truxSend(sessionId: _sessionId, rejectToken: proposal['token'] as String?);
-    } catch (_) {}
+    } catch (e) {
+      // Reject is best-effort — the proposal token just expires server-side.
+      Diag.log('voice: reject failed: $e');
+    }
     turns.add(TruxTurn('trux', 'Cancelled.'));
     notifyListeners();
   }
