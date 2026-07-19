@@ -96,9 +96,9 @@ export const useAuth = () => useContext(AuthContext)
 /** Which nav sections each role can see (admin sees everything). */
 const DRIVES = ['personal_drive', 'team_drive']
 export const ROLE_MODULES: Record<string, string[]> = {
-  admin: ['dashboard', 'track', 'loads', 'dispatch', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', ...DRIVES, 'users', 'settings'],
-  dispatcher: ['dashboard', 'track', 'loads', 'dispatch', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', ...DRIVES],
-  accountant: ['dashboard', 'track', 'loads', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', ...DRIVES],
+  admin: ['dashboard', 'track', 'loads', 'dispatch', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', 'tolls', ...DRIVES, 'users', 'settings'],
+  dispatcher: ['dashboard', 'track', 'loads', 'dispatch', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', 'tolls', ...DRIVES],
+  accountant: ['dashboard', 'track', 'loads', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', 'tolls', ...DRIVES],
   maintenance: ['trucks', 'trailers', 'maintenance', ...DRIVES],
   driver: ['dashboard', ...DRIVES],
 }
@@ -117,6 +117,7 @@ export const ROUTE_MODULE: { prefix: string; module: string }[] = [
   { prefix: '/reports', module: 'reports' },
   { prefix: '/invoices', module: 'invoices' },
   { prefix: '/fuel', module: 'fuel' },
+  { prefix: '/tolls', module: 'tolls' },
   { prefix: '/personal-drive', module: 'personal_drive' },
   { prefix: '/team-drive', module: 'team_drive' },
   { prefix: '/users', module: 'users' },

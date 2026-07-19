@@ -38,7 +38,7 @@ RLS (admin / dispatcher / driver / accountant / maintenance).
    supabase login                      # or: export SUPABASE_ACCESS_TOKEN=...
    supabase link --project-ref <YOUR_PROJECT_REF>
    supabase db push                    # applies supabase/migrations/*
-   supabase functions deploy extract-pdf distance admin-users notify trux-agent trux-inbox watchdog fuel-import
+   supabase functions deploy extract-pdf distance admin-users notify trux-agent trux-inbox watchdog fuel-import toll-sync
    supabase secrets set LLM_API_KEY=... XAI_API_KEY=... GOOGLE_MAPS_API_KEY=...   # optional
    # One-shot when tokens are ready:  ./scripts/go-live.sh ~/truckson-live.env
    # Checklist: docs/GO_LIVE.md

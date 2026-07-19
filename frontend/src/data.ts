@@ -24,6 +24,8 @@ import type {
   MaintenanceRecord,
   Profile,
   SearchResults,
+  TollByAgencyRow,
+  TollByTruckRow,
   WeeklyReport,
 } from './types'
 
@@ -484,6 +486,39 @@ export async function fuelByTruck(start: string, end: string): Promise<FuelByTru
 export async function fuelIftaSummary(start: string, end: string): Promise<FuelIftaRow[]> {
   const data = unwrap(await supabase.rpc('fuel_ifta_summary', { p_start: start, p_end: end }))
   return (data as unknown as FuelIftaRow[]) ?? []
+}
+
+// ---------- Tolls ----------
+
+export interface TollFilters {
+  start?: string
+  end?: string
+  state?: string
+  truckId?: number
+  category?: string
+}
+
+/** Recent PrePass toll transactions (RLS limits to admin/accountant/dispatcher). */
+export async function listTollTransactions(filters: TollFilters = {}): Promise<Tables<'toll_transactions'>[]> {
+  let query = supabase.from('toll_transactions').select('*').order('post_date_time', { ascending: false }).limit(200)
+  if (filters.start) query = query.gte('post_date_time', filters.start)
+  if (filters.end) query = query.lte('post_date_time', filters.end + 'T23:59:59')
+  if (filters.state) query = query.eq('toll_agency_state', filters.state)
+  if (filters.truckId) query = query.eq('truck_id', filters.truckId)
+  if (filters.category) query = query.eq('toll_category', filters.category)
+  return unwrap(await query)
+}
+
+/** Toll spend/counts rolled up per truck over the range (server sorts by spend desc). */
+export async function tollByTruck(start: string, end: string): Promise<TollByTruckRow[]> {
+  const data = unwrap(await supabase.rpc('toll_by_truck', { p_start: start, p_end: end }))
+  return (data as unknown as TollByTruckRow[]) ?? []
+}
+
+/** Toll rollup per agency / jurisdiction over the range. */
+export async function tollByAgency(start: string, end: string): Promise<TollByAgencyRow[]> {
+  const data = unwrap(await supabase.rpc('toll_by_agency', { p_start: start, p_end: end }))
+  return (data as unknown as TollByAgencyRow[]) ?? []
 }
 
 // ---------- Edge functions ----------

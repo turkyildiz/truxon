@@ -228,6 +228,21 @@ export interface FuelIftaRow {
   spend: number
 }
 
+export interface TollByTruckRow {
+  truck_id: number
+  unit_number: string
+  tolls: number
+  violations: number
+  spend: number
+}
+
+export interface TollByAgencyRow {
+  jurisdiction: string
+  agency: string
+  tolls: number
+  spend: number
+}
+
 export interface FuelImportResult {
   parsed: number
   inserted: number

@@ -853,6 +853,110 @@ export type Database = {
           },
         ]
       }
+      toll_transactions: {
+        Row: {
+          account_name: string
+          account_number: number | null
+          bill_to_account_name: string
+          bill_to_account_number: number | null
+          billing_agency_code: string
+          device_number: string
+          dispute_status: string
+          entry_date_time: string | null
+          entry_plaza_code: string
+          entry_plaza_name: string
+          exit_date_time: string | null
+          exit_plaza_code: string
+          exit_plaza_name: string
+          id: number
+          imported_at: string
+          invoice_date_time: string | null
+          plate_number: string
+          post_date_time: string | null
+          raw: Json
+          read_type: string
+          toll_agency_name: string
+          toll_agency_state: string
+          toll_category: string
+          toll_charge: number
+          toll_class: string
+          toll_id: string
+          truck_id: number | null
+          updated_at: string
+          vehicle_number: string
+        }
+        Insert: {
+          account_name?: string
+          account_number?: number | null
+          bill_to_account_name?: string
+          bill_to_account_number?: number | null
+          billing_agency_code?: string
+          device_number?: string
+          dispute_status?: string
+          entry_date_time?: string | null
+          entry_plaza_code?: string
+          entry_plaza_name?: string
+          exit_date_time?: string | null
+          exit_plaza_code?: string
+          exit_plaza_name?: string
+          id?: never
+          imported_at?: string
+          invoice_date_time?: string | null
+          plate_number?: string
+          post_date_time?: string | null
+          raw?: Json
+          read_type?: string
+          toll_agency_name?: string
+          toll_agency_state?: string
+          toll_category?: string
+          toll_charge?: number
+          toll_class?: string
+          toll_id: string
+          truck_id?: number | null
+          updated_at?: string
+          vehicle_number?: string
+        }
+        Update: {
+          account_name?: string
+          account_number?: number | null
+          bill_to_account_name?: string
+          bill_to_account_number?: number | null
+          billing_agency_code?: string
+          device_number?: string
+          dispute_status?: string
+          entry_date_time?: string | null
+          entry_plaza_code?: string
+          entry_plaza_name?: string
+          exit_date_time?: string | null
+          exit_plaza_code?: string
+          exit_plaza_name?: string
+          id?: never
+          imported_at?: string
+          invoice_date_time?: string | null
+          plate_number?: string
+          post_date_time?: string | null
+          raw?: Json
+          read_type?: string
+          toll_agency_name?: string
+          toll_agency_state?: string
+          toll_category?: string
+          toll_charge?: number
+          toll_class?: string
+          toll_id?: string
+          truck_id?: number | null
+          updated_at?: string
+          vehicle_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "toll_transactions_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trailers: {
         Row: {
           created_at: string
@@ -1654,6 +1758,7 @@ export type Database = {
       }
       global_search: { Args: { q: string }; Returns: Json }
       import_fuel_transactions: { Args: { p_rows: Json }; Returns: Json }
+      import_toll_transactions: { Args: { p_rows: Json }; Returns: Json }
       ingest_vehicle_positions: { Args: { p_points: Json }; Returns: Json }
       llm_reserve_spend: {
         Args: { p_cents: number; p_provider: string }
@@ -1707,6 +1812,25 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      toll_by_agency: {
+        Args: { p_end: string; p_start: string }
+        Returns: {
+          agency: string
+          jurisdiction: string
+          spend: number
+          tolls: number
+        }[]
+      }
+      toll_by_truck: {
+        Args: { p_end: string; p_start: string }
+        Returns: {
+          spend: number
+          tolls: number
+          truck_id: number
+          unit_number: string
+          violations: number
+        }[]
       }
       trux_query: { Args: { p_sql: string }; Returns: Json }
       uncancel_load: {

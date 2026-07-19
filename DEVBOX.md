@@ -45,7 +45,7 @@ flutter run \
 supabase login
 supabase link --project-ref <REF>
 supabase db push
-supabase functions deploy extract-pdf distance admin-users notify trux-agent trux-inbox watchdog fuel-import
+supabase functions deploy extract-pdf distance admin-users notify trux-agent trux-inbox watchdog fuel-import toll-sync
 ```
 
 ## Notes

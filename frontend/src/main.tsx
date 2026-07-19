@@ -26,6 +26,7 @@ const Maintenance = lazy(() => import('./pages/Maintenance'))
 const Reports = lazy(() => import('./pages/Reports'))
 const Invoices = lazy(() => import('./pages/Invoices'))
 const Fuel = lazy(() => import('./pages/Fuel'))
+const Tolls = lazy(() => import('./pages/Tolls'))
 const Users = lazy(() => import('./pages/Users'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Drive = lazy(() => import('./pages/Drive'))
@@ -85,6 +86,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/reports" element={<Reports />} />
               <Route path="/invoices" element={<Invoices />} />
               <Route path="/fuel" element={<Fuel />} />
+              <Route path="/tolls" element={<Tolls />} />
               <Route path="/personal-drive" element={<Drive drive="personal" />} />
               <Route path="/team-drive" element={<Drive drive="team" />} />
               <Route path="/users" element={<Users />} />
