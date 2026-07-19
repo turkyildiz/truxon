@@ -1,9 +1,15 @@
 /**
- * Trux Command — a full-page executive-analyst workspace over the SAME
- * `trux-agent` edge function the floating TruxChat uses. Trux replies are
- * Markdown (exec summaries + tables); we parse with `marked` and sanitize with
- * `DOMPurify` before rendering — never raw HTML into the DOM. Write actions the
- * agent proposes surface as confirm/reject cards, exactly as in TruxChat.
+ * Trux — a search-bar-centric executive analyst over the SAME `trux-agent`
+ * edge function the floating TruxChat uses. The big "Ask Trux anything…" bar is
+ * the primary interface; answers stream below it newest-first. Trux replies are
+ * Markdown (exec summaries + tables) parsed with `marked` and sanitized with
+ * `DOMPurify` — never raw HTML into the DOM. Write actions the agent proposes
+ * surface as confirm/reject cards, exactly as in TruxChat.
+ *
+ * Hands-free voice is layered on top with the Web Speech API: speech-to-text
+ * (SpeechRecognition) drives the bar, text-to-speech (speechSynthesis) reads
+ * answers aloud, and a hands-free loop chains listen → send → speak → listen.
+ * All of it degrades to a plain text search when the API is absent.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
@@ -14,27 +20,39 @@ import { LoadError } from '../components/ui'
 import { truxAgent, ToolResult, type Proposal } from '../components/TruxChat'
 
 type LogEntry = { role: 'user' | 'assistant'; content: string; proposals?: Proposal[]; result?: unknown }
+type Phase = 'idle' | 'listening' | 'thinking' | 'speaking'
 
 // The conversation and session id live in a module-level store so navigating
 // away from /trux and back within the same SPA session preserves the whole
 // thread (a routed page unmounts on navigation, unlike the floating launcher).
 const store: { sessionId: string | null; log: LogEntry[] } = { sessionId: null, log: [] }
 
-// Suggested exec prompts shown on an empty conversation.
-const SUGGESTIONS = [
-  'P&L this month',
-  "Fuel efficiency by driver — who's burning the most?",
-  'Which customers owe us money?',
-  'Least profitable trucks this month',
-  'Toll violations this quarter',
-  'How are we doing vs last week?',
-]
-
 /** Parse Markdown, then sanitize — the ONLY path by which agent text reaches
  * the DOM. marked runs synchronously; DOMPurify strips scripts/handlers. */
 function renderMarkdown(md: string): string {
   const raw = marked.parse(md, { async: false, breaks: true, gfm: true }) as string
   return DOMPurify.sanitize(raw)
+}
+
+/** Reduce Markdown to plain prose the synthesizer can read: drop tables, code
+ * blocks and formatting marks, keep the narrative, and cap to a few sentences
+ * (~800 chars) so answers stay listenable, not a wall of speech. */
+function toSpeech(md: string): string {
+  const prose = md
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('|')) // drop Markdown table rows
+    .join('\n')
+    .replace(/```[\s\S]*?```/g, ' ') // fenced code blocks
+    .replace(/`([^`]*)`/g, '$1') // inline code
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ') // images
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // links → their text
+    .replace(/[#*_>`|~]/g, ' ') // stray formatting marks
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (prose.length <= 800) return prose
+  const head = prose.slice(0, 800)
+  const stop = Math.max(head.lastIndexOf('. '), head.lastIndexOf('! '), head.lastIndexOf('? '))
+  return stop > 200 ? head.slice(0, stop + 1) : head
 }
 
 /** Hand-rolled prose styling (no plugin) via Tailwind child selectors so the
@@ -64,23 +82,43 @@ function Markdown({ content }: { content: string }) {
   return <div className={PROSE} dangerouslySetInnerHTML={{ __html: html }} />
 }
 
+// Runtime feature detection — decided once, drives graceful degradation.
+const RECOGNITION_CTOR: SpeechRecognitionCtor | undefined =
+  typeof window !== 'undefined' ? window.SpeechRecognition ?? window.webkitSpeechRecognition : undefined
+const SYNTH_OK = typeof window !== 'undefined' && 'speechSynthesis' in window
+const STT_OK = RECOGNITION_CTOR != null
+
 export default function Trux() {
   const qc = useQueryClient()
   const [sessionId, setSessionId] = useState<string | null>(store.sessionId)
   const [log, setLog] = useState<LogEntry[]>(store.log)
   const [text, setText] = useState('')
   const [error, setError] = useState('')
-  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Voice UI state.
+  const [listening, setListening] = useState(false)
+  const [handsFree, setHandsFree] = useState(false)
+  const [phase, setPhaseState] = useState<Phase>('idle')
+  const [interim, setInterim] = useState('')
+  const [micDenied, setMicDenied] = useState(false)
+
+  // Refs let the async Web Speech callbacks (which capture an old render) read
+  // the *current* intent instead of a stale snapshot.
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const handsFreeRef = useRef(false)
+  const phaseRef = useRef<Phase>('idle')
+  const startListeningRef = useRef<() => void>(() => {})
+
+  function setPhase(p: Phase) {
+    phaseRef.current = p
+    setPhaseState(p)
+  }
 
   // Keep the module store in sync so the thread survives remounts.
   useEffect(() => {
     store.sessionId = sessionId
     store.log = log
   }, [sessionId, log])
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [log])
 
   const send = useMutation({
     mutationFn: async (message: string) => truxAgent({ session_id: sessionId ?? undefined, message }),
@@ -93,8 +131,14 @@ export default function Trux() {
       ])
       setText('')
       setError('')
+      // Hands-free: read the answer, then the utterance's onend resumes the loop.
+      // A proposal needs a human decision, so we don't auto-listen past it.
+      if (handsFreeRef.current) speak(res.reply ?? '', !res.proposals?.length)
     },
-    onError: (e) => setError(errorMessage(e)),
+    onError: (e) => {
+      setError(errorMessage(e))
+      if (handsFreeRef.current) startListeningRef.current() // keep the loop alive
+    },
   })
 
   const confirm = useMutation({
@@ -121,20 +165,191 @@ export default function Trux() {
     onError: (e) => setError(errorMessage(e)),
   })
 
-  function submit() {
-    const m = text.trim()
+  function cancelSpeech() {
+    if (SYNTH_OK) window.speechSynthesis.cancel()
+  }
+
+  function stopRecognition() {
+    const r = recognitionRef.current
+    if (!r) return
+    r.onresult = null
+    r.onerror = null
+    r.onend = null
+    try {
+      r.stop()
+    } catch {
+      /* stop() throws if not started — safe to ignore */
+    }
+    recognitionRef.current = null
+  }
+
+  /** Speak an answer aloud; `resume` chains back into the hands-free loop when
+   * the utterance finishes (barge-in-safe: any new query cancels it). */
+  function speak(md: string, resume: boolean) {
+    if (!SYNTH_OK) {
+      if (resume && handsFreeRef.current) startListeningRef.current()
+      return
+    }
+    window.speechSynthesis.cancel()
+    const spoken = toSpeech(md)
+    if (!spoken) {
+      if (resume && handsFreeRef.current) startListeningRef.current()
+      else setPhase('idle')
+      return
+    }
+    const u = new SpeechSynthesisUtterance(spoken)
+    u.rate = 1.05
+    const done = () => {
+      if (resume && handsFreeRef.current) startListeningRef.current()
+      else if (phaseRef.current === 'speaking') setPhase('idle')
+    }
+    u.onend = done
+    u.onerror = done
+    setPhase('speaking')
+    window.speechSynthesis.speak(u)
+  }
+
+  /** Submit a query from any source (typing, mic, hands-free). Cancels ongoing
+   * speech (barge-in) so a new question always interrupts Trux mid-sentence. */
+  function runQuery(message: string) {
+    const m = message.trim()
     if (!m || send.isPending) return
+    cancelSpeech()
+    setInterim('')
+    if (handsFreeRef.current) setPhase('thinking')
     send.mutate(m)
   }
 
-  function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  function startListening() {
+    if (!STT_OK || !RECOGNITION_CTOR) return
+    cancelSpeech()
+    stopRecognition()
+    const rec = new RECOGNITION_CTOR()
+    rec.lang = 'en-US'
+    rec.interimResults = true
+    rec.continuous = false
+    rec.maxAlternatives = 1
+    recognitionRef.current = rec
+    setInterim('')
+    setListening(true)
+    setPhase('listening')
+    rec.onresult = (e) => {
+      let interimStr = ''
+      let finalStr = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i]
+        if (r.isFinal) finalStr += r[0].transcript
+        else interimStr += r[0].transcript
+      }
+      if (finalStr) {
+        setText(finalStr)
+        runQuery(finalStr) // recognition auto-stops (continuous=false); onend follows
+      } else {
+        setInterim(interimStr)
+      }
+    }
+    rec.onerror = (e) => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        setMicDenied(true)
+        setHandsFree(false)
+        handsFreeRef.current = false
+      }
+    }
+    rec.onend = () => {
+      setListening(false)
+      recognitionRef.current = null
+      // Silence with no final result: if still hands-free and idle-listening
+      // (a query would have moved us to 'thinking'), resume the loop.
+      if (handsFreeRef.current && phaseRef.current === 'listening') startListeningRef.current()
+    }
+    try {
+      rec.start()
+    } catch {
+      setListening(false)
+    }
+  }
+  // Always call the freshest closure from async callbacks.
+  startListeningRef.current = startListening
+
+  function toggleMic() {
+    if (!STT_OK) return
+    if (listening) {
+      stopRecognition()
+      setListening(false)
+      setPhase('idle')
+    } else {
+      setMicDenied(false)
+      startListening()
+    }
+  }
+
+  function stopHandsFree() {
+    setHandsFree(false)
+    handsFreeRef.current = false
+    stopRecognition()
+    cancelSpeech()
+    setListening(false)
+    setInterim('')
+    setPhase('idle')
+  }
+
+  function toggleHandsFree() {
+    if (!STT_OK || !SYNTH_OK) return
+    if (handsFreeRef.current) {
+      stopHandsFree()
+    } else {
+      setMicDenied(false)
+      setHandsFree(true)
+      handsFreeRef.current = true
+      startListening()
+    }
+  }
+
+  // Tear down any recognition/speech when leaving the page.
+  useEffect(() => {
+    return () => {
+      handsFreeRef.current = false
+      stopRecognition()
+      cancelSpeech()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function submit() {
+    runQuery(text)
+  }
+
+  function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
       e.preventDefault()
       submit()
     }
   }
 
+  // Group the flat log into turns (a question + its answer parts) and show the
+  // newest turn on top — a running transcript, not a chat-bubble app.
+  const turns = useMemo(() => {
+    const out: { key: number; question?: string; answers: LogEntry[] }[] = []
+    log.forEach((e, i) => {
+      if (e.role === 'user') out.push({ key: i, question: e.content, answers: [] })
+      else {
+        if (!out.length) out.push({ key: i, answers: [] })
+        out[out.length - 1].answers.push(e)
+      }
+    })
+    return out.reverse()
+  }, [log])
+
   const empty = log.length === 0
+  const inputValue = listening && interim ? interim : text
+  const busy = send.isPending
+
+  const PILL: Record<Phase, { label: string; cls: string }> = {
+    idle: { label: 'Idle', cls: 'bg-surface-2 text-muted' },
+    listening: { label: '● Listening', cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300' },
+    thinking: { label: '… Thinking', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300' },
+    speaking: { label: '🔊 Speaking', cls: 'bg-navy-500/15 text-navy-700 dark:text-navy-200' },
+  }
 
   return (
     <div className="flex h-[calc(100vh-6.5rem)] flex-col gap-4">
@@ -149,109 +364,153 @@ export default function Trux() {
         </div>
       </div>
 
-      {/* Conversation */}
-      <div
-        ref={scrollRef}
-        className="flex-1 space-y-4 overflow-y-auto rounded-2xl border border-line bg-surface-2 p-4"
-      >
-        {empty && (
-          <div className="mx-auto max-w-3xl py-6">
-            <p className="mb-4 text-center text-sm text-muted">
-              Ask Trux to analyze operations &amp; finances. Any action it proposes needs your confirmation.
+      {/* Search bar — the centerpiece */}
+      <div className={empty ? 'flex flex-1 flex-col justify-center' : ''}>
+        <div className="mx-auto w-full max-w-3xl">
+          <div className="flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-2.5 shadow-sm focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/30">
+            <svg className="h-5 w-5 shrink-0 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+            </svg>
+            <input
+              value={inputValue}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="Ask Trux anything…"
+              disabled={busy}
+              className="flex-1 bg-transparent py-1 text-base text-body placeholder:text-muted focus:outline-none disabled:opacity-50"
+            />
+            {STT_OK && (
+              <button
+                onClick={toggleMic}
+                disabled={busy || handsFree}
+                title={listening ? 'Stop listening' : 'Speak your question'}
+                aria-pressed={listening}
+                className={
+                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors disabled:opacity-40 ' +
+                  (listening ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300' : 'text-muted hover:bg-surface-2 hover:text-body')
+                }
+              >
+                <span className={listening ? 'animate-pulse text-lg' : 'text-lg'}>🎤</span>
+              </button>
+            )}
+            <button
+              onClick={submit}
+              disabled={busy || !text.trim()}
+              className="shrink-0 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-brand-fg hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy ? '…' : 'Ask'}
+            </button>
+          </div>
+
+          {/* Controls row: hint / hands-free toggle / status */}
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1">
+            <p className="text-xs text-muted">
+              {empty
+                ? 'Ask about fuel, P&L, who owes us money, a driver, a load — or tap the mic and talk'
+                : 'Enter to ask · Any action Trux proposes needs your confirmation'}
             </p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => send.mutate(s)}
-                  disabled={send.isPending}
-                  className="group flex items-start gap-3 rounded-xl border border-line bg-surface p-4 text-left transition-colors hover:border-navy-600 disabled:opacity-50"
-                >
-                  <span className="text-lg">💡</span>
-                  <span className="text-sm font-medium text-body group-hover:text-brand">{s}</span>
-                </button>
+            <div className="flex items-center gap-2">
+              {handsFree && (
+                <span className={'rounded-full px-2.5 py-1 text-xs font-semibold ' + PILL[phase].cls}>{PILL[phase].label}</span>
+              )}
+              {STT_OK && SYNTH_OK &&
+                (handsFree ? (
+                  <button
+                    onClick={stopHandsFree}
+                    className="rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold text-body hover:bg-surface-2"
+                  >
+                    ■ Stop
+                  </button>
+                ) : (
+                  <button
+                    onClick={toggleHandsFree}
+                    disabled={busy || listening}
+                    className="rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold text-body hover:border-navy-600 disabled:opacity-50"
+                  >
+                    🎙 Hands-free
+                  </button>
+                ))}
+            </div>
+          </div>
+
+          {micDenied && (
+            <p className="mt-1 px-1 text-xs text-amber-600 dark:text-amber-400">
+              Microphone access was blocked. Enable it in your browser to use voice, or just type your question.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Answer stream (newest first) */}
+      {!empty && (
+        <div className="flex-1 space-y-4 overflow-y-auto rounded-2xl border border-line bg-surface-2 p-4">
+          {busy && (
+            <div className="flex items-center gap-2 px-1 text-sm text-muted">
+              <span className="inline-flex gap-1">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.3s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.15s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted" />
+              </span>
+              Trux is thinking…
+            </div>
+          )}
+
+          {turns.map((t) => (
+            <div key={t.key} className="space-y-2">
+              {t.question && (
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 text-muted">You</span>
+                  <p className="flex-1 text-sm font-medium text-body">{t.question}</p>
+                </div>
+              )}
+              {t.answers.map((m, j) => (
+                <div key={j} className="w-full rounded-2xl border border-line bg-surface p-4 shadow-sm">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                      <span>✨</span> Trux
+                    </div>
+                    {SYNTH_OK && m.content && (
+                      <button
+                        onClick={() => speak(m.content, false)}
+                        title="Read this answer aloud"
+                        className="rounded-lg px-1.5 py-0.5 text-sm text-muted hover:bg-surface-2 hover:text-body"
+                      >
+                        🔊
+                      </button>
+                    )}
+                  </div>
+                  {m.content && <Markdown content={m.content} />}
+                  {m.result != null && <ToolResult result={m.result} />}
+                  {m.proposals?.map((p) => (
+                    <div key={p.token} className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                      <div className="font-medium break-words text-amber-900 dark:text-amber-200">{p.summary}</div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => confirm.mutate(p.token)}
+                          disabled={confirm.isPending}
+                          className="rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-brand-fg hover:bg-brand-hover disabled:opacity-50"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => reject.mutate(p.token)}
+                          disabled={reject.isPending}
+                          className="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-body hover:bg-surface-2 disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {log.map((m, i) =>
-          m.role === 'user' ? (
-            <div key={i} className="flex justify-end">
-              <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-navy-700 px-4 py-2.5 text-sm text-white">
-                {m.content}
-              </div>
-            </div>
-          ) : (
-            <div key={i} className="flex flex-col items-start">
-              <div className="w-full rounded-2xl border border-line bg-surface p-4 shadow-sm">
-                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
-                  <span>✨</span> Trux
-                </div>
-                {m.content && <Markdown content={m.content} />}
-                {m.result != null && <ToolResult result={m.result} />}
-                {m.proposals?.map((p) => (
-                  <div key={p.token} className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-                    <div className="font-medium break-words text-amber-900 dark:text-amber-200">{p.summary}</div>
-                    <div className="mt-3 flex gap-2">
-                      <button
-                        onClick={() => confirm.mutate(p.token)}
-                        disabled={confirm.isPending}
-                        className="rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-brand-fg hover:bg-brand-hover disabled:opacity-50"
-                      >
-                        Confirm
-                      </button>
-                      <button
-                        onClick={() => reject.mutate(p.token)}
-                        disabled={reject.isPending}
-                        className="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-body hover:bg-surface-2 disabled:opacity-50"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ),
-        )}
-
-        {send.isPending && (
-          <div className="flex items-center gap-2 px-1 text-sm text-muted">
-            <span className="inline-flex gap-1">
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.3s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.15s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted" />
-            </span>
-            Trux is thinking…
-          </div>
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
       {error && <LoadError error={error} onRetry={() => setError('')} />}
-
-      {/* Composer */}
-      <div className="rounded-2xl border border-line bg-surface p-3 shadow-sm">
-        <div className="flex items-end gap-2">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="Ask Trux anything about your operations or finances…"
-            rows={2}
-            disabled={send.isPending}
-            className="max-h-40 flex-1 resize-none rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-body placeholder:text-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30 disabled:opacity-50"
-          />
-          <button
-            onClick={submit}
-            disabled={send.isPending || !text.trim()}
-            className="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-brand-fg hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {send.isPending ? '…' : 'Send'}
-          </button>
-        </div>
-        <p className="mt-1.5 px-1 text-xs text-muted">Enter to send · Shift+Enter for a new line</p>
-      </div>
     </div>
   )
 }
