@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
@@ -7,22 +7,28 @@ import './i18n'
 import { ThemeProvider } from './theme'
 import { AuthProvider, homePathForRole, moduleForPath, roleCanAccess, useAuth } from './auth'
 import Layout from './components/Layout'
-import Landing from './pages/Landing'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import FleetMap from './pages/FleetMap'
-import Loads from './pages/Loads'
-import LoadDetail from './pages/LoadDetail'
-import Dispatch from './pages/Dispatch'
-import Customers from './pages/Customers'
-import Drivers from './pages/Drivers'
-import { Trailers, Trucks } from './pages/Equipment'
-import Maintenance from './pages/Maintenance'
-import Reports from './pages/Reports'
-import Invoices from './pages/Invoices'
-import Users from './pages/Users'
-import Settings from './pages/Settings'
-import Drive from './pages/Drive'
+import PageLoader from './components/PageLoader'
+
+// Pages are code-split: each becomes its own chunk so the heavy libraries they
+// pull in (recharts, leaflet, jspdf, pdfjs…) no longer weigh down the initial
+// load. Layout/PageLoader stay static so the shell renders instantly.
+const Landing = lazy(() => import('./pages/Landing'))
+const Login = lazy(() => import('./pages/Login'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const FleetMap = lazy(() => import('./pages/FleetMap'))
+const Loads = lazy(() => import('./pages/Loads'))
+const LoadDetail = lazy(() => import('./pages/LoadDetail'))
+const Dispatch = lazy(() => import('./pages/Dispatch'))
+const Customers = lazy(() => import('./pages/Customers'))
+const Drivers = lazy(() => import('./pages/Drivers'))
+const Trucks = lazy(() => import('./pages/Equipment').then((m) => ({ default: m.Trucks })))
+const Trailers = lazy(() => import('./pages/Equipment').then((m) => ({ default: m.Trailers })))
+const Maintenance = lazy(() => import('./pages/Maintenance'))
+const Reports = lazy(() => import('./pages/Reports'))
+const Invoices = lazy(() => import('./pages/Invoices'))
+const Users = lazy(() => import('./pages/Users'))
+const Settings = lazy(() => import('./pages/Settings'))
+const Drive = lazy(() => import('./pages/Drive'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 15_000 } },
@@ -53,6 +59,7 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
+          <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
@@ -84,6 +91,7 @@ createRoot(document.getElementById('root')!).render(
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
