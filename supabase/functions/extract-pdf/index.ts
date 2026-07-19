@@ -10,6 +10,7 @@
 
 import { extractText, getDocumentProxy } from 'npm:unpdf@0.12.1'
 import { corsResponse, getCaller, json } from '../_shared/auth.ts'
+import { extractFields, sliceText, workOrderPrompt, type LlmContent } from '../_shared/extract_llm.ts'
 
 function extractionPrompt(carrierName: string): string {
   return `You extract structured data from a trucking rate confirmation addressed to the carrier "${carrierName}".
@@ -43,87 +44,8 @@ Respond with ONLY a JSON object (no markdown fences) with these keys:
 Use null for anything genuinely absent.`
 }
 
-const TEXT_HEAD = 7000
-const TEXT_TAIL = 4000
-
-/** Brokers bury the money next to the signature block, so when a document is
- * too long keep the start AND the end rather than truncating blindly. */
-function sliceText(text: string): string {
-  if (text.length <= TEXT_HEAD + TEXT_TAIL + 100) return text
-  return text.slice(0, TEXT_HEAD) + '\n...[middle of document omitted]...\n' + text.slice(-TEXT_TAIL)
-}
-
-type LlmContent = string | Array<{ type: string; text?: string; image_url?: { url: string } }>
-
-async function callLlm(apiKey: string, model: string, content: LlmContent): Promise<string> {
-  const url = `${Deno.env.get('LLM_BASE_URL') ?? 'https://openrouter.ai/api/v1'}/chat/completions`
-  const body = (jsonMode: boolean) =>
-    JSON.stringify({
-      model,
-      messages: [{ role: 'user', content }],
-      temperature: 0,
-      ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
-    })
-
-  let jsonMode = true
-  for (let attempt = 1; ; attempt++) {
-    let resp: Response
-    try {
-      resp = await fetch(url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: body(jsonMode),
-        signal: AbortSignal.timeout(45_000),
-      })
-    } catch (err) {
-      // Hung/dropped connection — retry instead of riding out the gateway timeout.
-      if (attempt < 3) continue
-      throw new Error(`LLM API unreachable: ${err}`)
-    }
-    if (resp.ok) {
-      const data = await resp.json()
-      return data.choices[0].message.content.trim()
-    }
-    await resp.body?.cancel()
-    // Some providers reject response_format for some models — retry without it.
-    if (resp.status === 400 && jsonMode) {
-      jsonMode = false
-      continue
-    }
-    // Per-minute token limits (Groq free tier) surface as 429 — wait and retry.
-    if ((resp.status === 429 || resp.status >= 500) && attempt < 3) {
-      const retryAfter = Number(resp.headers.get('retry-after'))
-      await new Promise((r) => setTimeout(r, Math.min(retryAfter > 0 ? retryAfter * 1000 : attempt * 4000, 15000)))
-      continue
-    }
-    throw new Error(`LLM API returned ${resp.status}`)
-  }
-}
-
-/** Call the model, and if the reply isn't parseable JSON (tabular rate cons
- * sometimes make small models echo the table), retry once with a sharper
- * instruction before giving up. */
-async function extractFields(apiKey: string, model: string, content: LlmContent): Promise<Record<string, unknown>> {
-  try {
-    return parseFields(await callLlm(apiKey, model, content))
-  } catch {
-    const stricter =
-      typeof content === 'string'
-        ? content + '\n\nIMPORTANT: Your ENTIRE response must be one valid JSON object. No prose, no tables, no explanations.'
-        : [...content, { type: 'text', text: 'IMPORTANT: Your ENTIRE response must be one valid JSON object. No prose, no tables, no explanations.' }]
-    return parseFields(await callLlm(apiKey, model, stricter))
-  }
-}
-
-function parseFields(content: string): Record<string, unknown> {
-  let c = content
-  if (c.startsWith('```')) c = c.replace(/^```(json)?/, '').replace(/```$/, '').trim()
-  // Tolerate stray prose around the object — grab the outermost braces.
-  const start = c.indexOf('{')
-  const end = c.lastIndexOf('}')
-  if (start >= 0 && end > start) c = c.slice(start, end + 1)
-  return JSON.parse(c)
-}
+// LLM plumbing (callLlm / extractFields / parseFields / sliceText) lives in
+// ../_shared/extract_llm.ts so trux-inbox's work-order path shares one brain.
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
@@ -180,9 +102,12 @@ Deno.serve(async (req) => {
 
   const { data: settings } = await caller.client.from('company_settings').select('company_name').eq('id', 1).maybeSingle()
   const carrier = settings?.company_name || 'the carrier'
-  // mode=customer extracts the broker's company profile (Customers quick-add)
-  // instead of load details.
-  const prompt = form.get('mode') === 'customer' ? customerPrompt(carrier) : extractionPrompt(carrier)
+  // mode=customer extracts the broker's company profile (Customers quick-add);
+  // mode=work_order extracts a shop maintenance work order (Maintenance add).
+  const mode = form.get('mode')
+  const prompt = mode === 'customer' ? customerPrompt(carrier)
+    : mode === 'work_order' ? workOrderPrompt()
+    : extractionPrompt(carrier)
 
   try {
     let fields: Record<string, unknown>
