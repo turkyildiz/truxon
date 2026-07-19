@@ -485,6 +485,7 @@ export type Database = {
       }
       loads: {
         Row: {
+          cancel_reason: string
           created_at: string
           customer_id: number
           delivery_address: string
@@ -510,6 +511,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancel_reason?: string
           created_at?: string
           customer_id: number
           delivery_address?: string
@@ -535,6 +537,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancel_reason?: string
           created_at?: string
           customer_id?: number
           delivery_address?: string
@@ -1251,12 +1254,48 @@ export type Database = {
         }
         Returns: undefined
       }
+      cancel_load: {
+        Args: { p_load_id: number; p_reason?: string }
+        Returns: {
+          cancel_reason: string
+          created_at: string
+          customer_id: number
+          delivery_address: string
+          delivery_number: string
+          delivery_time: string | null
+          driver_id: number | null
+          empty_miles: number
+          equipment_type: string
+          id: number
+          invoice_id: number | null
+          load_number: string
+          miles: number
+          notes: string
+          pickup_address: string
+          pickup_number: string
+          pickup_time: string | null
+          rate: number
+          reference_number: string
+          special_terms: string
+          status: Database["public"]["Enums"]["load_status"]
+          trailer_id: number | null
+          truck_id: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "loads"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       change_load_status: {
         Args: {
           p_load_id: number
           p_status: Database["public"]["Enums"]["load_status"]
         }
         Returns: {
+          cancel_reason: string
           created_at: string
           customer_id: number
           delivery_address: string
@@ -1370,6 +1409,26 @@ export type Database = {
       }
       next_invoice_number: { Args: never; Returns: string }
       next_load_number: { Args: never; Returns: string }
+      replace_load_stops: {
+        Args: { p_load_id: number; p_stops?: Json }
+        Returns: {
+          address: string
+          facility: string
+          id: number
+          load_id: number
+          notes: string
+          reference: string
+          seq: number
+          stop_time: string | null
+          stop_type: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "load_stops"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       set_invoice_status: {
         Args: {
           p_invoice_id: number
@@ -1393,6 +1452,41 @@ export type Database = {
         }
       }
       trux_query: { Args: { p_sql: string }; Returns: Json }
+      uncancel_load: {
+        Args: { p_load_id: number }
+        Returns: {
+          cancel_reason: string
+          created_at: string
+          customer_id: number
+          delivery_address: string
+          delivery_number: string
+          delivery_time: string | null
+          driver_id: number | null
+          empty_miles: number
+          equipment_type: string
+          id: number
+          invoice_id: number | null
+          load_number: string
+          miles: number
+          notes: string
+          pickup_address: string
+          pickup_number: string
+          pickup_time: string | null
+          rate: number
+          reference_number: string
+          special_terms: string
+          status: Database["public"]["Enums"]["load_status"]
+          trailer_id: number | null
+          truck_id: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "loads"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       void_invoice: { Args: { p_invoice_id: number }; Returns: undefined }
       weekly_report: { Args: { p_week_of?: string }; Returns: Json }
     }
@@ -1408,6 +1502,7 @@ export type Database = {
         | "delivered"
         | "completed"
         | "billed"
+        | "cancelled"
       user_role:
         | "admin"
         | "dispatcher"
@@ -2097,6 +2192,7 @@ export const Constants = {
         "delivered",
         "completed",
         "billed",
+        "cancelled",
       ],
       user_role: ["admin", "dispatcher", "driver", "accountant", "maintenance"],
     },

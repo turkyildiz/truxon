@@ -209,7 +209,7 @@ export interface LoadFilters {
 
 export async function listLoads(filters: LoadFilters = {}): Promise<Load[]> {
   let query = supabase.from('loads').select(LOAD_SELECT).order('created_at', { ascending: false }).limit(200)
-  if (filters.status) query = query.eq('status', filters.status as LoadStatus)
+  if (filters.status) query = query.eq('status', filters.status as Tables<'loads'>['status'])
   if (filters.customer_id) query = query.eq('customer_id', Number(filters.customer_id))
   if (filters.driver_id) query = query.eq('driver_id', Number(filters.driver_id))
   if (filters.date_from) query = query.gte('pickup_time', filters.date_from)
@@ -251,17 +251,10 @@ export async function listStops(loadId: number | string): Promise<LoadStop[]> {
   return rows.map((s) => ({ ...s, stop_type: s.stop_type as LoadStop['stop_type'] }))
 }
 
-/** Replace a load's full itinerary (delete + insert, seq renumbered). */
+/** Replace a load's full itinerary — one transactional RPC (seq renumbered
+ * server-side), so a failure can't leave the load with half an itinerary. */
 export async function replaceStops(loadId: number | string, stops: Omit<LoadStop, 'id' | 'load_id' | 'seq'>[]): Promise<void> {
-  unwrap(await supabase.from('load_stops').delete().eq('load_id', Number(loadId)))
-  if (stops.length === 0) return
-  let pu = 0
-  let del = 0
-  unwrap(
-    await supabase.from('load_stops').insert(
-      stops.map((s) => ({ ...s, load_id: Number(loadId), seq: s.stop_type === 'pickup' ? ++pu : ++del })),
-    ),
-  )
+  unwrap(await supabase.rpc('replace_load_stops', { p_load_id: Number(loadId), p_stops: stops }))
 }
 
 export async function createLoad(payload: Row, stops: Omit<LoadStop, 'id' | 'load_id' | 'seq'>[] = []): Promise<Load> {
@@ -285,7 +278,17 @@ export async function updateLoad(id: number | string, payload: Row): Promise<Loa
 }
 
 export async function changeLoadStatus(id: number | string, status: LoadStatus): Promise<void> {
+  // change_load_status only walks the linear workflow; 'cancelled' goes
+  // through cancelLoad/uncancelLoad (the RPC rejects it server-side too).
   unwrap(await supabase.rpc('change_load_status', { p_load_id: Number(id), p_status: status }))
+}
+
+export async function cancelLoad(id: number | string, reason = ''): Promise<void> {
+  unwrap(await supabase.rpc('cancel_load', { p_load_id: Number(id), p_reason: reason }))
+}
+
+export async function uncancelLoad(id: number | string): Promise<void> {
+  unwrap(await supabase.rpc('uncancel_load', { p_load_id: Number(id) }))
 }
 
 // ---------- Invoices ----------
@@ -363,18 +366,22 @@ export async function uploadDocument(entityType: string, entityId: number | stri
   if (uploadError) throw new Error(uploadError.message)
 
   const { data: userData } = await supabase.auth.getUser()
-  unwrap(
-    await supabase.from('documents').insert({
-      entity_type: entityType,
-      entity_id: Number(entityId),
-      doc_type: docType,
-      filename: file.name,
-      storage_path: path,
-      content_type: file.type || 'application/octet-stream',
-      size_bytes: file.size,
-      uploaded_by: userData.user?.id,
-    }),
-  )
+  const { error: insertError } = await supabase.from('documents').insert({
+    entity_type: entityType,
+    entity_id: Number(entityId),
+    doc_type: docType,
+    filename: file.name,
+    storage_path: path,
+    content_type: file.type || 'application/octet-stream',
+    size_bytes: file.size,
+    uploaded_by: userData.user?.id,
+  })
+  if (insertError) {
+    // Metadata is the source of truth — without the row the upload is an
+    // invisible orphan, so clean it up (best-effort) before surfacing.
+    await supabase.storage.from('documents').remove([path]).catch(() => {})
+    throw new Error(insertError.message)
+  }
 
   // Notify linked driver when load paperwork is uploaded (best-effort).
   if (entityType === 'load') {
