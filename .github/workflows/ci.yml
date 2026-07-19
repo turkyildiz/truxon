@@ -21,3 +21,33 @@ jobs:
       - name: Typecheck and build
         working-directory: frontend
         run: npm run build
+
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Analyze
+        working-directory: mobile
+        run: flutter analyze
+      - name: Test
+        working-directory: mobile
+        run: flutter test
+
+  # Applies every migration to a fresh Postgres, then runs the pgTAP suite in
+  # supabase/tests/ — a broken migration or workflow/invoice regression fails
+  # here instead of during `supabase db push` against production.
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Apply migrations to a fresh database
+        run: supabase db start
+      - name: Run pgTAP tests
+        run: supabase test db
