@@ -50,7 +50,7 @@ yellow "Pushing migrations…"
 supabase db push
 
 yellow "Deploying edge functions…"
-supabase functions deploy extract-pdf distance admin-users notify trux-agent
+supabase functions deploy extract-pdf distance admin-users notify trux-agent trux-inbox watchdog
 
 # Secrets (only set if provided — never clear existing)
 SECRETS=()
