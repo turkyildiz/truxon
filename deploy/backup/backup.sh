@@ -5,6 +5,9 @@
 # $BACKUP_DIR for the ransomware-proof copy (3-2-1-1-0 rule: Supabase's
 # own backups + these local copies + immutable snapshot + restore test).
 #
+# The gpg passphrase travels over fd 3, never argv (argv is visible in `ps`
+# to every process on the NAS).
+#
 # Required environment (put in /etc/truxon-backup.env, chmod 600):
 #   SUPABASE_DB_URL      postgresql://postgres:...@db.<ref>.supabase.co:5432/postgres
 #   SUPABASE_URL         https://<ref>.supabase.co
@@ -30,7 +33,7 @@ echo "[1/3] Dumping Supabase Postgres…"
 #  dump behind — pipefail above turns that into a loud failure.)
 docker run --rm postgres:17-alpine pg_dump "$SUPABASE_DB_URL" -Fc \
   --schema=public --schema=storage --no-owner \
-  | gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase "$BACKUP_PASSPHRASE" \
+  | gpg --batch --yes --symmetric --cipher-algo AES256 --pinentry-mode loopback --passphrase-fd 3 3<<<"$BACKUP_PASSPHRASE" \
   > "$BACKUP_DIR/db_${STAMP}.dump.gpg"
 
 echo "[2/3] Downloading document storage…"
@@ -38,7 +41,7 @@ docker run --rm \
   -e SUPABASE_URL -e SUPABASE_SERVICE_ROLE_KEY \
   -v "$SCRIPT_DIR:/scripts:ro" \
   python:3.12-alpine python /scripts/storage_backup.py \
-  | gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase "$BACKUP_PASSPHRASE" \
+  | gpg --batch --yes --symmetric --cipher-algo AES256 --pinentry-mode loopback --passphrase-fd 3 3<<<"$BACKUP_PASSPHRASE" \
   > "$BACKUP_DIR/documents_${STAMP}.tar.gpg"
 
 echo "[3/3] Pruning backups older than ${RETENTION_DAYS} days…"
