@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Suspense, useEffect, useRef, useState, type FormEvent } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import ErrorBoundary from './ErrorBoundary'
+import PageLoader from './PageLoader'
 import LanguageSwitcher from './LanguageSwitcher'
 import { ROLE_MODULES, useAuth } from '../auth'
 import { globalSearch } from '../data'
@@ -89,12 +90,14 @@ function GlobalSearch() {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<SearchResults | null>(null)
   const [failed, setFailed] = useState(false)
+  const [active, setActive] = useState(-1)
   const navigate = useNavigate()
   const boxRef = useRef<HTMLDivElement>(null)
   const seq = useRef(0)
 
   useEffect(() => {
     setFailed(false)
+    setActive(-1)
     if (q.trim().length < 2) {
       setResults(null)
       return
@@ -128,6 +131,7 @@ function GlobalSearch() {
   function go(path: string) {
     setResults(null)
     setQ('')
+    setActive(-1)
     navigate(path)
   }
 
@@ -143,11 +147,46 @@ function GlobalSearch() {
       ]
     : []
 
+  // Flatten every section's rows into one list so Arrow keys move a single
+  // highlight across the whole dropdown; the index maps to each option's id.
+  const flat = sections.flatMap((s) => s.items.map((item) => ({ path: s.path(item.id) })))
+  const optionId = (i: number) => `global-search-opt-${i}`
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Escape') {
+      setResults(null)
+      setQ('')
+      setActive(-1)
+      return
+    }
+    if (!flat.length) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActive((i) => (i + 1) % flat.length)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActive((i) => (i <= 0 ? flat.length - 1 : i - 1))
+    } else if (e.key === 'Enter') {
+      if (active >= 0 && active < flat.length) {
+        e.preventDefault()
+        go(flat[active].path)
+      }
+    }
+  }
+
+  // Running index across sections, aligned with `flat`, for aria/highlight.
+  let idx = -1
   return (
     <div className="relative w-full max-w-md" ref={boxRef}>
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
+        onKeyDown={onKeyDown}
+        role="combobox"
+        aria-expanded={!!results}
+        aria-controls="global-search-listbox"
+        aria-autocomplete="list"
+        aria-activedescendant={active >= 0 ? optionId(active) : undefined}
         placeholder="Search loads, customers, drivers, trucks…"
         className="w-full rounded-lg border border-line bg-surface px-4 py-2 text-sm text-body placeholder:text-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
       />
@@ -157,22 +196,30 @@ function GlobalSearch() {
         </div>
       )}
       {results && (
-        <div className="absolute top-full z-40 mt-1 w-full rounded-lg border border-line bg-surface shadow-lg">
+        <div id="global-search-listbox" role="listbox" className="absolute top-full z-40 mt-1 w-full rounded-lg border border-line bg-surface shadow-lg">
           {sections.every((s) => s.items.length === 0) && <div className="p-3 text-sm text-muted">No results</div>}
           {sections.map(
             (s) =>
               s.items.length > 0 && (
                 <div key={s.title} className="border-b border-line last:border-0">
                   <div className="px-3 pt-2 text-xs font-semibold uppercase text-muted">{s.title}</div>
-                  {s.items.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => go(s.path(item.id))}
-                      className="block w-full px-3 py-2 text-left text-sm text-body hover:bg-surface-2"
-                    >
-                      {item.label}
-                    </button>
-                  ))}
+                  {s.items.map((item) => {
+                    idx += 1
+                    const i = idx
+                    return (
+                      <button
+                        key={item.id}
+                        id={optionId(i)}
+                        role="option"
+                        aria-selected={active === i}
+                        onMouseEnter={() => setActive(i)}
+                        onClick={() => go(s.path(item.id))}
+                        className={`block w-full px-3 py-2 text-left text-sm text-body ${active === i ? 'bg-surface-2' : 'hover:bg-surface-2'}`}
+                      >
+                        {item.label}
+                      </button>
+                    )
+                  })}
                 </div>
               ),
           )}
@@ -255,7 +302,12 @@ export default function Layout() {
         </header>
         <main className="flex-1 p-4 lg:p-6">
           <ErrorBoundary key={location.pathname}>
-            <Outlet />
+            {/* Suspense sits inside the boundary so a slow/broken lazy chunk
+                shows the PageLoader (or, if it throws, the boundary) — never a
+                white screen. */}
+            <Suspense fallback={<PageLoader />}>
+              <Outlet />
+            </Suspense>
           </ErrorBoundary>
         </main>
         <TruxLauncher />

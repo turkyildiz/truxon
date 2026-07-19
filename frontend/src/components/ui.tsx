@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import { errorMessage } from '../supabase'
 
@@ -84,19 +85,72 @@ export function StatCard({ label, value, icon, color = 'blue', footer }: { label
         {icon && <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-xl">{icon}</div>}
       </div>
       <div className="mt-1 text-3xl font-extrabold tracking-tight">{value}</div>
-      {footer && <div className="mt-2 flex justify-end">{footer}</div>}
+      {footer && <div className="mt-2 flex flex-wrap justify-end gap-1.5">{footer}</div>}
     </div>
   )
 }
 
+const FOCUSABLE = 'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])'
+
 export function Modal({ title, open, onClose, children }: { title: string; open: boolean; onClose: () => void; children: ReactNode }) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const restoreRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    // Remember what had focus so we can return the user there on close.
+    restoreRef.current = document.activeElement as HTMLElement | null
+    const dialog = dialogRef.current
+    const visibleFocusable = () =>
+      Array.from(dialog?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []).filter((el) => el.offsetParent !== null || el === document.activeElement)
+    // Move focus into the dialog on open.
+    visibleFocusable()[0]?.focus()
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const els = visibleFocusable()
+      if (els.length === 0) {
+        e.preventDefault()
+        return
+      }
+      const first = els[0]
+      const last = els[els.length - 1]
+      const active = document.activeElement
+      // Wrap focus so Tab/Shift+Tab cycle stays trapped inside the dialog.
+      if (e.shiftKey && (active === first || !dialog?.contains(active))) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && (active === last || !dialog?.contains(active))) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      restoreRef.current?.focus?.()
+    }
+  }, [open, onClose])
+
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-12" onClick={onClose}>
-      <div className="w-full max-w-2xl rounded-2xl border border-line bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="w-full max-w-2xl rounded-2xl border border-line bg-surface p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-body">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1 text-2xl leading-none text-muted hover:text-body">
+          <button onClick={onClose} aria-label="Close" className="rounded-lg p-1 text-2xl leading-none text-muted hover:text-body">
             ×
           </button>
         </div>

@@ -10,6 +10,34 @@ import { Button, Input } from './ui'
 
 type Proposal = { token: string; tool: string; args: unknown; summary: string }
 
+type LogEntry = { role: 'user' | 'assistant'; content: string; proposals?: Proposal[]; result?: unknown }
+
+/** One-line human summary of a tool result, shown as the details toggle. */
+function resultSummary(result: unknown): string {
+  if (Array.isArray(result)) return `${result.length} item${result.length === 1 ? '' : 's'} — details`
+  if (result && typeof result === 'object') {
+    const obj = result as Record<string, unknown>
+    const id = obj.load_number ?? obj.number ?? obj.id
+    if (id != null) return `Result: ${String(id)} — details`
+    const keys = Object.keys(obj)
+    return `${keys.length} field${keys.length === 1 ? '' : 's'} — details`
+  }
+  if (result == null) return 'details'
+  return `${String(result)}`
+}
+
+/** Renders a tool result as a compact, collapsible pane instead of dumping raw
+ * JSON into the message flow. */
+function ToolResult({ result }: { result: unknown }) {
+  if (result == null || (typeof result === 'object' && Object.keys(result as object).length === 0)) return null
+  return (
+    <details className="mt-2 inline-block max-w-[95%] rounded-lg border border-line bg-surface px-3 py-2 text-left text-xs">
+      <summary className="cursor-pointer font-medium text-muted">{resultSummary(result)}</summary>
+      <pre className="mt-2 max-h-52 overflow-auto whitespace-pre-wrap break-all text-muted">{JSON.stringify(result, null, 2)}</pre>
+    </details>
+  )
+}
+
 async function truxAgent(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('trux-agent', { body })
   if (error) {
@@ -43,7 +71,7 @@ export default function TruxChat({ onClose }: { onClose?: () => void }) {
   const { user } = useAuth()
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [text, setText] = useState('')
-  const [log, setLog] = useState<{ role: 'user' | 'assistant'; content: string; proposals?: Proposal[] }[]>([])
+  const [log, setLog] = useState<LogEntry[]>([])
   const [error, setError] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -76,9 +104,9 @@ export default function TruxChat({ onClose }: { onClose?: () => void }) {
         ...prev,
         {
           role: 'assistant',
-          content: res.executed
-            ? `✓ Confirmed. ${JSON.stringify(res.result ?? {}).slice(0, 300)}`
-            : res.reply ?? 'Done.',
+          content: res.executed ? '✓ Confirmed.' : res.reply ?? 'Done.',
+          // Structured result is shown via a collapsible pane, not dumped raw.
+          result: res.executed ? res.result : undefined,
         },
       ])
       void qc.invalidateQueries({ queryKey: ['loads'] })
@@ -143,6 +171,11 @@ export default function TruxChat({ onClose }: { onClose?: () => void }) {
             >
               {m.content}
             </div>
+            {m.result != null && (
+              <div>
+                <ToolResult result={m.result} />
+              </div>
+            )}
             {m.proposals?.map((p) => (
               <div key={p.token} className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-left">
                 <div className="font-medium break-all text-amber-900">{p.summary}</div>
@@ -182,11 +215,13 @@ export function TruxLauncher() {
   const [open, setOpen] = useState(false)
   return (
     <>
-      {open && (
-        <div className="fixed right-4 bottom-20 z-40 flex h-[min(34rem,calc(100vh-7rem))] w-[min(24rem,calc(100vw-2rem))] flex-col">
-          <TruxChat onClose={() => setOpen(false)} />
-        </div>
-      )}
+      {/* Kept mounted and hidden with CSS (not unmounted) so toggling the panel
+          closed and back open preserves the whole conversation. */}
+      <div
+        className={`fixed right-4 bottom-20 z-40 flex h-[min(34rem,calc(100vh-7rem))] w-[min(24rem,calc(100vw-2rem))] flex-col ${open ? '' : 'hidden'}`}
+      >
+        <TruxChat onClose={() => setOpen(false)} />
+      </div>
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? 'Close Trux' : 'Open Trux'}

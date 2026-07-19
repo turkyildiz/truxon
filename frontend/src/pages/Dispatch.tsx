@@ -1,10 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Button, Card, Field, Input, Select, Textarea } from '../components/ui'
-import { calculateDistance, createCustomer, createLoad, extractPdf, listCustomers, listDrivers, trailersApi, trucksApi, type ExtractedStop } from '../data'
+import { calculateDistance, createCustomer, createLoad, extractPdf, type ExtractedStop } from '../data'
 import { errorMessage } from '../supabase'
+import { ReferenceDataBanner, useReferenceData } from '../useReferenceData'
 import FleetMap from './FleetMap'
 
 const EMPTY_FORM = {
@@ -44,15 +45,7 @@ export default function Dispatch() {
   /** Extracted customer name that matched nothing — offer add-or-pick. */
   const [pendingCustomer, setPendingCustomer] = useState<string | null>(null)
 
-  const customersQ = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
-  const driversQ = useQuery({ queryKey: ['drivers', ''], queryFn: () => listDrivers() })
-  const trucksQ = useQuery({ queryKey: ['trucks', ''], queryFn: () => trucksApi.list() })
-  const trailersQ = useQuery({ queryKey: ['trailers', ''], queryFn: () => trailersApi.list() })
-  const customers = customersQ.data ?? []
-  const drivers = driversQ.data ?? []
-  const trucks = trucksQ.data ?? []
-  const trailers = trailersQ.data ?? []
-  const sourceQueries = [customersQ, driversQ, trucksQ, trailersQ]
+  const { customers, drivers, trucks, trailers, isError: refError, retry: retryRef } = useReferenceData()
 
   const extract = useMutation({
     mutationFn: async (file: File) => {
@@ -223,15 +216,7 @@ export default function Dispatch() {
       </Card>
 
       <Card title="Load Details">
-        {sourceQueries.some((q) => q.isError) && (
-          <p className="mb-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-300">
-            Some dropdown options failed to load — check your connection and{' '}
-            <button type="button" className="font-medium underline" onClick={() => sourceQueries.forEach((q) => q.isError && q.refetch())}>
-              retry
-            </button>
-            .
-          </p>
-        )}
+        <ReferenceDataBanner show={refError} onRetry={retryRef} />
         <form onSubmit={onSubmit}>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>

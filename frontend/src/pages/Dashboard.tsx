@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useAuth } from '../auth'
-import { Badge, Button, Card, formatDate, formatDateTime, LoadError, money } from '../components/ui'
+import { Badge, Button, Card, formatDate, formatDateTime, LoadError, money, StatCard } from '../components/ui'
 import { dashboardSummary } from '../data'
 import type { TrendPoint } from '../types'
 
@@ -35,33 +35,13 @@ function TrendBadge({ change, vs, noDataLabel }: { change: number | null; vs: st
   )
 }
 
-function KpiCard({
-  label,
-  value,
-  icon,
-  gradient,
-  change,
-  changeYoY,
-}: {
-  label: string
-  value: string
-  icon: string
-  gradient: string
-  change: number | null
-  changeYoY: number | null
-}) {
+/** The KPI card's week/year trend pair, passed as StatCard's footer. */
+function KpiTrend({ change, changeYoY }: { change: number | null; changeYoY: number | null }) {
   return (
-    <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} p-5 text-white shadow-md`}>
-      <div className="flex items-start justify-between">
-        <div className="text-sm font-semibold text-white/90">{label}</div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-xl">{icon}</div>
-      </div>
-      <div className="mt-1 text-3xl font-extrabold tracking-tight">{value}</div>
-      <div className="mt-2 flex flex-wrap justify-end gap-1.5">
-        <TrendBadge change={change} vs="vs last wk" noDataLabel="no prior week" />
-        <TrendBadge change={changeYoY} vs="vs last yr" noDataLabel="no data last yr" />
-      </div>
-    </div>
+    <>
+      <TrendBadge change={change} vs="vs last wk" noDataLabel="no prior week" />
+      <TrendBadge change={changeYoY} vs="vs last yr" noDataLabel="no data last yr" />
+    </>
   )
 }
 
@@ -133,37 +113,38 @@ export default function Dashboard() {
 
       {/* KPI cards — this week vs last week */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
+        <StatCard
           label="Week Revenue"
           value={money(data.week_revenue)}
           icon="💰"
-          gradient="from-blue-500 to-blue-700"
-          change={pctChange(data.week_revenue, data.prev_week?.revenue ?? 0)}
-          changeYoY={pctChange(data.week_revenue, data.prev_year_week?.revenue ?? 0)}
+          color="blue"
+          footer={<KpiTrend change={pctChange(data.week_revenue, data.prev_week?.revenue ?? 0)} changeYoY={pctChange(data.week_revenue, data.prev_year_week?.revenue ?? 0)} />}
         />
-        <KpiCard
+        <StatCard
           label="Week Miles"
           value={Number(data.week_miles).toLocaleString()}
           icon="🛣️"
-          gradient="from-amber-400 to-orange-600"
-          change={pctChange(Number(data.week_miles), Number(data.prev_week?.miles ?? 0))}
-          changeYoY={pctChange(Number(data.week_miles), Number(data.prev_year_week?.miles ?? 0))}
+          color="amber"
+          footer={<KpiTrend change={pctChange(Number(data.week_miles), Number(data.prev_week?.miles ?? 0))} changeYoY={pctChange(Number(data.week_miles), Number(data.prev_year_week?.miles ?? 0))} />}
         />
-        <KpiCard
+        <StatCard
           label="Week Loads"
           value={String(data.week_loads)}
           icon="📦"
-          gradient="from-emerald-400 to-green-600"
-          change={pctChange(data.week_loads, data.prev_week?.loads ?? 0)}
-          changeYoY={pctChange(data.week_loads, data.prev_year_week?.loads ?? 0)}
+          color="green"
+          footer={<KpiTrend change={pctChange(data.week_loads, data.prev_week?.loads ?? 0)} changeYoY={pctChange(data.week_loads, data.prev_year_week?.loads ?? 0)} />}
         />
-        <KpiCard
+        <StatCard
           label="Avg Rate / Mile"
           value={data.week_avg_rate_per_mile != null ? `$${Number(data.week_avg_rate_per_mile).toFixed(2)}` : '—'}
           icon="📈"
-          gradient="from-orange-500 to-red-600"
-          change={pctChange(Number(data.week_avg_rate_per_mile ?? 0), Number(data.prev_week?.avg_rate_per_mile ?? 0))}
-          changeYoY={pctChange(Number(data.week_avg_rate_per_mile ?? 0), Number(data.prev_year_week?.avg_rate_per_mile ?? 0))}
+          color="red"
+          footer={
+            <KpiTrend
+              change={pctChange(Number(data.week_avg_rate_per_mile ?? 0), Number(data.prev_week?.avg_rate_per_mile ?? 0))}
+              changeYoY={pctChange(Number(data.week_avg_rate_per_mile ?? 0), Number(data.prev_year_week?.avg_rate_per_mile ?? 0))}
+            />
+          }
         />
       </div>
 

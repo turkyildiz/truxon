@@ -4,8 +4,9 @@ import { useParams } from 'react-router-dom'
 import DocsNotes from '../components/DocsNotes'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Badge, Button, Card, Field, formatDateTime, Input, LoadError, money, Select, Textarea } from '../components/ui'
-import { cancelLoad, changeLoadStatus, getLoad, listCustomers, listDrivers, listStops, replaceStops, trailersApi, trucksApi, uncancelLoad, updateLoad } from '../data'
+import { cancelLoad, changeLoadStatus, getLoad, listStops, replaceStops, uncancelLoad, updateLoad } from '../data'
 import { errorMessage } from '../supabase'
+import { ReferenceDataBanner, useReferenceData } from '../useReferenceData'
 import { LOAD_STATUSES, type Load } from '../types'
 
 function StatusStepper({ load, onAdvance, busy }: { load: Load; onAdvance: (status: string) => void; busy: boolean }) {
@@ -49,15 +50,7 @@ export default function LoadDetail() {
   const load = loadQ.data
   const stopsQ = useQuery({ queryKey: ['load-stops', id], queryFn: () => listStops(id!) })
   const itinerary = stopsQ.data ?? []
-  const driversQ = useQuery({ queryKey: ['drivers', ''], queryFn: () => listDrivers() })
-  const trucksQ = useQuery({ queryKey: ['trucks', ''], queryFn: () => trucksApi.list() })
-  const trailersQ = useQuery({ queryKey: ['trailers', ''], queryFn: () => trailersApi.list() })
-  const customersQ = useQuery({ queryKey: ['customers', ''], queryFn: () => listCustomers() })
-  const drivers = driversQ.data ?? []
-  const trucks = trucksQ.data ?? []
-  const trailers = trailersQ.data ?? []
-  const customers = customersQ.data ?? []
-  const sourceQueries = [driversQ, trucksQ, trailersQ, customersQ]
+  const { customers, drivers, trucks, trailers, isError: refError, retry: retryRef } = useReferenceData()
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['load', id] })
@@ -208,15 +201,7 @@ export default function LoadDetail() {
 
       {editForm ? (
         <Card title="Edit Load">
-          {sourceQueries.some((q) => q.isError) && (
-            <p className="mb-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-300">
-              Some dropdown options failed to load — check your connection and{' '}
-              <button type="button" className="font-medium underline" onClick={() => sourceQueries.forEach((q) => q.isError && q.refetch())}>
-                retry
-              </button>
-              .
-            </p>
-          )}
+          <ReferenceDataBanner show={refError} onRetry={retryRef} />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Customer">
               <Select value={editForm.customer_id} onChange={(e) => setEditForm({ ...editForm, customer_id: e.target.value })}>
