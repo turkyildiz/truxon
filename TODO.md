@@ -39,8 +39,15 @@ Ordered by risk. ✅ confirmed · ⬜ open (in our hands) · 🔶 needs Ilker / 
       domain; verify SPF/DKIM/DMARC and send a test to an external inbox so they
       don't spam-file.
 - ⬜ **Sentinel proactive push (#27)** — schedule + daily brief + push + in-app feed (below).
-- 🔶 **Fuel & tolls live feeds** — fuel is manual CSV, tolls not flowing. Decide:
-      automate (AtoB fetcher / PrePass) before launch, or start manual.
+- 🔶 **Fuel & tolls live feeds** — **fuel is LIVE (2026-07-19)**: the AtoB
+      Playwright fetcher runs on the NAS via `truxon-scheduler` cron at
+      03:00/16:00 CST (UTC-6). Verified end-to-end through the cron path: 209-row
+      CSV downloaded headless, idempotent import (2nd run: 208 updated / 0
+      inserted). Session lives in `/volume1/docker/truxon-fuel/.atob-profile`;
+      when it eventually expires the run alerts through the watchdog and the
+      login is redone (headed browser on the dev box → tar profile to NAS).
+      **19 unmatched_trucks** rows need unit-name reconciliation in Truxon.
+      Tolls (PrePass) still pending the client-secret call.
 - ⬜ **Seed data so modules aren't empty** — PM history + odometers (maintenance
       board / CPM) and monthly budgets (budget-variance).
 - ⬜ **Company/invoice details** — logo, address, invoice numbering, payment terms
