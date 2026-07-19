@@ -224,9 +224,17 @@ Deno.serve(async (req) => {
   try { body = await req.json() } catch { /* empty */ }
 
   if (body.mode === 'pull') {
-    // cron sends the public anon key; admins may also trigger from the app
+    // cron sends the public anon key. After the key rotation the env's
+    // SUPABASE_ANON_KEY may be the new-format key, so instead of an exact
+    // match, accept any bearer whose JWT payload is this project's anon role
+    // (same trust level: the anon key is public; pull is read-only sync).
     const auth = req.headers.get('Authorization') ?? ''
-    const isCron = auth === `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`
+    let isCron = false
+    try {
+      const payload = JSON.parse(atob((auth.replace('Bearer ', '').split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/')))
+      const ref = new URL(Deno.env.get('SUPABASE_URL')!).hostname.split('.')[0]
+      isCron = payload?.role === 'anon' && payload?.ref === ref
+    } catch { /* not a JWT */ }
     if (!isCron) {
       const caller = await getCaller(req)
       if (caller instanceof Response) return caller
