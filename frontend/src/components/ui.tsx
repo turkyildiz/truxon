@@ -95,6 +95,12 @@ const FOCUSABLE = 'a[href],button:not([disabled]),textarea:not([disabled]),input
 export function Modal({ title, open, onClose, children }: { title: string; open: boolean; onClose: () => void; children: ReactNode }) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const restoreRef = useRef<HTMLElement | null>(null)
+  // Keep the latest onClose in a ref so the effect can depend on `open` ALONE.
+  // Callers pass an inline onClose (new identity every render); if it were a
+  // dependency, every keystroke would re-run this effect and steal focus back
+  // to the first focusable element (the × button).
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
     if (!open) return
@@ -103,13 +109,15 @@ export function Modal({ title, open, onClose, children }: { title: string; open:
     const dialog = dialogRef.current
     const visibleFocusable = () =>
       Array.from(dialog?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []).filter((el) => el.offsetParent !== null || el === document.activeElement)
-    // Move focus into the dialog on open.
-    visibleFocusable()[0]?.focus()
+    // On open, focus the first field if there is one (else the first focusable),
+    // so typing starts in the input rather than on the × button.
+    const firstField = Array.from(dialog?.querySelectorAll<HTMLElement>('input, textarea, select') ?? []).find((el) => el.offsetParent !== null)
+    ;(firstField ?? visibleFocusable()[0])?.focus()
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.stopPropagation()
-        onClose()
+        onCloseRef.current()
         return
       }
       if (e.key !== 'Tab') return
@@ -135,7 +143,7 @@ export function Modal({ title, open, onClose, children }: { title: string; open:
       document.removeEventListener('keydown', onKeyDown)
       restoreRef.current?.focus?.()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
   return (
