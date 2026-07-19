@@ -1,5 +1,0 @@
-{
-  "nav": { "dashboard": "Dolandyryş paneli", "track": "Yzarlama", "loads": "Ükler", "dispatch": "Dispetçer", "customers": "Müşderiler", "drivers": "Sürüjiler", "trucks": "Ük ulaglary", "trailers": "Tirkegler", "maintenance": "Hyzmat", "reports": "Buhgalteriýa", "invoices": "Hasap-fakturalar", "personal_drive": "Şahsy disk", "team_drive": "Topar diski", "users": "Ulanyјylar", "settings": "Sazlamalar" },
-  "common": { "signOut": "Çykmak", "search": "Gözleg…", "changePassword": "Paroly üýtgetmek", "language": "Dil", "save": "ýatda saklamak", "cancel": "ýatyrmak", "loading": "Üklenýär…" },
-  "login": { "subtitle": "Ulag dolandyryş ulgamy", "email": "E-poçta", "password": "Parol", "signIn": "Girmek", "signingIn": "Girilýär…" }
-}

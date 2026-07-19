@@ -1,5 +1,0 @@
-{
-  "nav": { "dashboard": "Panel", "track": "Rastreo", "loads": "Cargas", "dispatch": "Despacho", "customers": "Clientes", "drivers": "Conductores", "trucks": "Camiones", "trailers": "Remolques", "maintenance": "Mantenimiento", "reports": "Contabilidad", "invoices": "Facturas", "personal_drive": "Disco personal", "team_drive": "Disco del equipo", "users": "Usuarios", "settings": "Ajustes" },
-  "common": { "signOut": "Cerrar sesión", "search": "Buscar…", "changePassword": "Cambiar contraseña", "language": "Idioma", "save": "Guardar", "cancel": "Cancelar", "loading": "Cargando…" },
-  "login": { "subtitle": "Sistema de Gestión de Transporte", "email": "Correo electrónico", "password": "Contraseña", "signIn": "Iniciar sesión", "signingIn": "Iniciando sesión…" }
-}

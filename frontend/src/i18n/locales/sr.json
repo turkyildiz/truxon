@@ -1,5 +1,0 @@
-{
-  "nav": { "dashboard": "Kontrolna tabla", "track": "Praćenje", "loads": "Tovari", "dispatch": "Dispečer", "customers": "Klijenti", "drivers": "Vozači", "trucks": "Kamioni", "trailers": "Prikolice", "maintenance": "Održavanje", "reports": "Računovodstvo", "invoices": "Fakture", "personal_drive": "Lični disk", "team_drive": "Timski disk", "users": "Korisnici", "settings": "Podešavanja" },
-  "common": { "signOut": "Odjava", "search": "Pretraga…", "changePassword": "Promeni lozinku", "language": "Jezik", "save": "Sačuvaj", "cancel": "Otkaži", "loading": "Učitavanje…" },
-  "login": { "subtitle": "Sistem za upravljanje transportom", "email": "Imejl", "password": "Lozinka", "signIn": "Prijava", "signingIn": "Prijavljivanje…" }
-}

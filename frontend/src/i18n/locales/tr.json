@@ -1,5 +1,0 @@
-{
-  "nav": { "dashboard": "Panel", "track": "Takip", "loads": "Yükler", "dispatch": "Sevkiyat", "customers": "Müşteriler", "drivers": "Sürücüler", "trucks": "Kamyonlar", "trailers": "Dorseler", "maintenance": "Bakım", "reports": "Muhasebe", "invoices": "Faturalar", "personal_drive": "Kişisel Sürücü", "team_drive": "Takım Sürücüsü", "users": "Kullanıcılar", "settings": "Ayarlar" },
-  "common": { "signOut": "Çıkış yap", "search": "Ara…", "changePassword": "Şifre değiştir", "language": "Dil", "save": "Kaydet", "cancel": "İptal", "loading": "Yükleniyor…" },
-  "login": { "subtitle": "Taşımacılık Yönetim Sistemi", "email": "E-posta", "password": "Şifre", "signIn": "Giriş yap", "signingIn": "Giriş yapılıyor…" }
-}

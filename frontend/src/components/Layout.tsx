@@ -1,9 +1,7 @@
 import { Suspense, useEffect, useRef, useState, type FormEvent } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
 import ErrorBoundary from './ErrorBoundary'
 import PageLoader from './PageLoader'
-import LanguageSwitcher from './LanguageSwitcher'
 import { ROLE_MODULES, useAuth } from '../auth'
 import { globalSearch } from '../data'
 import { errorMessage, supabase } from '../supabase'
@@ -231,7 +229,6 @@ function GlobalSearch() {
 
 export default function Layout() {
   const { user, logout } = useAuth()
-  const { t } = useTranslation()
   const { theme, toggle } = useTheme()
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -261,7 +258,7 @@ export default function Layout() {
               }
             >
               <span>{item.icon}</span>
-              {t(`nav.${item.key}`)}
+              {item.label}
             </NavLink>
           ))}
         </nav>
@@ -280,7 +277,6 @@ export default function Layout() {
               <div className="text-sm font-medium text-body">{user?.full_name || user?.username}</div>
               <div className="text-xs capitalize text-muted">{user?.role}</div>
             </div>
-            <LanguageSwitcher />
             <button
               onClick={toggle}
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
