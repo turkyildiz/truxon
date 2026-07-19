@@ -17,9 +17,14 @@ additional_redirect_urls = ["http://localhost:5173"]
 # Staff accounts are created by admins via the admin-users edge function;
 # public self-signup stays off.
 enable_signup = false
+# Required for password login (GoTrue GOTRUE_EXTERNAL_EMAIL_ENABLED).
+# Without this, admin-created users cannot signInWithPassword.
+enable_manual_linking = false
 
 [auth.email]
-enable_signup = false
+# Keep public email signup off at [auth] level; enable the email *provider*
+# so existing (admin-created) accounts can log in with email+password.
+enable_signup = true
 enable_confirmations = false
 
 [functions.extract-pdf]
