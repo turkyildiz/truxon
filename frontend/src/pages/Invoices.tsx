@@ -113,9 +113,9 @@ export default function Invoices() {
                     Mark Paid
                   </button>
                 )}
-                {inv.status !== 'paid' && (
+                {inv.status !== 'paid' && inv.status !== 'void' && (
                   <button
-                    onClick={() => window.confirm(`Void ${inv.invoice_number}? Its loads go back to "completed" for re-billing.`) && voidMutation.mutate(inv.id)}
+                    onClick={() => window.confirm(`Void ${inv.invoice_number}? It stays on record as void; its loads go back to "completed" for re-billing.`) && voidMutation.mutate(inv.id)}
                     className="mr-3 text-sm font-medium text-red-600 hover:underline"
                   >
                     Void

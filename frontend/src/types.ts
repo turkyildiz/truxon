@@ -117,7 +117,7 @@ export interface Invoice {
   invoice_date: string
   due_date: string | null
   total: number
-  status: 'draft' | 'sent' | 'paid'
+  status: 'draft' | 'sent' | 'paid' | 'void'
   load_count: number
 }
 
