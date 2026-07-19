@@ -15,6 +15,9 @@ import type {
   DocumentMeta,
   Driver,
   Equipment,
+  FuelByTruckRow,
+  FuelIftaRow,
+  FuelImportResult,
   Invoice,
   Load,
   LoadStatus,
@@ -452,6 +455,37 @@ export async function globalSearch(q: string): Promise<SearchResults> {
   return unwrap(await supabase.rpc('global_search', { q })) as unknown as SearchResults
 }
 
+// ---------- Fuel ----------
+
+export interface FuelFilters {
+  start?: string
+  end?: string
+  state?: string
+  truckId?: number
+}
+
+/** Recent fuel-card transactions (RLS limits to admin/accountant/dispatcher). */
+export async function listFuelTransactions(filters: FuelFilters = {}): Promise<Tables<'fuel_transactions'>[]> {
+  let query = supabase.from('fuel_transactions').select('*').order('transaction_time', { ascending: false }).limit(200)
+  if (filters.start) query = query.gte('transaction_time', filters.start)
+  if (filters.end) query = query.lte('transaction_time', filters.end + 'T23:59:59')
+  if (filters.state) query = query.eq('merchant_state', filters.state)
+  if (filters.truckId) query = query.eq('truck_id', filters.truckId)
+  return unwrap(await query)
+}
+
+/** Spend/gallons rolled up per truck over the range (server sorts by spend desc). */
+export async function fuelByTruck(start: string, end: string): Promise<FuelByTruckRow[]> {
+  const data = unwrap(await supabase.rpc('fuel_by_truck', { p_start: start, p_end: end }))
+  return (data as unknown as FuelByTruckRow[]) ?? []
+}
+
+/** IFTA rollup per jurisdiction over the range. */
+export async function fuelIftaSummary(start: string, end: string): Promise<FuelIftaRow[]> {
+  const data = unwrap(await supabase.rpc('fuel_ifta_summary', { p_start: start, p_end: end }))
+  return (data as unknown as FuelIftaRow[]) ?? []
+}
+
 // ---------- Edge functions ----------
 
 /** Invoke an edge function, surfacing the server's JSON error body — on
@@ -656,4 +690,10 @@ export async function calculateDistance(
   waypoints: string[] = [],
 ): Promise<{ miles: number | null; available: boolean }> {
   return invokeFunction<{ miles: number | null; available: boolean }>('distance', { body: { origin, destination, waypoints } })
+}
+
+/** Admin-only: push a fuel-card CSV export to the importer (matches trucks by
+ * unit, upserts by uuid). The admin's JWT is sent automatically by invoke. */
+export async function importFuelCsv(csvText: string): Promise<FuelImportResult> {
+  return invokeFunction<FuelImportResult>('fuel-import', { body: { csv: csvText } })
 }

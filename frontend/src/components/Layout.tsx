@@ -78,6 +78,7 @@ const NAV_ITEMS: { key: string; to: string; label: string; icon: string }[] = [
   { key: 'maintenance', to: '/maintenance', label: 'Maintenance', icon: '🔧' },
   { key: 'reports', to: '/reports', label: 'Accounting', icon: '🧾' },
   { key: 'invoices', to: '/invoices', label: 'Invoices', icon: '💵' },
+  { key: 'fuel', to: '/fuel', label: 'Fuel', icon: '⛽' },
   { key: 'personal_drive', to: '/personal-drive', label: 'Personal Drive', icon: '📁' },
   { key: 'team_drive', to: '/team-drive', label: 'Team Drive', icon: '🗂️' },
   { key: 'users', to: '/users', label: 'Users', icon: '👤' },

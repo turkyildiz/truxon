@@ -150,6 +150,11 @@ export interface WeeklyRow {
   revenue: number
   avg_rate_per_mile: number | null
   driver_pay?: number | null
+  // by_truck only:
+  fuel_cost?: number | null
+  fuel_gallons?: number | null
+  mpg?: number | null
+  net_after_fuel?: number | null
 }
 
 export interface WeeklyReport {
@@ -157,7 +162,16 @@ export interface WeeklyReport {
   week_end: string
   by_truck: WeeklyRow[]
   by_driver: WeeklyRow[]
-  totals: { loads: number; miles: number; revenue: number; avg_rate_per_mile: number | null }
+  totals: {
+    loads: number
+    miles: number
+    revenue: number
+    avg_rate_per_mile: number | null
+    fuel_cost?: number | null
+    fuel_gallons?: number | null
+    net_after_fuel?: number | null
+    fuel_pct_of_revenue?: number | null
+  }
 }
 
 export interface DashboardActiveLoad {
@@ -197,6 +211,30 @@ export interface DashboardSummary {
   driver_perf: { name: string; miles: number; revenue: number; loads: number }[]
   expiring_licenses: { id: number; full_name: string; license_expiration: string }[]
   active_loads: DashboardActiveLoad[]
+}
+
+export interface FuelByTruckRow {
+  truck_id: number
+  unit_number: string
+  transactions: number
+  gallons: number
+  spend: number
+}
+
+export interface FuelIftaRow {
+  jurisdiction: string
+  transactions: number
+  gallons: number
+  spend: number
+}
+
+export interface FuelImportResult {
+  parsed: number
+  inserted: number
+  updated: number
+  received: number
+  /** Count of imported rows whose vehicle didn't match a Truxon truck. */
+  unmatched_trucks: number
 }
 
 export interface SearchResults {

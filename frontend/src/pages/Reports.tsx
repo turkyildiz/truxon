@@ -20,7 +20,12 @@ function ReportTable({ title, rows, isDriver }: { title: string; rows: WeeklyRow
       {rows.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted">No completed loads this week.</p>
       ) : (
-        <Table headers={[isDriver ? 'Driver' : 'Truck', 'Loads', 'Miles', ...(isDriver ? ['Empty Mi.'] : []), 'Revenue', 'Avg $/Mile', ...(isDriver ? ['Driver Pay'] : [])]}>
+        <Table headers={[
+          isDriver ? 'Driver' : 'Truck', 'Loads', 'Miles',
+          ...(isDriver ? ['Empty Mi.'] : []),
+          'Revenue', 'Avg $/Mile',
+          ...(isDriver ? ['Driver Pay'] : ['Fuel', 'MPG', 'Net After Fuel']),
+        ]}>
           {rows.map((r) => (
             <tr key={r.key_id}>
               <td className="px-3 py-3 font-medium">{r.name}</td>
@@ -30,6 +35,9 @@ function ReportTable({ title, rows, isDriver }: { title: string; rows: WeeklyRow
               <td className="px-3 py-3">{money(r.revenue)}</td>
               <td className="px-3 py-3">{r.avg_rate_per_mile != null ? `$${Number(r.avg_rate_per_mile).toFixed(2)}` : '—'}</td>
               {isDriver && <td className="px-3 py-3 font-semibold text-brand">{money(r.driver_pay ?? null)}</td>}
+              {!isDriver && <td className="px-3 py-3 text-amber-600 dark:text-amber-400">{r.fuel_cost ? money(r.fuel_cost) : '—'}</td>}
+              {!isDriver && <td className="px-3 py-3">{r.mpg != null ? Number(r.mpg).toFixed(2) : '—'}</td>}
+              {!isDriver && <td className="px-3 py-3 font-semibold">{r.net_after_fuel != null ? money(r.net_after_fuel) : '—'}</td>}
             </tr>
           ))}
         </Table>
@@ -93,6 +101,23 @@ export default function Reports() {
               <div className="mt-1 text-2xl font-bold">
                 {data.totals.avg_rate_per_mile != null ? `$${Number(data.totals.avg_rate_per_mile).toFixed(2)}` : '—'}
               </div>
+            </Card>
+          </div>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+            <Card>
+              <div className="text-xs font-semibold uppercase text-muted">Fuel Cost</div>
+              <div className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">{money(data.totals.fuel_cost ?? 0)}</div>
+              {data.totals.fuel_pct_of_revenue != null && (
+                <div className="mt-0.5 text-xs text-muted">{Number(data.totals.fuel_pct_of_revenue).toFixed(1)}% of revenue</div>
+              )}
+            </Card>
+            <Card>
+              <div className="text-xs font-semibold uppercase text-muted">Fuel Gallons</div>
+              <div className="mt-1 text-2xl font-bold">{Number(data.totals.fuel_gallons ?? 0).toLocaleString()}</div>
+            </Card>
+            <Card>
+              <div className="text-xs font-semibold uppercase text-muted">Net After Fuel</div>
+              <div className="mt-1 text-2xl font-bold">{money(data.totals.net_after_fuel ?? data.totals.revenue)}</div>
             </Card>
           </div>
           <ReportTable title="By Truck" rows={data.by_truck} />

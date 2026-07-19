@@ -25,6 +25,7 @@ const Trailers = lazy(() => import('./pages/Equipment').then((m) => ({ default: 
 const Maintenance = lazy(() => import('./pages/Maintenance'))
 const Reports = lazy(() => import('./pages/Reports'))
 const Invoices = lazy(() => import('./pages/Invoices'))
+const Fuel = lazy(() => import('./pages/Fuel'))
 const Users = lazy(() => import('./pages/Users'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Drive = lazy(() => import('./pages/Drive'))
@@ -83,6 +84,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/maintenance" element={<Maintenance />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/invoices" element={<Invoices />} />
+              <Route path="/fuel" element={<Fuel />} />
               <Route path="/personal-drive" element={<Drive drive="personal" />} />
               <Route path="/team-drive" element={<Drive drive="team" />} />
               <Route path="/users" element={<Users />} />
