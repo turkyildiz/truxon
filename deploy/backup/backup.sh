@@ -47,6 +47,32 @@ docker run --rm \
 echo "[3/3] Pruning backups older than ${RETENTION_DAYS} days…"
 find "$BACKUP_DIR" -name '*.gpg' -mtime "+${RETENTION_DAYS}" -delete
 
+# Off-site immutable copy: upload the two encrypted files to a Backblaze B2
+# bucket with Object Lock in COMPLIANCE mode. A retain-until date is stamped on
+# each object, so nothing — not this key (even with deleteFiles), not full NAS
+# root, not a Supabase compromise — can delete or alter it before it expires.
+# This is the copy that survives ransomware. Needs B2_* in the env file.
+if [[ -n "${B2_BUCKET:-}" && -n "${B2_KEY_ID:-}" && -n "${B2_APP_KEY:-}" ]]; then
+  lock_days="${OFFSITE_LOCK_DAYS:-${RETENTION_DAYS}}"
+  retain="$(date -u -d "+${lock_days} days" +%Y-%m-%dT%H:%M:%SZ)"
+  echo "[off-site] Uploading immutable copy to B2 (${B2_BUCKET}, locked until ${retain})…"
+  export AWS_ACCESS_KEY_ID="$B2_KEY_ID" AWS_SECRET_ACCESS_KEY="$B2_APP_KEY" AWS_DEFAULT_REGION="${B2_REGION:-us-east-005}"
+  for f in "db_${STAMP}.dump.gpg" "documents_${STAMP}.tar.gpg"; do
+    [ -f "$BACKUP_DIR/$f" ] || continue
+    if docker run --rm \
+        -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
+        -v "$BACKUP_DIR/$f:/u/$f:ro" amazon/aws-cli \
+        --endpoint-url "$B2_ENDPOINT" s3api put-object \
+        --bucket "$B2_BUCKET" --key "nightly/$f" --body "/u/$f" \
+        --object-lock-mode COMPLIANCE --object-lock-retain-until-date "$retain" >/dev/null; then
+      echo "  off-site OK: $f"
+    else
+      echo "  WARNING: off-site upload failed for $f (local + snapshot copies still saved)"
+    fi
+  done
+  unset AWS_SECRET_ACCESS_KEY
+fi
+
 # Tell the watchdog this run completed — it alarms if no heartbeat lands in 26h.
 # The function has verify_jwt on (like the cron caller), so we must send the anon
 # key as the platform Authorization header; the function then does its own

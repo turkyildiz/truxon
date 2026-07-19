@@ -23,6 +23,18 @@ Ordered by risk. ✅ confirmed · ⬜ open (in our hands) · 🔶 needs Ilker / 
       `backup_fresh` heartbeat now green (WATCHDOG_REPORT_KEY rotated + anon bearer).
       Fixed two real script bugs in the process (storage URL-encode; heartbeat auth
       header) — see below. Old broken-storage container retired.
+- ✅ **Ransomware-resistant off-site copy** (2026-07-19). Nightly backup now also
+      uploads both encrypted files to a Backblaze B2 bucket (`truxon-backups`) with
+      **Object Lock in COMPLIANCE mode** — a per-object retain-until date that
+      NOTHING can delete before it expires: proven by test (the write key, which
+      holds deleteFiles + bypassGovernance, got AccessDenied deleting a locked
+      object). This copy survives full NAS root compromise, a Supabase compromise,
+      fire, or theft — the real ransomware defense. Scoped append-style key on the
+      NAS (`b2.env`, chmod 600). 3-2-1-1-0 now complete: Supabase + local NAS +
+      immutable off-site, restore-tested. (On-box btrfs immutable snapshots are
+      staged in `deploy/backup/immutable/` but not deployed — capped value given
+      the NAS login is in the docker group, so the off-site WORM copy is the
+      backstop instead.)
 - ⬜ **Outbound email deliverability** — invoices + Trux replies send from the
       domain; verify SPF/DKIM/DMARC and send a test to an external inbox so they
       don't spam-file.
