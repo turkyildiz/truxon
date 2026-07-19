@@ -152,10 +152,36 @@ not a gap.
 ## Watchdog
 
 `watchdog` edge function, pg_cron every 5 min (`truxon-watchdog` job). Checks:
-inbox poll freshness, trux_inbox_log failures (1h), stale unread mail in
-Inbox/Junk (>12 min), each edge function's CORS preflight, LLM provider
-reachability, Graph token validity (catches client-secret expiry — renews
-7/2028). State in `watchdog_state` (admin-readable). Alerts email FROM
-trux@truxon.com to WATCHDOG_ALERT_TO (default owner gmail) on failure and
-recovery, 60-min re-alert cooldown. Planned layer 2: outside-in ping from the
-UGREEN NAS to catch full-platform outage (add when next touching the NAS).
+inbox poll freshness (incl. future-stuck throttle), trux_inbox_log failures
+(1h) and rows wedged mid-processing, stale unread mail in Inbox/Junk (>12 min),
+each edge function's CORS preflight, LLM provider reachability, Graph token
+validity (catches client-secret expiry — renews 7/2028), **plus business-wide
+checks**: on-duty drivers not reporting GPS (>15 min), backup-job heartbeat
+freshness (NAS `backup.sh` pings the `heartbeat` mode; alarms >26h), invoice
+numbering integrity (no duplicate live numbers, sequence not behind), and
+truxon.com reachability. State in `watchdog_state`; failure episodes in
+`watchdog_incidents` (open→resolved, flap-suppressed). Alerts email FROM
+trux@truxon.com to WATCHDOG_ALERT_TO **and** push to active admins, 60-min
+re-alert cooldown.
+
+### Self-heal ladder
+
+The engine's hands are enumerable in code — `supabase/functions/_shared/
+remediations.ts` — never LLM- or email-invented. Every remediation is
+DB-scoped, reversible (snapshots before-state), rate-limited (`maxPerHour`),
+and ledgered in `watchdog_remediations` with before/after snapshots.
+
+- **Tier 3 (auto):** reversible low-risk fixes run unattended, then a canary
+  `verify()` runs — on failure the action is reverted. E.g. resetting a
+  future-stuck inbox throttle, requeueing stuck-processing messages.
+- **Tier 2 (approval):** allowlisted-but-weightier actions (e.g. load-shedding
+  the agent off) are *proposed* — a one-tap email link (prefetch-safe: GET
+  renders a confirm page, POST executes; single-use, 24h expiry) applies
+  exactly that action.
+- **Tier 1 (diagnose):** LLM reasoning stays in the READ-ONLY workstation
+  responder (`deploy/watchdog/responder.mjs`, `--allowedTools` inspection
+  only; `RESPONDER_AUTOFIX=1` opts back into autonomy). Code/schema/secret/data
+  changes are never auto-applied — they can only ever be a proposal to a human,
+  because the anon-key-reachable watchdog must never hold deploy credentials.
+
+Admins read history in-app via `watchdog_incident_feed()`.

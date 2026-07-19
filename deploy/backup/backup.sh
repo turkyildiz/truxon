@@ -47,4 +47,14 @@ docker run --rm \
 echo "[3/3] Pruning backups older than ${RETENTION_DAYS} days…"
 find "$BACKUP_DIR" -name '*.gpg' -mtime "+${RETENTION_DAYS}" -delete
 
+# Tell the watchdog this run completed — it alarms if no heartbeat lands in 26h.
+# Needs SUPABASE_URL (already required) + WATCHDOG_REPORT_KEY in the env file.
+if [[ -n "${WATCHDOG_REPORT_KEY:-}" ]]; then
+  db_size="$(du -h "$BACKUP_DIR/db_${STAMP}.dump.gpg" 2>/dev/null | cut -f1)"
+  curl -fsS -m 20 -X POST "${SUPABASE_URL}/functions/v1/watchdog" \
+    -H 'Content-Type: application/json' \
+    -d "$(printf '{"heartbeat":"backup","key":"%s","detail":"db_%s (%s)"}' "$WATCHDOG_REPORT_KEY" "$STAMP" "${db_size:-?}")" \
+    >/dev/null 2>&1 || echo "  (heartbeat ping failed — backup itself is fine)"
+fi
+
 echo "Backup complete: $BACKUP_DIR (db_${STAMP}, documents_${STAMP})"
