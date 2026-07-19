@@ -6,7 +6,7 @@
 // back to the free browser voice.
 import { corsResponse, getCaller, json } from '../_shared/auth.ts'
 
-const DEFAULT_VOICE = 'JBFqnCBsd6RMkjVDRZzb' // ElevenLabs stock "George" — warm British male
+const DEFAULT_VOICE = 'onwK4e9ZLuTAKqWW03F9' // ElevenLabs stock "Daniel" — deep, authoritative British male
 const DEFAULT_MODEL = 'eleven_turbo_v2_5'
 
 Deno.serve(async (req) => {

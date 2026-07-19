@@ -132,6 +132,26 @@ if (SYNTH_OK) {
   })
 }
 
+// Premium-voice delivery tuning: louder (gain above 100%) and a touch faster,
+// pitch-preserved so the speed-up doesn't undo the voice's depth.
+const VOICE_GAIN = 1.6
+const VOICE_RATE = 1.08
+let audioCtx: AudioContext | null = null
+function boostGain(audio: HTMLAudioElement): void {
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!Ctx) return
+    if (!audioCtx) audioCtx = new Ctx()
+    if (audioCtx.state === 'suspended') void audioCtx.resume()
+    const src = audioCtx.createMediaElementSource(audio)
+    const gain = audioCtx.createGain()
+    gain.gain.value = VOICE_GAIN
+    src.connect(gain).connect(audioCtx.destination)
+  } catch {
+    /* fall back to the element's own volume */
+  }
+}
+
 export default function Trux() {
   const qc = useQueryClient()
   const [sessionId, setSessionId] = useState<string | null>(store.sessionId)
@@ -282,7 +302,10 @@ export default function Trux() {
         if (seq !== speakSeqRef.current) return // barged in during the fetch
         const url = URL.createObjectURL(blob)
         const audio = new Audio(url)
+        ;(audio as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true
+        audio.playbackRate = VOICE_RATE
         audioRef.current = audio
+        boostGain(audio)
         const end = () => {
           URL.revokeObjectURL(url)
           resumeOrIdle()
@@ -311,8 +334,8 @@ export default function Trux() {
       u.voice = v
       u.lang = v.lang
     }
-    u.rate = 0.97
-    u.pitch = 0.9
+    u.rate = 1.05
+    u.pitch = 0.82
     u.onend = resumeOrIdle
     u.onerror = resumeOrIdle
     window.speechSynthesis.speak(u)
