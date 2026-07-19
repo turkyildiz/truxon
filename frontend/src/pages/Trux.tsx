@@ -19,6 +19,7 @@ import { errorMessage } from '../supabase'
 import { synthesizeSpeech } from '../data'
 import { LoadError } from '../components/ui'
 import { truxAgent, ToolResult, type Proposal } from '../components/TruxChat'
+import SentinelFeed from '../components/SentinelFeed'
 
 type LogEntry = { role: 'user' | 'assistant'; content: string; proposals?: Proposal[]; result?: unknown }
 type Phase = 'idle' | 'listening' | 'thinking' | 'speaking'
@@ -584,6 +585,9 @@ export default function Trux() {
           )}
         </div>
       </div>
+
+      {/* Sentinel: what Trux noticed on its own */}
+      <SentinelFeed />
 
       {/* Answer stream (newest first) */}
       {!empty && (

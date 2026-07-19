@@ -823,6 +823,30 @@ export async function revokeDriveShare(id: number): Promise<void> {
   unwrap(await supabase.from('drive_shares').update({ revoked: true }).eq('id', id))
 }
 
+// ---------- Trux Sentinel insights ----------
+
+export interface TruxInsight {
+  id: number
+  dedup_key: string
+  category: 'money' | 'cash' | 'ops' | 'compliance' | 'maintenance'
+  severity: 'info' | 'warn' | 'critical'
+  title: string
+  detail: string
+  entity_type: string
+  entity_id: number | null
+  status: 'open' | 'acknowledged' | 'resolved'
+  first_seen: string
+  last_seen: string
+}
+
+export async function listInsights(includeResolved = false): Promise<TruxInsight[]> {
+  return unwrap(await supabase.rpc('trux_insights_feed', { p_include_resolved: includeResolved })) as unknown as TruxInsight[]
+}
+
+export async function acknowledgeInsight(id: number): Promise<void> {
+  unwrap(await supabase.rpc('acknowledge_insight', { p_id: id }))
+}
+
 // ---------- Trux premium voice ----------
 
 /** POST answer text to the trux-tts edge function; returns MP3 audio (the key
