@@ -853,6 +853,109 @@ export type Database = {
           },
         ]
       }
+      safety_csa: {
+        Row: {
+          alert: boolean
+          basic: string
+          measure: number | null
+          percentile: number | null
+          updated_at: string
+        }
+        Insert: {
+          alert?: boolean
+          basic: string
+          measure?: number | null
+          percentile?: number | null
+          updated_at?: string
+        }
+        Update: {
+          alert?: boolean
+          basic?: string
+          measure?: number | null
+          percentile?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      safety_events: {
+        Row: {
+          claim_amount: number
+          created_at: string
+          created_by: string | null
+          csa_basic: string
+          description: string
+          driver_id: number | null
+          event_date: string
+          event_type: string
+          id: number
+          location: string
+          out_of_service: boolean
+          preventable: boolean
+          severity: string
+          status: string
+          truck_id: number | null
+          updated_at: string
+        }
+        Insert: {
+          claim_amount?: number
+          created_at?: string
+          created_by?: string | null
+          csa_basic?: string
+          description?: string
+          driver_id?: number | null
+          event_date: string
+          event_type: string
+          id?: never
+          location?: string
+          out_of_service?: boolean
+          preventable?: boolean
+          severity?: string
+          status?: string
+          truck_id?: number | null
+          updated_at?: string
+        }
+        Update: {
+          claim_amount?: number
+          created_at?: string
+          created_by?: string | null
+          csa_basic?: string
+          description?: string
+          driver_id?: number | null
+          event_date?: string
+          event_type?: string
+          id?: never
+          location?: string
+          out_of_service?: boolean
+          preventable?: boolean
+          severity?: string
+          status?: string
+          truck_id?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safety_events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_events_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_events_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       toll_transactions: {
         Row: {
           account_name: string
@@ -1769,6 +1872,10 @@ export type Database = {
         Args: { p_action: string; p_max: number; p_window?: string }
         Returns: boolean
       }
+      company_scorecard: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
+      }
       create_invoice: {
         Args: {
           p_customer_id: number
@@ -1901,6 +2008,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      safety_summary: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
       }
       sentinel_scan: { Args: never; Returns: Json }
       set_invoice_status: {
