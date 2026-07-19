@@ -11,8 +11,9 @@ plugins {
 }
 
 // Release signing — loaded from android/key.properties (gitignored, never
-// committed). When the file is absent (e.g. a fresh checkout, CI without the
-// keystore) the release build falls back to debug signing so it still builds.
+// committed). Release builds REQUIRE it: a missing file fails the build loudly
+// rather than silently shipping a debug-signed "release" (which would poison
+// the OTA chain — see RELEASES.md). Debug builds don't need it.
 // OTA REQUIRES a stable key: once the fleet has a release-signed build, this
 // keystore must never change or Android rejects the update.
 val keystoreProperties = Properties()
@@ -58,12 +59,17 @@ android {
 
     buildTypes {
         release {
-            // Use the release keystore when present, else fall back to debug so
-            // the build never breaks without it.
-            signingConfig = if (hasReleaseKeystore) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
+            if (hasReleaseKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            } else if (gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }) {
+                // Fail only when a release build was actually requested, so
+                // debug builds on a checkout without the keystore still work.
+                throw GradleException(
+                    "Release build requires android/key.properties (keystore for release " +
+                    "signing) and it was not found. Never ship a debug-signed release — it " +
+                    "breaks the OTA update chain. See RELEASES.md → 'Migrating to a real " +
+                    "keystore' for how to create the keystore and key.properties."
+                )
             }
         }
     }

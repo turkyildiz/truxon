@@ -36,10 +36,13 @@ export PATH="$HOME/dev-tools/flutter/bin:$PATH"
 cp "build/app/outputs/flutter-apk/app-release.apk" "build/app/outputs/flutter-apk/TruxCompanion.apk"
 APK="build/app/outputs/flutter-apk/TruxCompanion.apk"
 
-# 3) latest.json — apkUrl uses the stable /latest/ path so it always points here
+# 3) latest.json — apkUrl uses the stable /latest/ path so it always points
+# here. sha256 lets the app verify the download before installing; the app
+# refuses any APK that doesn't match (or a manifest without the field).
 APKURL="https://github.com/${REPO}/releases/latest/download/TruxCompanion.apk"
+SHA256=$(sha256sum "$APK" | cut -d' ' -f1)
 cat > /tmp/latest.json <<JSON
-{ "versionCode": ${newcode}, "versionName": "${name}", "apkUrl": "${APKURL}", "notes": "${NOTES//\"/\\\"}" }
+{ "versionCode": ${newcode}, "versionName": "${name}", "apkUrl": "${APKURL}", "sha256": "${SHA256}", "notes": "${NOTES//\"/\\\"}" }
 JSON
 
 # 4) publish the GitHub release with both assets
