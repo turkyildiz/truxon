@@ -1,14 +1,21 @@
 // Truxon incident responder — runs on the workstation via systemd timer.
 // When watchdog checks stay red past the playbook window, summon a headless
-// Claude Code session to investigate and fix (code/functions autonomous;
-// DB data/schema changes are proposed by email, never applied).
+// Claude Code session to INVESTIGATE (read-only) and email a diagnosis with
+// a proposed fix. It never edits, commits, or deploys on its own: the
+// watchdog endpoint is reachable with the public anon key, so a sustained
+// induced failure must not be able to summon an agent with write powers.
+//
+// RESPONDER_AUTOFIX=1 in responder.env opts back into autonomous fixing
+// (edits/redeploys/commits, still propose-only for DB data/schema). Only set
+// it understanding the above: autofix hands code execution to whatever
+// condition keeps the checks red.
 //
 // Needs NO privileged credentials: it reads health from the watchdog
 // function (anon) and reports back through the same function's report mode.
 //
 // Env (~/.config/truxon/responder.env):
 //   SUPABASE_URL, SUPABASE_ANON_KEY, WATCHDOG_REPORT_KEY,
-//   TRUXON_REPO (default /home/turkyildiz/TRUXON)
+//   TRUXON_REPO (default /home/turkyildiz/TRUXON), RESPONDER_AUTOFIX (0/1)
 //
 // Guarantees: at most one summon per SUMMON_COOLDOWN_MIN; a check must be
 // failing for at least FAIL_AGE_MIN (playbooks get their chance first).
@@ -30,6 +37,7 @@ const env = Object.fromEntries(
     .map((l) => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1).trim()]),
 )
 const REPO = env.TRUXON_REPO ?? '/home/turkyildiz/TRUXON'
+const AUTOFIX = env.RESPONDER_AUTOFIX === '1'
 mkdirSync(STATE_DIR, { recursive: true })
 
 const log = (m) => console.log(`[responder] ${new Date().toISOString()} ${m}`)
@@ -83,19 +91,24 @@ Supabase project ref okoeeyxxvzypjiumraxq; deploy edge functions with the
 SUPABASE_ACCESS_TOKEN env prefix form used throughout git history.
 
 YOUR MANDATE:
-1. Investigate the root cause. Check edge function behavior, reproduce if possible.
+${AUTOFIX
+    ? `1. Investigate the root cause. Check edge function behavior, reproduce if possible.
 2. AUTONOMOUS: code fixes, edge function redeploys, git commit+push, re-running the
    watchdog endpoint to verify recovery.
 3. PROPOSE-ONLY (never execute): production data changes (INSERT/UPDATE/DELETE on
    business tables), schema migrations, secrets changes, anything irreversible.
    Write proposed SQL/steps into your final summary instead.
-4. Do not touch: customer/load/invoice data, auth users, storage objects.
-5. Keep the investigation under ~15 minutes of work. If the cause is external
+4. Do not touch: customer/load/invoice data, auth users, storage objects.`
+    : `1. Investigate the root cause by READING the repo (code, docs, git history).
+2. You are read-only: do not edit files, run commands with side effects, deploy,
+   or commit. Diagnose and write the exact proposed fix (diff or steps) into
+   your final summary for the owner to apply.`}
+${AUTOFIX ? '5' : '3'}. Keep the investigation under ~15 minutes of work. If the cause is external
    (provider outage, platform incident), say so and stop — do not thrash.
-6. End with a short plain-language RESOLUTION section: what was wrong, what you did,
-   what (if anything) needs the owner.`
+${AUTOFIX ? '6' : '4'}. End with a short plain-language RESOLUTION section: what was wrong, what
+   ${AUTOFIX ? 'you did' : 'you propose'}, what (if anything) needs the owner.`
 
-log(`summoning Claude for: ${stubborn.map((c) => c.name).join(', ')}`)
+log(`summoning Claude (${AUTOFIX ? 'AUTOFIX' : 'read-only investigate'}) for: ${stubborn.map((c) => c.name).join(', ')}`)
 writeFileSync(lockFile, String(now))
 
 let claudeBin = ''
@@ -110,7 +123,12 @@ let sessionOut = ''
 let resolution = 'Responder could not run a Claude session (CLI missing on this machine).'
 if (claudeBin) {
   try {
-    sessionOut = execFileSync(claudeBin, ['-p', prompt, '--dangerously-skip-permissions'], {
+    // Read-only mode grants only inspection tools; nothing that mutates state.
+    // AUTOFIX (explicit owner opt-in) restores full-permission autonomy.
+    const claudeArgs = AUTOFIX
+      ? ['-p', prompt, '--dangerously-skip-permissions']
+      : ['-p', prompt, '--allowedTools', 'Read Glob Grep Bash(git log:*) Bash(git show:*) Bash(git diff:*)']
+    sessionOut = execFileSync(claudeBin, claudeArgs, {
       cwd: REPO,
       encoding: 'utf8',
       timeout: CLAUDE_TIMEOUT_MIN * 60000,
