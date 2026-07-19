@@ -47,6 +47,30 @@ export type Database = {
           },
         ]
       }
+      budgets: {
+        Row: {
+          amount: number
+          id: number
+          line: string
+          period_month: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          id?: never
+          line: string
+          period_month: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          id?: never
+          line?: string
+          period_month?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       companion_config: {
         Row: {
           flags: Json
@@ -764,6 +788,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      playbook_metrics: {
+        Row: {
+          category: string
+          definition: string
+          name: string
+          number: number
+          owner_role: string
+          source: string
+          status: string
+          target: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          definition?: string
+          name: string
+          number: number
+          owner_role?: string
+          source?: string
+          status?: string
+          target?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          definition?: string
+          name?: string
+          number?: number
+          owner_role?: string
+          source?: string
+          status?: string
+          target?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -1795,6 +1855,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      budget_variance: {
+        Args: { p_end: string; p_start: string }
+        Returns: {
+          actual: number
+          budget: number
+          line: string
+          variance: number
+          variance_pct: number
+        }[]
+      }
       cancel_load: {
         Args: { p_load_id: number; p_reason?: string }
         Returns: {
@@ -1988,6 +2058,27 @@ export type Database = {
       }
       next_invoice_number: { Args: never; Returns: string }
       next_load_number: { Args: never; Returns: string }
+      playbook_coverage: { Args: never; Returns: Json }
+      playbook_metrics_list: {
+        Args: { p_owner?: string; p_search?: string; p_status?: string }
+        Returns: {
+          category: string
+          definition: string
+          name: string
+          number: number
+          owner_role: string
+          source: string
+          status: string
+          target: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "playbook_metrics"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       pnl_summary: { Args: { p_end: string; p_start: string }; Returns: Json }
       replace_load_stops: {
         Args: { p_load_id: number; p_stops?: Json }
