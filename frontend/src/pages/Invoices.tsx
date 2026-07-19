@@ -1,9 +1,58 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Badge, Button, Card, Field, formatDate, LoadError, Modal, money, Select, Table } from '../components/ui'
-import { createInvoice, listCustomers, listInvoices, listLoads, setInvoiceStatus, voidInvoice } from '../data'
+import { createInvoice, listCustomers, listInvoices, listLoads, qboConnectUrl, qboStatus, setInvoiceStatus, triggerQboPull, voidInvoice } from '../data'
 import { downloadInvoicePdf } from '../invoicePdf'
 import { errorMessage } from '../supabase'
+
+/** QuickBooks connection card — renders only for admins (the RPC rejects
+ * everyone else). Transition mode: QBO stays the books of record and Truxon
+ * mirrors it, until the owner flips to Truxon-first invoicing. */
+function QboPanel() {
+  const qc = useQueryClient()
+  const q = useQuery({ queryKey: ['qbo-status'], queryFn: qboStatus, retry: false, refetchInterval: 120_000 })
+  const pull = useMutation({
+    mutationFn: triggerQboPull,
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['qbo-status'] })
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+    },
+  })
+  if (!q.data) return null // non-admin (RPC refused) or still loading
+  const s = q.data
+
+  async function connect() {
+    window.open(await qboConnectUrl(), '_blank', 'noopener')
+  }
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface p-3 text-sm">
+      <span className="font-semibold text-body">🧾 QuickBooks</span>
+      {s.connected ? (
+        <>
+          <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-xs font-semibold text-green-700 dark:text-green-300">Connected</span>
+          <span className="text-muted">
+            {s.qbo_invoices} invoices mirrored · {money(s.qbo_open_balance)} open
+            {s.last_pull_at && <> · synced {formatDate(s.last_pull_at)}</>}
+          </span>
+          {s.last_error && <span className="text-xs text-red-600 dark:text-red-300">⚠ {s.last_error.slice(0, 120)}</span>}
+          <button
+            onClick={() => pull.mutate()}
+            disabled={pull.isPending}
+            className="ml-auto rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-muted hover:text-body disabled:opacity-50"
+          >
+            {pull.isPending ? 'Syncing…' : 'Sync now'}
+          </button>
+        </>
+      ) : (
+        <>
+          <span className="text-muted">Mirror your QBO invoices into Truxon (AR truth, one entry point).</span>
+          <Button onClick={connect}>Connect QuickBooks</Button>
+        </>
+      )}
+    </div>
+  )
+}
 
 export default function Invoices() {
   const qc = useQueryClient()
@@ -74,6 +123,7 @@ export default function Invoices() {
 
   return (
     <Card title="Invoices" actions={<Button onClick={() => setCreating(true)}>+ Generate Invoice</Button>}>
+      <QboPanel />
       {pageError && <p className="mb-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-300">{pageError}</p>}
       {isLoading ? (
         <p className="py-8 text-center text-muted">Loading…</p>
@@ -85,14 +135,25 @@ export default function Invoices() {
         <Table headers={['Invoice #', 'Customer', 'Date', 'Loads', 'Total', 'Status', '']}>
           {invoices.map((inv) => (
             <tr key={inv.id} className="hover:bg-surface-2">
-              <td className="px-3 py-3 font-medium text-brand">{inv.invoice_number}</td>
+              <td className="px-3 py-3 font-medium text-brand">
+                {inv.source === 'qbo' ? `#${inv.qbo_doc_number}` : inv.invoice_number}
+                {inv.source === 'qbo' && (
+                  <span className="ml-2 rounded bg-indigo-500/15 px-1.5 py-0.5 text-xs font-semibold text-indigo-600 dark:text-indigo-300">QBO</span>
+                )}
+              </td>
               <td className="px-3 py-3">{inv.customer_name}</td>
               <td className="px-3 py-3">{formatDate(inv.invoice_date)}</td>
-              <td className="px-3 py-3">{inv.load_count}</td>
+              <td className="px-3 py-3">{inv.source === 'qbo' ? '—' : inv.load_count}</td>
               <td className="px-3 py-3 font-semibold">{money(inv.total)}</td>
               <td className="px-3 py-3">
                 <Badge status={inv.status} />
+                {inv.source === 'qbo' && inv.status === 'sent' && (inv.qbo_balance ?? 0) < inv.total && (
+                  <span className="ml-1 text-xs text-muted">{money(inv.qbo_balance ?? 0)} due</span>
+                )}
               </td>
+              {inv.source === 'qbo' ? (
+                <td className="px-3 py-3 text-right text-xs whitespace-nowrap text-muted">synced from QuickBooks</td>
+              ) : (
               <td className="px-3 py-3 text-right whitespace-nowrap">
                 <button onClick={() => pdf(inv.id)} className="mr-3 text-sm font-medium text-brand hover:underline">
                   PDF
@@ -122,6 +183,7 @@ export default function Invoices() {
                   </button>
                 )}
               </td>
+              )}
             </tr>
           ))}
         </Table>

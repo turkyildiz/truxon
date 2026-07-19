@@ -58,3 +58,8 @@ verify_jwt = false
 [functions.trux-tts]
 # premium voice: proxies ElevenLabs TTS; caller verified in-function via getCaller
 verify_jwt = false
+
+[functions.qbo-sync]
+# OAuth browser navigations (connect/callback) can't carry a JWT header;
+# every mode gates itself in-function (admin JWT / anon-cron / oauth state)
+verify_jwt = false

@@ -19,6 +19,7 @@ import type {
   FuelIftaRow,
   FuelImportResult,
   Invoice,
+  QboStatus,
   Load,
   LoadStatus,
   MaintenanceAlert,
@@ -389,6 +390,7 @@ type InvoiceRow = Tables<'invoices'> & {
 function mapInvoice({ customer, loads, ...invoice }: InvoiceRow): Invoice {
   return {
     ...invoice,
+    source: invoice.source as Invoice['source'],
     customer_name: customer?.company_name ?? null,
     load_count: loads.length,
   }
@@ -401,7 +403,7 @@ export async function listInvoices(): Promise<Invoice[]> {
 
 export async function createInvoice(customerId: number, loadIds: number[]): Promise<Invoice> {
   const invoice = unwrap(await supabase.rpc('create_invoice', { p_customer_id: customerId, p_load_ids: loadIds }))
-  return { ...invoice, customer_name: null, load_count: loadIds.length }
+  return { ...invoice, source: invoice.source as Invoice['source'], customer_name: null, load_count: loadIds.length }
 }
 
 export async function setInvoiceStatus(id: number, status: string): Promise<void> {
@@ -410,6 +412,25 @@ export async function setInvoiceStatus(id: number, status: string): Promise<void
 
 export async function voidInvoice(id: number): Promise<void> {
   unwrap(await supabase.rpc('void_invoice', { p_invoice_id: id }))
+}
+
+// ── QuickBooks sync (transition mode: QBO is the books of record) ───────────
+
+export async function qboStatus(): Promise<QboStatus> {
+  return unwrap(await supabase.rpc('qbo_status')) as unknown as QboStatus
+}
+
+/** Connect URL opens the OAuth consent in a new tab; the fn validates the JWT. */
+export async function qboConnectUrl(): Promise<string> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token ?? ''
+  return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/qbo-sync?mode=connect&token=${encodeURIComponent(token)}`
+}
+
+export async function triggerQboPull(): Promise<Record<string, number>> {
+  const { data, error } = await supabase.functions.invoke('qbo-sync', { body: { mode: 'pull' } })
+  if (error) throw error
+  return data as Record<string, number>
 }
 
 /** Invoice with its customer and full load rows — used for PDF generation. */

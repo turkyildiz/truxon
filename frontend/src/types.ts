@@ -253,6 +253,23 @@ export interface Invoice {
   total: number
   status: 'draft' | 'sent' | 'paid' | 'void'
   load_count: number
+  /** 'qbo' rows are mirrored from QuickBooks (books of record in transition mode) */
+  source: 'truxon' | 'qbo'
+  qbo_doc_number: string | null
+  qbo_balance: number | null
+}
+
+/** QuickBooks connection + sync status card (admin only). */
+export interface QboStatus {
+  connected: boolean
+  realm_id: string | null
+  connected_at: string | null
+  backfilled: boolean
+  last_pull_at: string | null
+  last_error: string | null
+  last_result: Record<string, number> | null
+  qbo_invoices: number
+  qbo_open_balance: number
 }
 
 export interface DocumentMeta {

@@ -135,6 +135,7 @@ export type Database = {
           notes: string
           payment_terms: string
           phone: string
+          qbo_id: string | null
           secondary_contact: string
           secondary_email: string
           secondary_phone: string
@@ -153,6 +154,7 @@ export type Database = {
           notes?: string
           payment_terms?: string
           phone?: string
+          qbo_id?: string | null
           secondary_contact?: string
           secondary_email?: string
           secondary_phone?: string
@@ -171,6 +173,7 @@ export type Database = {
           notes?: string
           payment_terms?: string
           phone?: string
+          qbo_id?: string | null
           secondary_contact?: string
           secondary_email?: string
           secondary_phone?: string
@@ -553,6 +556,11 @@ export type Database = {
           id: number
           invoice_date: string
           invoice_number: string
+          qbo_balance: number | null
+          qbo_doc_number: string | null
+          qbo_id: string | null
+          qbo_synced_at: string | null
+          source: string
           status: Database["public"]["Enums"]["invoice_status"]
           total: number
         }
@@ -563,6 +571,11 @@ export type Database = {
           id?: never
           invoice_date?: string
           invoice_number: string
+          qbo_balance?: number | null
+          qbo_doc_number?: string | null
+          qbo_id?: string | null
+          qbo_synced_at?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["invoice_status"]
           total?: number
         }
@@ -573,6 +586,11 @@ export type Database = {
           id?: never
           invoice_date?: string
           invoice_number?: string
+          qbo_balance?: number | null
+          qbo_doc_number?: string | null
+          qbo_id?: string | null
+          qbo_synced_at?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["invoice_status"]
           total?: number
         }
@@ -1056,6 +1074,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      qbo_connection: {
+        Row: {
+          access_expires_at: string
+          access_token: string
+          connected_at: string
+          id: number
+          oauth_state: string | null
+          realm_id: string
+          refresh_expires_at: string
+          refresh_token: string
+        }
+        Insert: {
+          access_expires_at: string
+          access_token: string
+          connected_at?: string
+          id?: number
+          oauth_state?: string | null
+          realm_id: string
+          refresh_expires_at: string
+          refresh_token: string
+        }
+        Update: {
+          access_expires_at?: string
+          access_token?: string
+          connected_at?: string
+          id?: number
+          oauth_state?: string | null
+          realm_id?: string
+          refresh_expires_at?: string
+          refresh_token?: string
+        }
+        Relationships: []
+      }
+      qbo_sync_state: {
+        Row: {
+          backfilled: boolean
+          id: number
+          last_cdc: string | null
+          last_error: string | null
+          last_pull_at: string | null
+          last_result: Json | null
+        }
+        Insert: {
+          backfilled?: boolean
+          id?: number
+          last_cdc?: string | null
+          last_error?: string | null
+          last_pull_at?: string | null
+          last_result?: Json | null
+        }
+        Update: {
+          backfilled?: boolean
+          id?: number
+          last_cdc?: string | null
+          last_error?: string | null
+          last_pull_at?: string | null
+          last_result?: Json | null
+        }
+        Relationships: []
       }
       rate_limit_events: {
         Row: {
@@ -1568,6 +1646,7 @@ export type Database = {
           first_seen: string
           id: number
           last_seen: string
+          notified_at: string | null
           resolved_at: string | null
           severity: string
           status: string
@@ -1584,6 +1663,7 @@ export type Database = {
           first_seen?: string
           id?: never
           last_seen?: string
+          notified_at?: string | null
           resolved_at?: string | null
           severity: string
           status?: string
@@ -1600,6 +1680,7 @@ export type Database = {
           first_seen?: string
           id?: never
           last_seen?: string
+          notified_at?: string | null
           resolved_at?: string | null
           severity?: string
           status?: string
@@ -1994,6 +2075,7 @@ export type Database = {
           first_seen: string
           id: number
           last_seen: string
+          notified_at: string | null
           resolved_at: string | null
           severity: string
           status: string
@@ -2132,6 +2214,11 @@ export type Database = {
           id: number
           invoice_date: string
           invoice_number: string
+          qbo_balance: number | null
+          qbo_doc_number: string | null
+          qbo_id: string | null
+          qbo_synced_at: string | null
+          source: string
           status: Database["public"]["Enums"]["invoice_status"]
           total: number
         }
@@ -2346,6 +2433,9 @@ export type Database = {
         }
       }
       pnl_summary: { Args: { p_end: string; p_start: string }; Returns: Json }
+      qbo_mark_voided: { Args: { p_qbo_ids: Json }; Returns: number }
+      qbo_status: { Args: never; Returns: Json }
+      qbo_upsert_invoices: { Args: { p_rows: Json }; Returns: Json }
       replace_load_stops: {
         Args: { p_load_id: number; p_stops?: Json }
         Returns: {
@@ -2370,7 +2460,34 @@ export type Database = {
         Args: { p_end: string; p_start: string }
         Returns: Json
       }
+      sentinel_open_summary: { Args: never; Returns: Json }
       sentinel_scan: { Args: never; Returns: Json }
+      sentinel_take_alerts: {
+        Args: never
+        Returns: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          category: string
+          dedup_key: string
+          detail: string
+          entity_id: number | null
+          entity_type: string
+          first_seen: string
+          id: number
+          last_seen: string
+          notified_at: string | null
+          resolved_at: string | null
+          severity: string
+          status: string
+          title: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "trux_insights"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       set_invoice_status: {
         Args: {
           p_invoice_id: number
@@ -2383,6 +2500,11 @@ export type Database = {
           id: number
           invoice_date: string
           invoice_number: string
+          qbo_balance: number | null
+          qbo_doc_number: string | null
+          qbo_id: string | null
+          qbo_synced_at: string | null
+          source: string
           status: Database["public"]["Enums"]["invoice_status"]
           total: number
         }
@@ -2425,6 +2547,7 @@ export type Database = {
           first_seen: string
           id: number
           last_seen: string
+          notified_at: string | null
           resolved_at: string | null
           severity: string
           status: string
