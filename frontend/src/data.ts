@@ -21,7 +21,16 @@ import type {
   Invoice,
   Load,
   LoadStatus,
+  MaintenanceAlert,
+  MaintenanceByTruckRow,
+  MaintenanceByVendorRow,
+  MaintenanceCpm,
+  MaintenanceDueRow,
   MaintenanceRecord,
+  MaintenanceSummary,
+  MaintenanceVendor,
+  FleetOdometerRow,
+  PmProgram,
   Profile,
   SearchResults,
   TollByAgencyRow,
@@ -155,10 +164,12 @@ type MaintenanceRow = Tables<'maintenance_records'> & {
 }
 
 function mapMaintenance({ truck, trailer, ...row }: MaintenanceRow): MaintenanceRecord {
+  // `source` is a text+check column (codegen types it as string); cast the
+  // mapped row to the domain union at this boundary.
   return {
     ...row,
     equipment_unit: row.equipment_type === 'truck' ? truck?.unit_number ?? null : trailer?.unit_number ?? null,
-  }
+  } as MaintenanceRecord
 }
 
 export async function listMaintenance(): Promise<MaintenanceRecord[]> {
@@ -178,6 +189,76 @@ export async function updateMaintenance(id: number, payload: Row): Promise<Maint
   return mapMaintenance(
     unwrap(await supabase.from('maintenance_records').update(payload as TablesUpdate<'maintenance_records'>).eq('id', id).select(MAINTENANCE_SELECT).single()),
   )
+}
+
+// ---------- Maintenance: vendors & PM programs ----------
+
+export const vendorsApi = {
+  async list(): Promise<MaintenanceVendor[]> {
+    return unwrap(await supabase.from('maintenance_vendors').select('*').order('name'))
+  },
+  async create(payload: Row): Promise<MaintenanceVendor> {
+    return unwrap(await supabase.from('maintenance_vendors').insert(payload as TablesInsert<'maintenance_vendors'>).select().single())
+  },
+  async update(id: number, payload: Row): Promise<MaintenanceVendor> {
+    return unwrap(await supabase.from('maintenance_vendors').update(payload as TablesUpdate<'maintenance_vendors'>).eq('id', id).select().single())
+  },
+}
+
+export const pmProgramsApi = {
+  // applies_to is a text+check column (codegen types it as string), so cast to
+  // the PmProgram union at this boundary — same pattern as the RPC wrappers.
+  async list(): Promise<PmProgram[]> {
+    return unwrap(await supabase.from('pm_programs').select('*').order('name')) as unknown as PmProgram[]
+  },
+  async create(payload: Row): Promise<PmProgram> {
+    return unwrap(await supabase.from('pm_programs').insert(payload as TablesInsert<'pm_programs'>).select().single()) as unknown as PmProgram
+  },
+  async update(id: number, payload: Row): Promise<PmProgram> {
+    return unwrap(await supabase.from('pm_programs').update(payload as TablesUpdate<'pm_programs'>).eq('id', id).select().single()) as unknown as PmProgram
+  },
+}
+
+// ---------- Maintenance: engine & analytics (RPCs) ----------
+
+/** Unified "needs attention" feed: PM/inspection due + plate expiry + stale WOs. */
+export async function maintenanceAlerts(): Promise<MaintenanceAlert[]> {
+  const data = unwrap(await supabase.rpc('maintenance_alerts'))
+  return (data as unknown as MaintenanceAlert[]) ?? []
+}
+
+/** Per-unit PM/inspection status board (miles/days remaining, due_status). */
+export async function maintenanceDue(): Promise<MaintenanceDueRow[]> {
+  const data = unwrap(await supabase.rpc('maintenance_due'))
+  return (data as unknown as MaintenanceDueRow[]) ?? []
+}
+
+/** Current odometer per truck from the fuel-card readings, with reading date. */
+export async function fleetOdometers(): Promise<FleetOdometerRow[]> {
+  const data = unwrap(await supabase.rpc('fleet_odometers'))
+  return (data as unknown as FleetOdometerRow[]) ?? []
+}
+
+/** Command-center rollup: spend split, PM compliance, deadlined %, top units. */
+export async function maintenanceSummary(start: string, end: string): Promise<MaintenanceSummary> {
+  return unwrap(await supabase.rpc('maintenance_summary', { p_start: start, p_end: end })) as unknown as MaintenanceSummary
+}
+
+/** Fleet Maintenance CPM & Tire CPM over the range (playbook #29/#31). */
+export async function maintenanceCpm(start: string, end: string): Promise<MaintenanceCpm> {
+  return unwrap(await supabase.rpc('maintenance_cpm', { p_start: start, p_end: end })) as unknown as MaintenanceCpm
+}
+
+/** Maintenance cost + CPM per truck over the range (server sorts by cost desc). */
+export async function maintenanceByTruck(start: string, end: string): Promise<MaintenanceByTruckRow[]> {
+  const data = unwrap(await supabase.rpc('maintenance_by_truck', { p_start: start, p_end: end }))
+  return (data as unknown as MaintenanceByTruckRow[]) ?? []
+}
+
+/** Maintenance spend per shop/vendor over the range. */
+export async function maintenanceByVendor(start: string, end: string): Promise<MaintenanceByVendorRow[]> {
+  const data = unwrap(await supabase.rpc('maintenance_by_vendor', { p_start: start, p_end: end }))
+  return (data as unknown as MaintenanceByVendorRow[]) ?? []
 }
 
 // ---------- Loads ----------
@@ -717,6 +798,34 @@ export async function extractCustomerPdf(file: File, pageImages: Blob[] = []): P
   form.append('mode', 'customer')
   pageImages.forEach((img, i) => form.append(`page${i}`, new File([img], `page${i}.jpg`, { type: 'image/jpeg' })))
   return invokeFunction<CustomerExtract>('extract-pdf', { body: form })
+}
+
+/** Maintenance work-order / shop-invoice extraction (Maintenance add-from-sheet)
+ * — same function and rate limit, work_order prompt. A photo (image file) is
+ * also sent as page0 so the vision model handles it. */
+export interface WorkOrderExtract {
+  raw_text: string
+  fields: {
+    unit_number?: string | null
+    vin?: string | null
+    service_type?: string | null
+    description?: string | null
+    cost?: number | string | null
+    odometer?: number | string | null
+    date?: string | null
+    vendor?: string | null
+    invoice_ref?: string | null
+  } | null
+  needs_images?: boolean
+  error: string | null
+}
+
+export async function extractWorkOrderSheet(file: File): Promise<WorkOrderExtract> {
+  const form = new FormData()
+  form.append('mode', 'work_order')
+  form.append('file', file)
+  if (file.type.startsWith('image/')) form.append('page0', file)
+  return invokeFunction<WorkOrderExtract>('extract-pdf', { body: form })
 }
 
 export async function calculateDistance(

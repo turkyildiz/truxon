@@ -30,15 +30,18 @@ fabricates a number.**
 
 | status | count |
 |---|---|
-| live | 68 |
+| live | 75 |
 | external | 44 |
 | qualitative | 18 |
-| needs_data | 870 |
+| needs_data | 863 |
 | **total** | **1,000** |
 
 Live today: the exec **scorecard** (~40 financial/ops/revenue/maintenance
 metrics), the **safety** module (accidents/OOS/HOS/claims), **fuel & toll**
-analytics, and P&L **budget variance**.
+analytics, P&L **budget variance**, and the **maintenance** module —
+Maintenance CPM, Tire CPM, PM Compliance %, and Deadlined Tractors %, backed by
+a real PM/inspection due engine (mileage from the fuel-card odometer) and the
+Sentinel's overdue-PM / repeat-breakdown / stale-work-order alerts.
 
 ## Instrumentation roadmap (biggest converters first)
 

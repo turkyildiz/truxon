@@ -743,10 +743,20 @@ export type Database = {
           description: string
           equipment_type: Database["public"]["Enums"]["equipment_type"]
           id: number
+          invoice_ref: string
+          is_planned: boolean
+          needs_review: boolean
+          odometer: number | null
+          pm_program_id: number | null
+          scheduled_date: string | null
+          service_type: Database["public"]["Enums"]["maintenance_service_type"]
+          source: string
+          status: Database["public"]["Enums"]["maintenance_status"]
           technician_shop: string
           trailer_id: number | null
           truck_id: number | null
           updated_at: string
+          vendor_id: number | null
         }
         Insert: {
           cost?: number
@@ -755,10 +765,20 @@ export type Database = {
           description?: string
           equipment_type: Database["public"]["Enums"]["equipment_type"]
           id?: never
+          invoice_ref?: string
+          is_planned?: boolean
+          needs_review?: boolean
+          odometer?: number | null
+          pm_program_id?: number | null
+          scheduled_date?: string | null
+          service_type?: Database["public"]["Enums"]["maintenance_service_type"]
+          source?: string
+          status?: Database["public"]["Enums"]["maintenance_status"]
           technician_shop?: string
           trailer_id?: number | null
           truck_id?: number | null
           updated_at?: string
+          vendor_id?: number | null
         }
         Update: {
           cost?: number
@@ -767,12 +787,29 @@ export type Database = {
           description?: string
           equipment_type?: Database["public"]["Enums"]["equipment_type"]
           id?: never
+          invoice_ref?: string
+          is_planned?: boolean
+          needs_review?: boolean
+          odometer?: number | null
+          pm_program_id?: number | null
+          scheduled_date?: string | null
+          service_type?: Database["public"]["Enums"]["maintenance_service_type"]
+          source?: string
+          status?: Database["public"]["Enums"]["maintenance_status"]
           technician_shop?: string
           trailer_id?: number | null
           truck_id?: number | null
           updated_at?: string
+          vendor_id?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "maintenance_records_pm_program_id_fkey"
+            columns: ["pm_program_id"]
+            isOneToOne: false
+            referencedRelation: "pm_programs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "maintenance_records_trailer_id_fkey"
             columns: ["trailer_id"]
@@ -787,7 +824,53 @@ export type Database = {
             referencedRelation: "trucks"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "maintenance_records_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_vendors"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      maintenance_vendors: {
+        Row: {
+          city: string
+          created_at: string
+          id: number
+          is_active: boolean
+          name: string
+          notes: string
+          phone: string
+          specialty: string
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          city?: string
+          created_at?: string
+          id?: never
+          is_active?: boolean
+          name: string
+          notes?: string
+          phone?: string
+          specialty?: string
+          state?: string
+          updated_at?: string
+        }
+        Update: {
+          city?: string
+          created_at?: string
+          id?: never
+          is_active?: boolean
+          name?: string
+          notes?: string
+          phone?: string
+          specialty?: string
+          state?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       playbook_metrics: {
         Row: {
@@ -821,6 +904,45 @@ export type Database = {
           source?: string
           status?: string
           target?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pm_programs: {
+        Row: {
+          applies_to: string
+          created_at: string
+          id: number
+          interval_days: number | null
+          interval_miles: number | null
+          is_active: boolean
+          name: string
+          notes: string
+          service_type: Database["public"]["Enums"]["maintenance_service_type"]
+          updated_at: string
+        }
+        Insert: {
+          applies_to?: string
+          created_at?: string
+          id?: never
+          interval_days?: number | null
+          interval_miles?: number | null
+          is_active?: boolean
+          name: string
+          notes?: string
+          service_type?: Database["public"]["Enums"]["maintenance_service_type"]
+          updated_at?: string
+        }
+        Update: {
+          applies_to?: string
+          created_at?: string
+          id?: never
+          interval_days?: number | null
+          interval_miles?: number | null
+          is_active?: boolean
+          name?: string
+          notes?: string
+          service_type?: Database["public"]["Enums"]["maintenance_service_type"]
           updated_at?: string
         }
         Relationships: []
@@ -1969,6 +2091,8 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_work_order_draft: { Args: { p: Json }; Returns: number }
+      current_odometer: { Args: { p_truck_id: number }; Returns: number }
       dashboard_summary: { Args: never; Returns: Json }
       driver_add_document: {
         Args: {
@@ -2010,6 +2134,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      fleet_odometers: {
+        Args: never
+        Returns: {
+          odometer: number
+          reading_date: string
+          truck_id: number
+          unit_number: string
+        }[]
+      }
       fleet_positions_snapshot: { Args: never; Returns: Json }
       fuel_by_truck: {
         Args: { p_end: string; p_start: string }
@@ -2050,6 +2183,71 @@ export type Database = {
       llm_reserve_spend: {
         Args: { p_cents: number; p_provider: string }
         Returns: boolean
+      }
+      maintenance_alerts: {
+        Args: never
+        Returns: {
+          category: string
+          detail: string
+          due_date: string
+          equipment_type: string
+          kind: string
+          label: string
+          severity: string
+          unit_id: number
+          unit_number: string
+        }[]
+      }
+      maintenance_by_truck: {
+        Args: { p_end: string; p_start: string }
+        Returns: {
+          cpm: number
+          events: number
+          planned_cost: number
+          reactive_cost: number
+          total_cost: number
+          truck_id: number
+          unit_number: string
+          window_miles: number
+        }[]
+      }
+      maintenance_by_vendor: {
+        Args: { p_end: string; p_start: string }
+        Returns: {
+          events: number
+          planned_cost: number
+          total_cost: number
+          vendor: string
+        }[]
+      }
+      maintenance_cpm: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
+      }
+      maintenance_due: {
+        Args: never
+        Returns: {
+          current_odometer: number
+          days_remaining: number
+          days_since: number
+          due_status: string
+          equipment_type: string
+          interval_days: number
+          interval_miles: number
+          last_service_date: string
+          last_service_odometer: number
+          miles_remaining: number
+          miles_since: number
+          program_id: number
+          program_name: string
+          service_type: string
+          unit_id: number
+          unit_number: string
+        }[]
+      }
+      maintenance_summary: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
       }
       my_driver_id: { Args: never; Returns: number }
       my_role: {
@@ -2250,6 +2448,25 @@ export type Database = {
         | "delivered"
         | "completed"
         | "billed"
+        | "cancelled"
+      maintenance_service_type:
+        | "pm_service"
+        | "oil_lube"
+        | "tires"
+        | "brakes"
+        | "engine"
+        | "drivetrain"
+        | "electrical"
+        | "cooling"
+        | "aftertreatment"
+        | "dot_inspection"
+        | "bodywork"
+        | "roadside"
+        | "other"
+      maintenance_status:
+        | "scheduled"
+        | "in_progress"
+        | "completed"
         | "cancelled"
       user_role:
         | "admin"
@@ -2940,6 +3157,27 @@ export const Constants = {
         "delivered",
         "completed",
         "billed",
+        "cancelled",
+      ],
+      maintenance_service_type: [
+        "pm_service",
+        "oil_lube",
+        "tires",
+        "brakes",
+        "engine",
+        "drivetrain",
+        "electrical",
+        "cooling",
+        "aftertreatment",
+        "dot_inspection",
+        "bodywork",
+        "roadside",
+        "other",
+      ],
+      maintenance_status: [
+        "scheduled",
+        "in_progress",
+        "completed",
         "cancelled",
       ],
       user_role: ["admin", "dispatcher", "driver", "accountant", "maintenance"],

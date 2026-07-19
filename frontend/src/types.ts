@@ -63,16 +63,148 @@ export interface Equipment {
   status: 'available' | 'in_use' | 'maintenance' | 'retired'
 }
 
+export type MaintenanceServiceType =
+  | 'pm_service' | 'oil_lube' | 'tires' | 'brakes' | 'engine' | 'drivetrain'
+  | 'electrical' | 'cooling' | 'aftertreatment' | 'dot_inspection' | 'bodywork'
+  | 'roadside' | 'other'
+
+export type MaintenanceStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+
+/** Human labels for the service-type enum (used in dropdowns and tables). */
+export const SERVICE_TYPE_LABELS: Record<MaintenanceServiceType, string> = {
+  pm_service: 'PM Service', oil_lube: 'Oil & Lube', tires: 'Tires', brakes: 'Brakes',
+  engine: 'Engine', drivetrain: 'Drivetrain', electrical: 'Electrical', cooling: 'Cooling',
+  aftertreatment: 'Aftertreatment/DEF', dot_inspection: 'DOT Inspection', bodywork: 'Body/Trailer',
+  roadside: 'Roadside', other: 'Other',
+}
+
 export interface MaintenanceRecord {
   id: number
   equipment_type: 'truck' | 'trailer'
   truck_id: number | null
   trailer_id: number | null
   date_completed: string | null
+  scheduled_date: string | null
+  service_type: MaintenanceServiceType
+  status: MaintenanceStatus
+  is_planned: boolean
+  odometer: number | null
+  vendor_id: number | null
+  invoice_ref: string
+  pm_program_id: number | null
   description: string
   cost: number
   technician_shop: string
+  source: 'manual' | 'email' | 'api'
+  needs_review: boolean
   equipment_unit: string | null
+}
+
+export interface MaintenanceVendor {
+  id: number
+  name: string
+  phone: string
+  city: string
+  state: string
+  specialty: string
+  notes: string
+  is_active: boolean
+}
+
+export interface PmProgram {
+  id: number
+  name: string
+  applies_to: 'truck' | 'trailer' | 'all'
+  service_type: MaintenanceServiceType
+  interval_miles: number | null
+  interval_days: number | null
+  is_active: boolean
+  notes: string
+}
+
+export type DueStatus = 'overdue' | 'due_soon' | 'ok' | 'never_serviced' | 'unknown'
+
+export interface MaintenanceAlert {
+  kind: 'pm' | 'plate' | 'open_wo'
+  severity: 'overdue' | 'due_soon' | 'info'
+  equipment_type: string
+  unit_id: number | null
+  unit_number: string | null
+  label: string
+  detail: string
+  due_date: string | null
+  category: string
+}
+
+export interface MaintenanceDueRow {
+  equipment_type: string
+  unit_id: number
+  unit_number: string
+  program_id: number
+  program_name: string
+  service_type: string
+  interval_miles: number | null
+  interval_days: number | null
+  last_service_date: string | null
+  last_service_odometer: number | null
+  current_odometer: number | null
+  miles_since: number | null
+  days_since: number | null
+  miles_remaining: number | null
+  days_remaining: number | null
+  due_status: DueStatus
+}
+
+export interface MaintenanceByTruckRow {
+  truck_id: number
+  unit_number: string
+  events: number
+  planned_cost: number
+  reactive_cost: number
+  total_cost: number
+  window_miles: number | null
+  cpm: number | null
+}
+
+export interface MaintenanceByVendorRow {
+  vendor: string
+  events: number
+  total_cost: number
+  planned_cost: number
+}
+
+export interface FleetOdometerRow {
+  truck_id: number
+  unit_number: string
+  odometer: number | null
+  reading_date: string | null
+}
+
+export interface MaintenanceSummary {
+  window: { start: string; end: string }
+  events: number
+  total_cost: number
+  planned_cost: number
+  reactive_cost: number
+  planned_pct: number | null
+  units_in_shop: number
+  deadlined_tractor_pct: number | null
+  open_work_orders: number
+  pm_compliance_pct: number | null
+  by_service: { service_type: string; cost: number; events: number }[]
+  top_units: { unit_number: string; total_cost: number; cpm: number | null }[]
+}
+
+export interface MaintenanceCpm {
+  window: { start: string; end: string }
+  total_miles: number
+  maintenance_cost: number
+  maintenance_cpm: number | null
+  tire_cost: number
+  tire_cpm: number | null
+  planned_cost: number
+  reactive_cost: number
+  planned_pct: number | null
 }
 
 export type LoadStatus = 'pending' | 'assigned' | 'in_transit' | 'delivered' | 'completed' | 'billed' | 'cancelled'
