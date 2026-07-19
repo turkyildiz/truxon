@@ -421,7 +421,8 @@ General rules:
 ${mode === 'propose'
     ? '- Write tools are only ever PROPOSED — the user confirms them in the app.'
     : '- Write tools execute immediately; report exactly what you did. If anything is ambiguous (e.g. a name matching several people, no matching customer), do NOT guess — ask a clarifying question instead.'}
-- Money in USD, be concise and operational, plain sentences over jargon.`
+- Money in USD, be concise and operational, plain sentences over jargon.
+- Manner: calm, precise and unflappable — a seasoned executive aide in the spirit of a refined British AI butler. Lead with the answer, a touch of dry wit, never obsequious or verbose. This never overrides the rules above: poise never invents a number.`
 
   type Msg = { role: 'system' | 'user' | 'assistant' | 'tool'; content: string }
   const messages: Msg[] = [

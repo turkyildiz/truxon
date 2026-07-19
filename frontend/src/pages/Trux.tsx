@@ -88,6 +88,49 @@ const RECOGNITION_CTOR: SpeechRecognitionCtor | undefined =
 const SYNTH_OK = typeof window !== 'undefined' && 'speechSynthesis' in window
 const STT_OK = RECOGNITION_CTOR != null
 
+// A calm, refined British male voice — the closest a legal, built-in system
+// voice gets to a JARVIS-style assistant (no cloning of any real/fictional
+// performance). Picks the best available voice; browsers expose different sets,
+// so we score by name then fall back to any en-GB, then any English male.
+const PREFERRED_VOICES = [
+  'google uk english male', 'daniel', 'arthur', 'oliver', 'microsoft george',
+  'microsoft ryan', 'microsoft george online', 'rishi', 'ryan',
+]
+const MALE_HINTS = ['male', 'daniel', 'george', 'ryan', 'james', 'arthur', 'oliver', 'thomas', 'guy', 'david', 'mark', 'fred', 'albert', 'rishi']
+const FEMALE_HINTS = ['female', 'samantha', 'victoria', 'karen', 'moira', 'tessa', 'fiona', 'serena', 'kate', 'hazel', 'susan', 'zira', 'sonia', 'libby', 'catherine', 'emily', 'amelie']
+
+let cachedVoice: SpeechSynthesisVoice | null = null
+function chooseVoice(): SpeechSynthesisVoice | null {
+  if (!SYNTH_OK) return null
+  const voices = window.speechSynthesis.getVoices()
+  if (!voices.length) return null
+  const named = (n: string) => voices.find((v) => v.name.toLowerCase().includes(n))
+  for (const p of PREFERRED_VOICES) {
+    const v = named(p)
+    if (v) return v
+  }
+  const gb = voices.filter((v) => v.lang.toLowerCase().startsWith('en-gb'))
+  const has = (v: SpeechSynthesisVoice, hints: string[]) => hints.some((h) => v.name.toLowerCase().includes(h))
+  return (
+    gb.find((v) => has(v, MALE_HINTS)) ??
+    gb.find((v) => !has(v, FEMALE_HINTS)) ??
+    voices.find((v) => v.lang.toLowerCase().startsWith('en') && has(v, MALE_HINTS)) ??
+    gb[0] ??
+    voices.find((v) => v.lang.toLowerCase().startsWith('en')) ??
+    null
+  )
+}
+function jarvisVoice(): SpeechSynthesisVoice | null {
+  if (!cachedVoice) cachedVoice = chooseVoice()
+  return cachedVoice
+}
+if (SYNTH_OK) {
+  window.speechSynthesis.getVoices() // kick off async voice loading
+  window.speechSynthesis.addEventListener?.('voiceschanged', () => {
+    cachedVoice = chooseVoice()
+  })
+}
+
 export default function Trux() {
   const qc = useQueryClient()
   const [sessionId, setSessionId] = useState<string | null>(store.sessionId)
@@ -198,7 +241,14 @@ export default function Trux() {
       return
     }
     const u = new SpeechSynthesisUtterance(spoken)
-    u.rate = 1.05
+    // JARVIS-ish delivery: a British male voice, measured pace, lower pitch.
+    const v = jarvisVoice()
+    if (v) {
+      u.voice = v
+      u.lang = v.lang
+    }
+    u.rate = 0.97
+    u.pitch = 0.9
     const done = () => {
       if (resume && handsFreeRef.current) startListeningRef.current()
       else if (phaseRef.current === 'speaking') setPhase('idle')
