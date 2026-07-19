@@ -48,10 +48,15 @@ echo "[3/3] Pruning backups older than ${RETENTION_DAYS} days…"
 find "$BACKUP_DIR" -name '*.gpg' -mtime "+${RETENTION_DAYS}" -delete
 
 # Tell the watchdog this run completed — it alarms if no heartbeat lands in 26h.
-# Needs SUPABASE_URL (already required) + WATCHDOG_REPORT_KEY in the env file.
-if [[ -n "${WATCHDOG_REPORT_KEY:-}" ]]; then
+# The function has verify_jwt on (like the cron caller), so we must send the anon
+# key as the platform Authorization header; the function then does its own
+# WATCHDOG_REPORT_KEY check on the body. Needs SUPABASE_URL + SUPABASE_ANON_KEY +
+# WATCHDOG_REPORT_KEY in the env file.
+if [[ -n "${WATCHDOG_REPORT_KEY:-}" && -n "${SUPABASE_ANON_KEY:-}" ]]; then
   db_size="$(du -h "$BACKUP_DIR/db_${STAMP}.dump.gpg" 2>/dev/null | cut -f1)"
   curl -fsS -m 20 -X POST "${SUPABASE_URL}/functions/v1/watchdog" \
+    -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+    -H "apikey: ${SUPABASE_ANON_KEY}" \
     -H 'Content-Type: application/json' \
     -d "$(printf '{"heartbeat":"backup","key":"%s","detail":"db_%s (%s)"}' "$WATCHDOG_REPORT_KEY" "$STAMP" "${db_size:-?}")" \
     >/dev/null 2>&1 || echo "  (heartbeat ping failed — backup itself is fine)"

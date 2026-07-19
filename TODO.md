@@ -13,9 +13,16 @@ Ordered by risk. ✅ confirmed · ⬜ open (in our hands) · 🔶 needs Ilker / 
       row-count sanity check. Biggest silent risk.
 - 🔶 **Staff accounts + roles** — create each user with the correct role; drivers
       also need the mobile app installed (blocked on the keystore below).
-- 🔶 **Verified backups** — `deploy/backup/{backup.sh,restore_test.sh,storage_backup.py}`
-      exist but deployment is parked on NAS access. Need one nightly backup + a
-      real restore test before launch.
+- ✅ **Verified backups** — deployed on the NAS (2026-07-19). A `truxon-scheduler`
+      Docker container (busybox crond via the docker socket; host cron needs root
+      we don't have) runs the hardened `deploy/backup/*` scripts: nightly encrypted
+      backup 02:00 CST + weekly restore test Sun 04:00 CST. Verified end-to-end —
+      full backup (662K DB dump + 872M storage archive, 2,463 objects across
+      documents/personal/team) AND a restore test that PASSED (5 profiles / 984
+      loads / 203 customers / 2,457 docs into a throwaway Postgres). Watchdog
+      `backup_fresh` heartbeat now green (WATCHDOG_REPORT_KEY rotated + anon bearer).
+      Fixed two real script bugs in the process (storage URL-encode; heartbeat auth
+      header) — see below. Old broken-storage container retired.
 - ⬜ **Outbound email deliverability** — invoices + Trux replies send from the
       domain; verify SPF/DKIM/DMARC and send a test to an external inbox so they
       don't spam-file.

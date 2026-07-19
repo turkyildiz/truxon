@@ -13,6 +13,7 @@ import os
 import sys
 import tarfile
 import time
+import urllib.parse
 import urllib.request
 
 BASE = os.environ["SUPABASE_URL"].rstrip("/")
@@ -63,7 +64,10 @@ def main() -> None:
                 continue
             print(f"backing up {len(paths)} objects from {bucket}", file=sys.stderr)
             for path in paths:
-                data = request(f"{BASE}/storage/v1/object/{bucket}/{path}")
+                # Object names can contain spaces, (), #, … — percent-encode each
+                # path segment (keep the / separators) or urllib rejects the URL.
+                enc = urllib.parse.quote(path, safe="/")
+                data = request(f"{BASE}/storage/v1/object/{bucket}/{enc}")
                 info = tarfile.TarInfo(name=f"{bucket}/{path}")
                 info.size = len(data)
                 info.mtime = int(time.time())
