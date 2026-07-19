@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'session_store.dart';
 
 final _sb = Supabase.instance.client;
 
@@ -43,12 +44,9 @@ class CompanionApi {
     await _sb.rpc('driver_set_duty', params: {'p_on_duty': onDuty});
   }
 
-  Future<Map<String, dynamic>> ingestPositions(List<Map<String, dynamic>> points) async {
-    final data = await _sb.rpc('ingest_vehicle_positions', params: {
-      'p_points': points,
-    });
-    return Map<String, dynamic>.from(data as Map);
-  }
+  // NOTE: no ingest_vehicle_positions wrapper here on purpose — the tracking
+  // isolate posts to that RPC over raw REST (Supabase.instance never exists
+  // in that isolate), and one ingest path is enough.
 
   Future<List<Map<String, dynamic>>> listDocuments(int loadId) async {
     final data = await _sb.rpc('driver_list_documents', params: {'p_load_id': loadId});
@@ -127,6 +125,23 @@ class CompanionApi {
     });
   }
 
+  /// Hand the current access token to the background GPS isolate, refreshing
+  /// it first if it went stale while the app was backgrounded. UI isolate
+  /// only — the tracker deliberately never refreshes tokens itself (see
+  /// [SessionStore] for why). Called on app resume and whenever the tracker
+  /// reports auth failures, so queued fixes flush on the next tick.
+  Future<void> pushFreshTokenToTracker() async {
+    var session = _sb.auth.currentSession;
+    if (session == null) return;
+    if (session.isExpired) {
+      try {
+        await _sb.auth.refreshSession();
+      } catch (_) {/* offline — the next resume/report tries again */}
+      session = _sb.auth.currentSession;
+    }
+    await SessionStore.saveAccessToken(session?.accessToken);
+  }
+
   Future<void> signOut() => _sb.auth.signOut();
 }
 
@@ -139,4 +154,22 @@ class OfflineOutbox {
   }
 
   static String encode(List<Map<String, dynamic>> items) => jsonEncode(items);
+
+  /// Replay [items] oldest-first through [send]. Returns the ones that still
+  /// failed, preserving their original order for the next attempt — one
+  /// failure doesn't stop later items from being tried.
+  static Future<List<Map<String, dynamic>>> replay(
+    List<Map<String, dynamic>> items,
+    Future<void> Function(Map<String, dynamic> item) send,
+  ) async {
+    final remaining = <Map<String, dynamic>>[];
+    for (final item in items) {
+      try {
+        await send(item);
+      } catch (_) {
+        remaining.add(item);
+      }
+    }
+    return remaining;
+  }
 }

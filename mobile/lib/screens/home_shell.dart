@@ -3,6 +3,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import '../i18n.dart';
 import '../services/alarms.dart';
 import '../services/api.dart';
+import '../services/diag.dart';
 import '../services/push.dart';
 import '../services/tracking_service.dart';
 import '../services/update_service.dart';
@@ -17,7 +18,7 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   final _api = CompanionApi();
   final _tracking = TruxTrackingService.instance;
   Map<String, dynamic>? _profile;
@@ -26,10 +27,52 @@ class _HomeShellState extends State<HomeShell> {
   String? _error;
   int _tab = 0;
 
+  // Latest status report from the tracking isolate (see _onTrackingData).
+  int _queuedFixes = 0;
+  bool _uploadAuthStale = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    FlutterForegroundTask.addTaskDataCallback(_onTrackingData);
     _bootstrap();
+  }
+
+  @override
+  void dispose() {
+    FlutterForegroundTask.removeTaskDataCallback(_onTrackingData);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// The token the tracker holds expires ~1h after the UI last refreshed it,
+  /// and while we're backgrounded nobody refreshes. Push a fresh one every
+  /// time the driver comes back so queued fixes flush on the next tick. Also
+  /// re-check location: this is the return path from the "Allow all the time"
+  /// settings redirect (silent — the redirect nags only once per session).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _api.pushFreshTokenToTracker();
+      if (_locationDenied) _startTracking();
+    }
+  }
+
+  /// Status report from the tracking isolate (queue depth + auth health),
+  /// sent every sample. Drives the "uploads paused" banner on the loads tab.
+  void _onTrackingData(Object data) {
+    if (data is! Map) return;
+    final queued = (data['queued'] as num?)?.toInt() ?? 0;
+    final stale = data['authStale'] == true;
+    if (mounted) {
+      setState(() {
+        _queuedFixes = queued;
+        _uploadAuthStale = stale;
+      });
+    }
+    // Tracker says its token is stale and we're alive to fix it — do so now.
+    if (stale) _api.pushFreshTokenToTracker();
   }
 
   Future<void> _bootstrap() async {
@@ -53,9 +96,10 @@ class _HomeShellState extends State<HomeShell> {
 
   /// Start (and keep) always-on background location for a driver. Retries the
   /// permission prompt if it isn't granted yet; the driver has no way to turn
-  /// this off inside the app.
+  /// this off inside the app. `ok` is honest: only a full "Allow all the time"
+  /// grant clears the red banner (see TruxTrackingService.setTracking).
   Future<void> _startTracking() async {
-    final ok = await _tracking.setTracking(true);
+    final ok = await _tracking.setTracking(true, context: context);
     try {
       await _api.setDuty(true);
     } catch (_) {/* duty flag is best-effort */}
@@ -149,6 +193,17 @@ class _HomeShellState extends State<HomeShell> {
             title: Text(tr('sharingLocation')),
             subtitle: Text(tr('alwaysOn')),
           ),
+        // Tracker is queuing fixes because its token went stale — the resume
+        // handler / _onTrackingData push a fresh one, so this self-heals.
+        if (_uploadAuthStale && _queuedFixes > 0)
+          Material(
+            color: Colors.orange.withValues(alpha: 0.15),
+            child: ListTile(
+              leading: const Icon(Icons.cloud_off, color: Colors.deepOrange),
+              title: Text(tr('uploadsPaused')),
+              dense: true,
+            ),
+          ),
         const Divider(height: 1),
         Expanded(child: LoadsScreen(api: _api, onTrackingHint: _onTrackingHint)),
       ],
@@ -172,6 +227,38 @@ class _HomeShellState extends State<HomeShell> {
             const Text('• Your loads, status, paperwork & photo POD (Loads tab)'),
             const Text('• Continuous background location (always on)'),
           ],
+          const SizedBox(height: 24),
+          // Read-only field log (Diag ring buffer) so tracking/upload problems
+          // can be diagnosed on the driver's own device. Newest first.
+          Text('Diagnostics', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Expanded(
+            child: FutureBuilder<List<String>>(
+              // Rebuilds (tab switches, tracker reports) re-read the log.
+              future: Diag.read(),
+              builder: (_, snap) {
+                final lines = snap.data ?? const <String>[];
+                if (lines.isEmpty) {
+                  return const Text('No diagnostics recorded.',
+                      style: TextStyle(color: Colors.grey));
+                }
+                return Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  child: ListView.builder(
+                    itemCount: lines.length,
+                    itemBuilder: (_, i) => Text(
+                      lines[lines.length - 1 - i],
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );

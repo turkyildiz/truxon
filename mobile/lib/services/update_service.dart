@@ -9,6 +9,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../config.dart';
+import 'diag.dart';
 
 /// Self-update (OTA). On launch the app fetches a small hosted `latest.json`:
 ///   { "versionCode": 3, "versionName": "1.0.2",
@@ -20,6 +21,43 @@ import '../config.dart';
 /// tampered or corrupted APK never reaches the installer. Install itself goes
 /// through Android's package installer, which asks the user to confirm (and to
 /// allow installs from this app the first time).
+/// What to do with a fetched update manifest (see [evaluateUpdateManifest]).
+enum UpdateDecision {
+  /// Strictly newer, has an APK URL and a sha256 — offer it.
+  install,
+
+  /// Same or older build (downgrades are refused) or no APK URL — silently skip.
+  notApplicable,
+
+  /// Newer, but no sha256 to verify against — refuse and tell the user.
+  unverifiable,
+}
+
+/// Pure decision half of the update check, split out of
+/// [UpdateService.checkAndPrompt] so it's unit-testable. Returns the parsed
+/// manifest fields alongside the decision (sha256 normalized to lowercase hex).
+({UpdateDecision decision, int latestCode, String apkUrl, String sha256Hex})
+    evaluateUpdateManifest(Map<String, dynamic> manifest, int currentCode) {
+  final latestCode = (manifest['versionCode'] as num?)?.toInt() ?? 0;
+  final apkUrl = (manifest['apkUrl'] as String?) ?? '';
+  final sha256Hex = ((manifest['sha256'] as String?) ?? '').trim().toLowerCase();
+  final UpdateDecision decision;
+  if (latestCode <= currentCode || apkUrl.isEmpty) {
+    decision = UpdateDecision.notApplicable;
+  } else if (sha256Hex.isEmpty) {
+    // No checksum in the manifest → we can't verify the APK, so don't offer it.
+    decision = UpdateDecision.unverifiable;
+  } else {
+    decision = UpdateDecision.install;
+  }
+  return (
+    decision: decision,
+    latestCode: latestCode,
+    apkUrl: apkUrl,
+    sha256Hex: sha256Hex,
+  );
+}
+
 class UpdateService {
   /// Check silently; if a newer build exists, prompt. Never throws.
   static Future<void> checkAndPrompt(BuildContext context) async {
@@ -33,12 +71,9 @@ class UpdateService {
           .timeout(const Duration(seconds: 10));
       if (res.statusCode != 200) return;
       final j = jsonDecode(res.body) as Map<String, dynamic>;
-      final latestCode = (j['versionCode'] as num?)?.toInt() ?? 0;
-      final apkUrl = (j['apkUrl'] as String?) ?? '';
-      final sha256Hex = ((j['sha256'] as String?) ?? '').trim().toLowerCase();
-      if (latestCode <= currentCode || apkUrl.isEmpty) return;
-      // No checksum in the manifest → we can't verify the APK, so don't offer it.
-      if (sha256Hex.isEmpty) {
+      final m = evaluateUpdateManifest(j, currentCode);
+      if (m.decision == UpdateDecision.notApplicable) return;
+      if (m.decision == UpdateDecision.unverifiable) {
         if (context.mounted) await _showVerifyFailed(context);
         return;
       }
@@ -49,7 +84,7 @@ class UpdateService {
         builder: (ctx) => AlertDialog(
           title: const Text('Update available'),
           content: Text(
-            'A newer version (${j['versionName'] ?? latestCode}) is ready.'
+            'A newer version (${j['versionName'] ?? m.latestCode}) is ready.'
             '${(j['notes'] as String?)?.isNotEmpty == true ? '\n\n${j['notes']}' : ''}',
           ),
           actions: [
@@ -60,9 +95,10 @@ class UpdateService {
       );
       if (go != true || !context.mounted) return;
 
-      await _downloadAndInstall(context, apkUrl, latestCode, sha256Hex);
-    } catch (_) {
+      await _downloadAndInstall(context, m.apkUrl, m.latestCode, m.sha256Hex);
+    } catch (e) {
       // Offline / bad manifest / etc. — updating is best-effort, never blocks use.
+      Diag.log('update: check failed: $e');
     }
   }
 
@@ -124,7 +160,8 @@ class UpdateService {
       }
       await sink.flush();
       await sink.close();
-    } catch (_) {
+    } catch (e) {
+      Diag.log('update: download failed: $e');
       if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -139,6 +176,7 @@ class UpdateService {
     // download) discards the file — the installer never sees it.
     final digest = await sha256.bind(outFile.openRead()).first;
     if (digest.toString() != sha256Hex) {
+      Diag.log('update: sha256 mismatch for build $code — discarded');
       try {
         await outFile.delete();
       } catch (_) {}

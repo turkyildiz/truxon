@@ -48,14 +48,10 @@ class _LoadsScreenState extends State<LoadsScreen> {
     final raw = prefs.getString('status_outbox');
     final items = OfflineOutbox.decode(raw);
     if (items.isEmpty) return;
-    final remaining = <Map<String, dynamic>>[];
-    for (final item in items) {
-      try {
-        await widget.api.changeStatus(item['load_id'] as int, item['status'] as String);
-      } catch (_) {
-        remaining.add(item);
-      }
-    }
+    final remaining = await OfflineOutbox.replay(
+      items,
+      (item) => widget.api.changeStatus(item['load_id'] as int, item['status'] as String),
+    );
     await prefs.setString('status_outbox', OfflineOutbox.encode(remaining));
   }
 
