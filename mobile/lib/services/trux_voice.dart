@@ -3,6 +3,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../config.dart';
+import '../i18n.dart';
 import 'api.dart';
 import 'diag.dart';
 
@@ -89,16 +90,16 @@ class TruxVoiceController extends ChangeNotifier {
   }
 
   String get statusLabel {
-    if (!_sttReady) return 'Microphone unavailable — check permissions';
+    if (!_sttReady) return tr('micUnavailable');
     switch (state) {
       case VoiceState.idle:
-        return handsFree ? 'Tap to speak · hands-free on' : 'Tap the mic and speak';
+        return handsFree ? tr('tapToSpeakHandsFree') : tr('tapMicSpeak');
       case VoiceState.listening:
-        return 'Listening…';
+        return tr('listening');
       case VoiceState.thinking:
-        return 'Trux is thinking…';
+        return tr('truxThinking');
       case VoiceState.speaking:
-        return 'Trux is speaking…';
+        return tr('truxSpeaking');
     }
   }
 
@@ -161,13 +162,13 @@ class TruxVoiceController extends ChangeNotifier {
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
       final spoken = (reply == null || reply.isEmpty)
-          ? 'Sorry, I did not catch a result. Could you rephrase?'
+          ? tr('voiceNoResult')
           : reply;
       turns.add(TruxTurn('trux', spoken, proposals: proposals));
       await _speak(spoken);
     } catch (e) {
-      turns.add(TruxTurn('trux', 'I hit an error reaching the office system.'));
-      await _speak('I hit an error reaching the office system.');
+      turns.add(TruxTurn('trux', tr('voiceError')));
+      await _speak(tr('voiceError'));
     }
   }
 
@@ -180,13 +181,13 @@ class TruxVoiceController extends ChangeNotifier {
         confirmToken: proposal['token'] as String?,
       );
       final msg = res['already_executed'] == true
-          ? 'That was already done.'
-          : 'Done — ${proposal['tool']} completed.';
+          ? tr('voiceAlreadyDone')
+          : tr('voiceDone').replaceFirst('{tool}', '${proposal['tool']}');
       turns.add(TruxTurn('trux', msg));
       await _speak(msg);
     } catch (e) {
-      turns.add(TruxTurn('trux', 'I could not complete that action.'));
-      await _speak('I could not complete that action.');
+      turns.add(TruxTurn('trux', tr('voiceCannotComplete')));
+      await _speak(tr('voiceCannotComplete'));
     }
   }
 
@@ -197,7 +198,7 @@ class TruxVoiceController extends ChangeNotifier {
       // Reject is best-effort — the proposal token just expires server-side.
       Diag.log('voice: reject failed: $e');
     }
-    turns.add(TruxTurn('trux', 'Cancelled.'));
+    turns.add(TruxTurn('trux', tr('voiceCancelled')));
     notifyListeners();
   }
 

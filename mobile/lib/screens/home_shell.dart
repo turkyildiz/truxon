@@ -154,7 +154,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           title: Text(isDriver ? 'Trux Companion' : 'Trux'),
           actions: [
             IconButton(
-              tooltip: 'Sign out',
+              tooltip: tr('signOut'),
               onPressed: () => _api.signOut(),
               icon: const Icon(Icons.logout),
             ),
@@ -179,8 +179,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             child: ListTile(
               leading: const Icon(Icons.location_off, color: Colors.red),
               title: Text(tr('locationRequired')),
-              subtitle: const Text(
-                'Enable "Allow all the time" so dispatch can see the truck.'),
+              subtitle: Text(tr('enableAllowAllTime')),
               trailing: FilledButton(
                 onPressed: _startTracking,
                 child: Text(tr('enable')),
@@ -216,21 +215,22 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Hello, $name', style: Theme.of(context).textTheme.headlineSmall),
+          Text(tr('hello').replaceFirst('{name}', name),
+              style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 8),
-          Text('Role: $role'),
+          Text('${tr('role')}: $role'),
           const SizedBox(height: 16),
           const Text('Trux Companion'),
-          const Text('• Trux voice assistant (Trux tab)'),
-          const Text('• Dispatch radio / push-to-talk (Radio tab)'),
+          Text(tr('aboutVoice')),
+          Text(tr('aboutRadio')),
           if (role == 'driver') ...[
-            const Text('• Your loads, status, paperwork & photo POD (Loads tab)'),
-            const Text('• Continuous background location (always on)'),
+            Text(tr('aboutLoads')),
+            Text(tr('aboutLocation')),
           ],
           const SizedBox(height: 24),
           // Read-only field log (Diag ring buffer) so tracking/upload problems
           // can be diagnosed on the driver's own device. Newest first.
-          Text('Diagnostics', style: Theme.of(context).textTheme.titleSmall),
+          Text(tr('diagnostics'), style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 4),
           Expanded(
             child: FutureBuilder<List<String>>(
@@ -239,8 +239,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               builder: (_, snap) {
                 final lines = snap.data ?? const <String>[];
                 if (lines.isEmpty) {
-                  return const Text('No diagnostics recorded.',
-                      style: TextStyle(color: Colors.grey));
+                  return Text(tr('noDiagnostics'),
+                      style: const TextStyle(color: Colors.grey));
                 }
                 return Container(
                   decoration: BoxDecoration(

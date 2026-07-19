@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../i18n.dart';
 import '../services/api.dart';
 import '../services/trux_voice.dart';
 
@@ -54,10 +55,10 @@ class _VoiceScreenState extends State<VoiceScreen> {
               child: Row(
                 children: [
                   Expanded(child: Text(_c.statusLabel, style: Theme.of(context).textTheme.bodyMedium)),
-                  const Text('Hands-free'),
+                  Text(tr('handsFree')),
                   Switch(value: _c.handsFree, onChanged: _c.setHandsFree),
                   IconButton(
-                    tooltip: 'Clear',
+                    tooltip: tr('clear'),
                     onPressed: turns.isEmpty ? null : _c.clear,
                     icon: const Icon(Icons.delete_sweep_outlined),
                   ),
@@ -70,8 +71,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
                       child: Padding(
                         padding: const EdgeInsets.all(32),
                         child: Text(
-                          'Ask Trux anything — "what are my loads today", '
-                          '"mark load 41216 delivered", "how far to the next stop".',
+                          tr('askTruxHint'),
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey),
                         ),
@@ -143,7 +143,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(isYou ? 'You' : 'TRUX', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              Text(isYou ? tr('you') : 'TRUX', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
               const SizedBox(height: 2),
               Text(t.text),
             ],
@@ -162,15 +162,15 @@ class _VoiceScreenState extends State<VoiceScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Confirm: ${p['tool']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('${tr('confirmColon')} ${p['tool']}', style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             Text('${p['summary'] ?? ''}', style: const TextStyle(fontSize: 12)),
             const SizedBox(height: 8),
             Row(
               children: [
-                FilledButton(onPressed: () => _c.confirm(p), child: const Text('Confirm')),
+                FilledButton(onPressed: () => _c.confirm(p), child: Text(tr('confirmBtn'))),
                 const SizedBox(width: 8),
-                OutlinedButton(onPressed: () => _c.reject(p), child: const Text('Cancel')),
+                OutlinedButton(onPressed: () => _c.reject(p), child: Text(tr('cancel'))),
               ],
             ),
           ],

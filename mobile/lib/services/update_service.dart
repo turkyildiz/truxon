@@ -9,6 +9,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../config.dart';
+import '../i18n.dart';
 import 'diag.dart';
 
 /// Self-update (OTA). On launch the app fetches a small hosted `latest.json`:
@@ -82,14 +83,14 @@ class UpdateService {
       final go = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Update available'),
+          title: Text(tr('updateAvailable')),
           content: Text(
-            'A newer version (${j['versionName'] ?? m.latestCode}) is ready.'
-            '${(j['notes'] as String?)?.isNotEmpty == true ? '\n\n${j['notes']}' : ''}',
+            tr('updateReady').replaceFirst('{v}', '${j['versionName'] ?? m.latestCode}') +
+                ((j['notes'] as String?)?.isNotEmpty == true ? '\n\n${j['notes']}' : ''),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Later')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Update now')),
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('later'))),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('updateNow'))),
           ],
         ),
       );
@@ -107,13 +108,10 @@ class UpdateService {
   static Future<void> _showVerifyFailed(BuildContext context) => showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Update failed verification'),
-          content: const Text(
-            'The downloaded update could not be verified and was discarded. '
-            'Nothing was installed — please try again later.',
-          ),
+          title: Text(tr('updateFailedTitle')),
+          content: Text(tr('updateFailedBody')),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('ok'))),
           ],
         ),
       );
@@ -129,7 +127,7 @@ class UpdateService {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Downloading update'),
+        title: Text(tr('downloadingUpdate')),
         content: ValueListenableBuilder<double>(
           valueListenable: progress,
           builder: (_, p, _) => Column(
@@ -137,7 +135,7 @@ class UpdateService {
             children: [
               LinearProgressIndicator(value: p > 0 ? p : null),
               const SizedBox(height: 12),
-              Text(p > 0 ? '${(p * 100).toStringAsFixed(0)}%' : 'Starting…'),
+              Text(p > 0 ? '${(p * 100).toStringAsFixed(0)}%' : tr('starting')),
             ],
           ),
         ),
@@ -165,7 +163,7 @@ class UpdateService {
       if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Update download failed — will retry next launch.')),
+          SnackBar(content: Text(tr('updateDownloadFailed'))),
         );
       }
       return;
@@ -191,7 +189,7 @@ class UpdateService {
         type: 'application/vnd.android.package-archive');
     if (result.type != ResultType.done && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open installer: ${result.message}')),
+        SnackBar(content: Text('${tr('couldNotOpenInstaller')}: ${result.message}')),
       );
     }
   }

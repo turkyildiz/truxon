@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../i18n.dart';
 import '../services/api.dart';
 
 class LoadsScreen extends StatefulWidget {
@@ -66,7 +67,7 @@ class _LoadsScreenState extends State<LoadsScreen> {
       await prefs.setString('status_outbox', OfflineOutbox.encode(items));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Queued offline: $next ($e)')),
+          SnackBar(content: Text('${tr('queuedOffline')}: $next ($e)')),
         );
       }
     }
@@ -79,8 +80,8 @@ class _LoadsScreenState extends State<LoadsScreen> {
   }
 
   String _label(String status) {
-    if (status == 'assigned') return 'Start trip (In transit)';
-    if (status == 'in_transit') return 'Mark delivered';
+    if (status == 'assigned') return tr('startTrip');
+    if (status == 'in_transit') return tr('markDelivered');
     return status;
   }
 
@@ -95,14 +96,14 @@ class _LoadsScreenState extends State<LoadsScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const ListTile(title: Text('What are you photographing?')),
-            for (final t in const [
-              ['pod', 'Proof of delivery (POD)'],
-              ['bol', 'Bill of lading (BOL)'],
-              ['receipt', 'Receipt'],
-              ['lumper', 'Lumper receipt'],
-              ['scale', 'Scale ticket'],
-              ['photo', 'Other photo'],
+            ListTile(title: Text(tr('whatPhotographing'))),
+            for (final t in [
+              ['pod', tr('docPod')],
+              ['bol', tr('docBol')],
+              ['receipt', tr('docReceipt')],
+              ['lumper', tr('docLumper')],
+              ['scale', tr('docScale')],
+              ['photo', tr('docPhoto')],
             ])
               ListTile(
                 leading: const Icon(Icons.description_outlined),
@@ -132,12 +133,12 @@ class _LoadsScreenState extends State<LoadsScreen> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${docType.toUpperCase()} sent to dispatch')),
+          SnackBar(content: Text(tr('sentToDispatch').replaceFirst('{doc}', docType.toUpperCase()))),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${tr('uploadFailed')}: $e')));
       }
     } finally {
       if (mounted) setState(() => _uploadingFor = null);
@@ -149,7 +150,7 @@ class _LoadsScreenState extends State<LoadsScreen> {
       final docs = await widget.api.listDocuments(load.id);
       if (!mounted) return;
       if (docs.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No documents')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('noDocuments'))));
         return;
       }
       await showModalBottomSheet(
@@ -186,7 +187,7 @@ class _LoadsScreenState extends State<LoadsScreen> {
           children: [
             Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            FilledButton(onPressed: _refresh, child: const Text('Retry')),
+            FilledButton(onPressed: _refresh, child: Text(tr('retry'))),
           ],
         ),
       );
@@ -195,9 +196,9 @@ class _LoadsScreenState extends State<LoadsScreen> {
       return RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
-          children: const [
-            SizedBox(height: 120),
-            Center(child: Text('No assigned loads. Ask dispatch to link your login to a driver record.')),
+          children: [
+            const SizedBox(height: 120),
+            Center(child: Text(tr('noLoadsDetail'))),
           ],
         ),
       );
@@ -228,9 +229,9 @@ class _LoadsScreenState extends State<LoadsScreen> {
                   ),
                   if (load.customerName != null) Text(load.customerName!),
                   const SizedBox(height: 6),
-                  Text('PU: ${load.pickup}'),
-                  Text('DEL: ${load.delivery}'),
-                  if (load.truckUnit != null) Text('Truck: ${load.truckUnit}'),
+                  Text('${tr('puLabel')}: ${load.pickup}'),
+                  Text('${tr('delLabel')}: ${load.delivery}'),
+                  if (load.truckUnit != null) Text('${tr('truckLabel')}: ${load.truckUnit}'),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -242,7 +243,7 @@ class _LoadsScreenState extends State<LoadsScreen> {
                         ),
                       OutlinedButton(
                         onPressed: () => _openDocs(load),
-                        child: const Text('Paperwork'),
+                        child: Text(tr('paperwork')),
                       ),
                       OutlinedButton.icon(
                         onPressed: _uploadingFor == load.id ? null : () => _capturePod(load),
@@ -250,7 +251,7 @@ class _LoadsScreenState extends State<LoadsScreen> {
                             ? const SizedBox(
                                 width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                             : const Icon(Icons.photo_camera, size: 18),
-                        label: Text(_uploadingFor == load.id ? 'Sending…' : 'Photo POD'),
+                        label: Text(_uploadingFor == load.id ? tr('sending') : tr('photoPod')),
                       ),
                     ],
                   ),

@@ -161,7 +161,7 @@ class _TrackingHandler extends TaskHandler {
     await loadLocale();
     if (_outage.warnDue(DateTime.now())) {
       FlutterForegroundTask.updateService(
-        notificationTitle: 'Trux — NOT UPLOADING',
+        notificationTitle: tr('notifTitleNotUploading'),
         notificationText:
             tr('notUploading').replaceFirst('{n}', '${_queue.length}'),
       );
@@ -171,8 +171,10 @@ class _TrackingHandler extends TaskHandler {
     final hh = now.hour.toString().padLeft(2, '0');
     final mm = now.minute.toString().padLeft(2, '0');
     FlutterForegroundTask.updateService(
-      notificationTitle: 'Trux — sharing location',
-      notificationText: 'Last fix $hh:$mm · ${_queue.length} queued',
+      notificationTitle: tr('notifTitleSharing'),
+      notificationText: tr('notifLastFix')
+          .replaceFirst('{t}', '$hh:$mm')
+          .replaceFirst('{n}', '${_queue.length}'),
     );
   }
 
@@ -260,8 +262,8 @@ class TruxTrackingService {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'trux_tracking',
-        channelName: 'Location sharing',
-        channelDescription: 'Shares your position with dispatch while on duty.',
+        channelName: tr('notifChannelName'),
+        channelDescription: tr('notifChannelDesc'),
         onlyAlertOnce: true,
       ),
       iosNotificationOptions: const IOSNotificationOptions(
@@ -312,19 +314,15 @@ class TruxTrackingService {
         final go = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('One more step'),
-            content: const Text(
-              'Dispatch needs to see the truck even when the screen is off.\n\n'
-              'On the next screen tap Permissions → Location and choose '
-              '"Allow all the time".',
-            ),
+            title: Text(tr('oneMoreStep')),
+            content: Text(tr('allowAllTimeBody')),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Not now')),
+                  child: Text(tr('notNow'))),
               FilledButton(
                   onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('Open settings')),
+                  child: Text(tr('openSettings'))),
             ],
           ),
         );
@@ -358,8 +356,8 @@ class TruxTrackingService {
       } else {
         await FlutterForegroundTask.startService(
           serviceId: 42,
-          notificationTitle: 'Trux — sharing location',
-          notificationText: 'Dispatch can see the truck. Always on.',
+          notificationTitle: tr('notifTitleSharing'),
+          notificationText: tr('notifDispatchSees'),
           callback: trackingCallback,
         );
       }
