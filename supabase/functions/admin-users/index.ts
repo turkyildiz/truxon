@@ -55,6 +55,9 @@ Deno.serve(async (req) => {
       if (drv.user_id) return json({ error: 'Driver already linked to a login' }, 409)
     }
 
+    // The profile trigger never grants 'admin' from metadata (defense against
+    // signup ever being enabled) — admins are created as dispatcher and
+    // promoted explicitly below with the service role.
     const { data, error } = await admin.auth.admin.createUser({
       email,
       password,
@@ -62,6 +65,17 @@ Deno.serve(async (req) => {
       user_metadata: { username: username || email.split('@')[0], full_name: full_name ?? '', role },
     })
     if (error) return json({ error: error.message }, 400)
+
+    if (role === 'admin' && data.user) {
+      const { error: promoteErr } = await admin
+        .from('profiles')
+        .update({ role: 'admin' })
+        .eq('id', data.user.id)
+      if (promoteErr) {
+        await admin.auth.admin.deleteUser(data.user.id).catch(() => {})
+        return json({ error: `User created but admin promotion failed: ${promoteErr.message}` }, 400)
+      }
+    }
 
     if (link_driver_id != null && data.user) {
       const { error: linkErr } = await admin
