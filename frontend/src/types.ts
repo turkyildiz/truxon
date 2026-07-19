@@ -75,8 +75,9 @@ export interface MaintenanceRecord {
   equipment_unit: string | null
 }
 
-export type LoadStatus = 'pending' | 'assigned' | 'in_transit' | 'delivered' | 'completed' | 'billed'
+export type LoadStatus = 'pending' | 'assigned' | 'in_transit' | 'delivered' | 'completed' | 'billed' | 'cancelled'
 
+/** The linear workflow progression — 'cancelled' sits outside it (cancel/un-cancel RPCs only). */
 export const LOAD_STATUSES: LoadStatus[] = ['pending', 'assigned', 'in_transit', 'delivered', 'completed', 'billed']
 
 export interface Load {
@@ -105,6 +106,7 @@ export interface Load {
   rate_per_mile: number | null
   special_terms: string
   notes: string
+  cancel_reason: string
   invoice_id: number | null
   created_at: string
 }

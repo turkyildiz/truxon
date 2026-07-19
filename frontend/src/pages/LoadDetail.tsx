@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom'
 import DocsNotes from '../components/DocsNotes'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Badge, Button, Card, Field, formatDateTime, Input, LoadError, money, Select, Textarea } from '../components/ui'
-import { changeLoadStatus, getLoad, listCustomers, listDrivers, listStops, replaceStops, trailersApi, trucksApi, updateLoad } from '../data'
+import { cancelLoad, changeLoadStatus, getLoad, listCustomers, listDrivers, listStops, replaceStops, trailersApi, trucksApi, uncancelLoad, updateLoad } from '../data'
 import { errorMessage } from '../supabase'
 import { LOAD_STATUSES, type Load } from '../types'
 
@@ -75,6 +75,24 @@ export default function LoadDetail() {
     onError: (err) => setError(errorMessage(err)),
   })
 
+  const cancel = useMutation({
+    mutationFn: (reason: string) => cancelLoad(id!, reason),
+    onSuccess: () => {
+      setError('')
+      refresh()
+    },
+    onError: (err) => setError(errorMessage(err)),
+  })
+
+  const uncancel = useMutation({
+    mutationFn: () => uncancelLoad(id!),
+    onSuccess: () => {
+      setError('')
+      refresh()
+    },
+    onError: (err) => setError(errorMessage(err)),
+  })
+
   const saveEdit = useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
       const realStops = editStops.filter((s) => s.facility || s.address || s.time || s.reference)
@@ -105,7 +123,16 @@ export default function LoadDetail() {
   if (loadQ.isError) return <LoadError error={loadQ.error} onRetry={() => loadQ.refetch()} />
   if (!load) return <p className="py-8 text-center text-muted">Loading…</p>
 
-  const editable = load.status !== 'billed'
+  // Billed loads are locked by billing; cancelled loads are locked server-side
+  // until un-cancelled.
+  const editable = load.status !== 'billed' && load.status !== 'cancelled'
+  const cancellable = load.status === 'pending' || load.status === 'assigned' || load.status === 'in_transit'
+
+  function promptCancel() {
+    if (!load) return
+    const reason = window.prompt(`Cancel ${load.load_number}? Reason (optional):`)
+    if (reason !== null) cancel.mutate(reason.trim())
+  }
 
   function startEdit() {
     if (!load) return
@@ -157,10 +184,24 @@ export default function LoadDetail() {
                 Edit
               </Button>
             )}
+            {cancellable && !editForm && (
+              <Button variant="danger" disabled={cancel.isPending} onClick={promptCancel}>
+                Cancel Load
+              </Button>
+            )}
           </div>
         </div>
         <div className="mt-4">
-          <StatusStepper load={load} onAdvance={(s) => advance.mutate(s)} busy={advance.isPending} />
+          {load.status === 'cancelled' ? (
+            <div className="flex flex-wrap items-center gap-3">
+              {load.cancel_reason && <p className="text-sm text-muted">Reason: {load.cancel_reason}</p>}
+              <Button variant="secondary" className="!py-1.5" disabled={uncancel.isPending} onClick={() => uncancel.mutate()}>
+                Un-cancel
+              </Button>
+            </div>
+          ) : (
+            <StatusStepper load={load} onAdvance={(s) => advance.mutate(s)} busy={advance.isPending} />
+          )}
         </div>
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
       </Card>

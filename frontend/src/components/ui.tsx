@@ -113,6 +113,7 @@ const STATUS_HUE: Record<string, string> = {
   completed: 'green', billed: 'purple', active: 'green', inactive: 'slate',
   terminated: 'red', available: 'green', in_use: 'blue', maintenance: 'amber',
   retired: 'slate', draft: 'slate', sent: 'blue', paid: 'green', void: 'red',
+  cancelled: 'red',
 }
 const HUE_CLASS: Record<string, string> = {
   slate: 'bg-slate-500/15 text-slate-600 dark:text-slate-300',

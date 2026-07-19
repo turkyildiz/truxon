@@ -29,7 +29,7 @@ export default function Loads() {
         <Input placeholder="Search load #, broker #, address…" value={q} onChange={(e) => setQ(e.target.value)} className="w-full sm:w-64" />
         <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full sm:w-44">
           <option value="">All statuses</option>
-          {LOAD_STATUSES.map((s) => (
+          {[...LOAD_STATUSES, 'cancelled' as const].map((s) => (
             <option key={s} value={s}>
               {s.replace('_', ' ')}
             </option>
