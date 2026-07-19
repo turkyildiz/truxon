@@ -52,6 +52,17 @@ Ordered by risk. ✅ confirmed · ⬜ open (in our hands) · 🔶 needs Ilker / 
       board / CPM) and monthly budgets (budget-variance).
 - ⬜ **Company/invoice details** — logo, address, invoice numbering, payment terms
       correct before the first real invoice reaches a broker.
+- ✅ **QuickBooks integration LIVE (2026-07-19)** — transition mode: QBO stays the
+      books of record; Truxon mirrors it every 30 min (cron `truxon-qbo-pull`).
+      First backfill: **812 invoices + 93 customers** from Aida Logistics' QBO.
+      Payments in QBO flip Truxon invoices to paid → AR aging/Sentinel run on
+      real cash. Intuit production app "Truxon" (workspace Truxon, compliance
+      questionnaire passed same-day); redirect URI = the qbo-sync fn URL, set on
+      the Settings→Redirect URIs tab. Push mode (Truxon-first invoicing) ships
+      disabled behind QBO_PUSH_ENABLED — flip when trusted. Follow-ups: sandbox
+      connect/disconnect test + intuit_tid capture (answered "not yet" on the
+      questionnaire), success-page renders as raw HTML on some browsers
+      (cosmetic), customer-dedup pass (93 QBO-created vs existing 203 by name).
 - ✅ **API-key rotation fallout** — after the 2026-07-19 key rotation the raw
       service key's role claim no longer reports `service_role`, breaking every
       RPC gated on it. Swept all 14 such functions (fuel/toll importers, sentinel,
