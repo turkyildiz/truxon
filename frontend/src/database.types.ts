@@ -1220,6 +1220,65 @@ export type Database = {
         }
         Relationships: []
       }
+      trux_insights: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          category: string
+          dedup_key: string
+          detail: string
+          entity_id: number | null
+          entity_type: string
+          first_seen: string
+          id: number
+          last_seen: string
+          resolved_at: string | null
+          severity: string
+          status: string
+          title: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          category: string
+          dedup_key: string
+          detail?: string
+          entity_id?: number | null
+          entity_type?: string
+          first_seen?: string
+          id?: never
+          last_seen?: string
+          resolved_at?: string | null
+          severity: string
+          status?: string
+          title: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          category?: string
+          dedup_key?: string
+          detail?: string
+          entity_id?: number | null
+          entity_type?: string
+          first_seen?: string
+          id?: never
+          last_seen?: string
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trux_insights_acknowledged_by_fkey"
+            columns: ["acknowledged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trux_messages: {
         Row: {
           content: string
@@ -1586,6 +1645,44 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      acknowledge_insight: {
+        Args: { p_id: number }
+        Returns: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          category: string
+          dedup_key: string
+          detail: string
+          entity_id: number | null
+          entity_type: string
+          first_seen: string
+          id: number
+          last_seen: string
+          resolved_at: string | null
+          severity: string
+          status: string
+          title: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "trux_insights"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      ar_aging: {
+        Args: never
+        Returns: {
+          company_name: string
+          customer_id: number
+          d0_30: number
+          d31_60: number
+          d61_90: number
+          d90_plus: number
+          invoices: number
+          outstanding: number
+        }[]
+      }
       assert_no_double_booking: {
         Args: {
           p_driver_id: number
@@ -1747,6 +1844,19 @@ export type Database = {
           unit_number: string
         }[]
       }
+      fuel_efficiency: {
+        Args: { p_end: string; p_start: string }
+        Returns: {
+          driver_id: number
+          driver_name: string
+          fuel_cost_per_mile: number
+          fuel_spend: number
+          gallons: number
+          loads: number
+          miles: number
+          mpg: number
+        }[]
+      }
       fuel_ifta_summary: {
         Args: { p_end: string; p_start: string }
         Returns: {
@@ -1771,6 +1881,7 @@ export type Database = {
       }
       next_invoice_number: { Args: never; Returns: string }
       next_load_number: { Args: never; Returns: string }
+      pnl_summary: { Args: { p_end: string; p_start: string }; Returns: Json }
       replace_load_stops: {
         Args: { p_load_id: number; p_stops?: Json }
         Returns: {
@@ -1791,6 +1902,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      sentinel_scan: { Args: never; Returns: Json }
       set_invoice_status: {
         Args: {
           p_invoice_id: number
@@ -1831,6 +1943,31 @@ export type Database = {
           unit_number: string
           violations: number
         }[]
+      }
+      trux_insights_feed: {
+        Args: { p_include_resolved?: boolean }
+        Returns: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          category: string
+          dedup_key: string
+          detail: string
+          entity_id: number | null
+          entity_type: string
+          first_seen: string
+          id: number
+          last_seen: string
+          resolved_at: string | null
+          severity: string
+          status: string
+          title: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "trux_insights"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       trux_query: { Args: { p_sql: string }; Returns: Json }
       uncancel_load: {

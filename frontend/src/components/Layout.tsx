@@ -74,6 +74,7 @@ type NavItem = { key: string; to: string; label: string; icon: string }
 const NAV_GROUPS: { title: string | null; items: NavItem[] }[] = [
   { title: null, items: [
     { key: 'dashboard', to: '/dashboard', label: 'Dashboard', icon: '📊' },
+    { key: 'trux', to: '/trux', label: 'Trux', icon: '✨' },
   ] },
   { title: 'Operations', items: [
     { key: 'track', to: '/track', label: 'Track & Trace', icon: '📍' },

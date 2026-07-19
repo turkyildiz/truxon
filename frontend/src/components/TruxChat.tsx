@@ -8,7 +8,7 @@ import { useAuth } from '../auth'
 import { supabase, errorMessage } from '../supabase'
 import { Button, Input } from './ui'
 
-type Proposal = { token: string; tool: string; args: unknown; summary: string }
+export type Proposal = { token: string; tool: string; args: unknown; summary: string }
 
 type LogEntry = { role: 'user' | 'assistant'; content: string; proposals?: Proposal[]; result?: unknown }
 
@@ -28,7 +28,7 @@ function resultSummary(result: unknown): string {
 
 /** Renders a tool result as a compact, collapsible pane instead of dumping raw
  * JSON into the message flow. */
-function ToolResult({ result }: { result: unknown }) {
+export function ToolResult({ result }: { result: unknown }) {
   if (result == null || (typeof result === 'object' && Object.keys(result as object).length === 0)) return null
   return (
     <details className="mt-2 inline-block max-w-[95%] rounded-lg border border-line bg-surface px-3 py-2 text-left text-xs">
@@ -38,7 +38,7 @@ function ToolResult({ result }: { result: unknown }) {
   )
 }
 
-async function truxAgent(body: Record<string, unknown>) {
+export async function truxAgent(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('trux-agent', { body })
   if (error) {
     const ctx = (error as { context?: Response }).context

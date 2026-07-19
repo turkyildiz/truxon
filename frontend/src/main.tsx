@@ -14,6 +14,7 @@ import PageLoader from './components/PageLoader'
 const Landing = lazy(() => import('./pages/Landing'))
 const Login = lazy(() => import('./pages/Login'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Trux = lazy(() => import('./pages/Trux'))
 const FleetMap = lazy(() => import('./pages/FleetMap'))
 const Loads = lazy(() => import('./pages/Loads'))
 const LoadDetail = lazy(() => import('./pages/LoadDetail'))
@@ -74,6 +75,7 @@ createRoot(document.getElementById('root')!).render(
               }
             >
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/trux" element={<Trux />} />
               <Route path="/track" element={<FleetMap />} />
               <Route path="/loads" element={<Loads />} />
               <Route path="/loads/:id" element={<LoadDetail />} />
