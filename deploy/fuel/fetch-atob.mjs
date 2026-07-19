@@ -46,9 +46,16 @@ const log = (m) => console.log(`[fuel] ${new Date().toISOString()} ${m}`)
 async function alert(subject, body) {
   if (!env.ALERT_WEBHOOK || !env.WATCHDOG_REPORT_KEY) return
   try {
+    // The watchdog has verify_jwt on, so the platform gate needs the anon key
+    // as a bearer (the function then checks WATCHDOG_REPORT_KEY on the body).
+    const headers = { 'Content-Type': 'application/json' }
+    if (env.SUPABASE_ANON_KEY) {
+      headers.Authorization = `Bearer ${env.SUPABASE_ANON_KEY}`
+      headers.apikey = env.SUPABASE_ANON_KEY
+    }
     await fetch(env.ALERT_WEBHOOK, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ report: { subject, body }, key: env.WATCHDOG_REPORT_KEY }),
     })
   } catch { /* best effort */ }
