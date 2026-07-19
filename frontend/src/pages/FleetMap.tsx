@@ -27,12 +27,18 @@ function ageLabel(iso: string): { text: string; stale: boolean } {
 
 const mph = (mps: number | null) => (mps != null ? `${Math.round(mps * 2.23694)} mph` : '—')
 
+/** Leaflet popup/tooltip content is raw HTML — escape every interpolated value
+ * (driver/load names come from the DB, alert headlines from the NWS API). */
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
+}
+
 function popupHtml(p: FleetPin, warned: boolean): string {
   const age = ageLabel(p.recorded_at)
   return `<div style="font:13px system-ui;line-height:1.5">
-    <strong>${p.driver_name ?? 'Driver'}</strong>${warned ? ' ⚠️' : ''}<br/>
-    Truck ${p.truck_unit ?? '—'} · Load ${p.load_number ?? '—'}<br/>
-    ${mph(p.speed_mps)} · <span style="color:${age.stale ? STALE : '#64748b'}">${age.text}</span>
+    <strong>${escapeHtml(p.driver_name ?? 'Driver')}</strong>${warned ? ' ⚠️' : ''}<br/>
+    Truck ${escapeHtml(p.truck_unit ?? '—')} · Load ${escapeHtml(p.load_number ?? '—')}<br/>
+    ${mph(p.speed_mps)} · <span style="color:${age.stale ? STALE : '#64748b'}">${escapeHtml(age.text)}</span>
   </div>`
 }
 
@@ -145,7 +151,7 @@ function MapCanvas({
         fillOpacity: 0.95,
       })
       marker.bindPopup(popupHtml(p, warned))
-      marker.bindTooltip(p.driver_name ?? '', { direction: 'top', offset: [0, -8] })
+      marker.bindTooltip(escapeHtml(p.driver_name ?? ''), { direction: 'top', offset: [0, -8] })
       marker.on('click', () => {
         map.setView([p.lat, p.lng], Math.max(map.getZoom(), 9))
         trailRef.current?.clearLayers()
@@ -200,7 +206,9 @@ function MapCanvas({
       {
         style: { color: ALERT, weight: 1, fillColor: ALERT, fillOpacity: 0.12 },
         onEachFeature: (f, l) =>
-          l.bindPopup(`<strong>${f.properties?.event ?? 'Alert'}</strong><br/>${f.properties?.headline ?? ''}`),
+          l.bindPopup(
+            `<strong>${escapeHtml(String(f.properties?.event ?? 'Alert'))}</strong><br/>${escapeHtml(String(f.properties?.headline ?? ''))}`,
+          ),
       },
     )
     gj.addTo(map)

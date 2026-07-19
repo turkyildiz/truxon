@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import ErrorBoundary from './ErrorBoundary'
 import LanguageSwitcher from './LanguageSwitcher'
 import { ROLE_MODULES, useAuth } from '../auth'
 import { globalSearch } from '../data'
@@ -185,6 +186,7 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const { t } = useTranslation()
   const { theme, toggle } = useTheme()
+  const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const [pwOpen, setPwOpen] = useState(false)
   const allowed = ROLE_MODULES[user?.role ?? 'driver'] ?? []
@@ -252,7 +254,9 @@ export default function Layout() {
           </div>
         </header>
         <main className="flex-1 p-4 lg:p-6">
-          <Outlet />
+          <ErrorBoundary key={location.pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </main>
         <TruxLauncher />
         <ChangePasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />

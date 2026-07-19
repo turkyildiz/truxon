@@ -1,8 +1,13 @@
 /**
  * Data access layer — every Supabase query/RPC/storage/edge-function call
  * the app makes lives here, so pages stay free of query syntax.
+ *
+ * Table/RPC shapes come from the generated src/database.types.ts; the domain
+ * types in types.ts stay the public interface for pages. json-returning RPCs
+ * are typed as Json by codegen, so those keep a single cast at this boundary.
  */
 import { supabase, unwrap } from './supabase'
+import type { Tables, TablesInsert, TablesUpdate } from './database.types'
 import type {
   Activity,
   Customer,
@@ -19,6 +24,8 @@ import type {
   WeeklyReport,
 } from './types'
 
+/** Form-shaped payloads pages submit; cast to the generated Insert/Update
+ * types at the query so the compiler checks the rest of the chain. */
 type Row = Record<string, unknown>
 
 /** Strip characters that break PostgREST filter grammar. */
@@ -42,11 +49,11 @@ export async function listCustomers(q?: string, opts: { includeInactive?: boolea
 }
 
 export async function createCustomer(payload: Row): Promise<Customer> {
-  return unwrap(await supabase.from('customers').insert(payload).select().single())
+  return unwrap(await supabase.from('customers').insert(payload as TablesInsert<'customers'>).select().single())
 }
 
 export async function updateCustomer(id: number, payload: Row): Promise<Customer> {
-  return unwrap(await supabase.from('customers').update(payload).eq('id', id).select().single())
+  return unwrap(await supabase.from('customers').update(payload as TablesUpdate<'customers'>).eq('id', id).select().single())
 }
 
 // ---------- Drivers ----------
@@ -68,7 +75,7 @@ export async function listLinkableDriverProfiles(currentUserId?: string | null):
     .order('username')
   if (error) throw error
   const drivers = await listDrivers()
-  const taken = new Set(drivers.map((d) => d.user_id).filter(Boolean) as string[])
+  const taken = new Set(drivers.map((d) => d.user_id).filter((id): id is string => Boolean(id)))
   return (profiles ?? []).filter((p) => !taken.has(p.id) || p.id === currentUserId)
 }
 
@@ -88,7 +95,7 @@ export interface FleetPin {
 
 export async function fleetPositionsSnapshot(): Promise<FleetPin[]> {
   const data = unwrap(await supabase.rpc('fleet_positions_snapshot'))
-  return (data as FleetPin[]) ?? []
+  return (data as unknown as FleetPin[]) ?? []
 }
 
 /** Recent breadcrumb trail for one driver (staff-readable via vehicle_positions RLS). */
@@ -101,17 +108,15 @@ export async function driverTrail(driverId: number): Promise<{ lat: number; lng:
       .order('recorded_at', { ascending: false })
       .limit(60),
   )
-  return ((data as { lat: number; lng: number }[]) ?? [])
-    .map((p) => ({ lat: p.lat, lng: p.lng }))
-    .reverse()
+  return (data ?? []).map((p) => ({ lat: p.lat, lng: p.lng })).reverse()
 }
 
 export async function createDriver(payload: Row): Promise<Driver> {
-  return unwrap(await supabase.from('drivers').insert(payload).select().single())
+  return unwrap(await supabase.from('drivers').insert(payload as TablesInsert<'drivers'>).select().single())
 }
 
 export async function updateDriver(id: number, payload: Row): Promise<Driver> {
-  return unwrap(await supabase.from('drivers').update(payload).eq('id', id).select().single())
+  return unwrap(await supabase.from('drivers').update(payload as TablesUpdate<'drivers'>).eq('id', id).select().single())
 }
 
 // ---------- Trucks / Trailers ----------
@@ -124,10 +129,10 @@ function equipmentApi(table: 'trucks' | 'trailers') {
       return unwrap(await query)
     },
     async create(payload: Row): Promise<Equipment> {
-      return unwrap(await supabase.from(table).insert(payload).select().single())
+      return unwrap(await supabase.from(table).insert(payload as TablesInsert<'trucks'>).select().single())
     },
     async update(id: number, payload: Row): Promise<Equipment> {
-      return unwrap(await supabase.from(table).update(payload).eq('id', id).select().single())
+      return unwrap(await supabase.from(table).update(payload as TablesUpdate<'trucks'>).eq('id', id).select().single())
     },
   }
 }
@@ -139,28 +144,35 @@ export const trailersApi = equipmentApi('trailers')
 
 const MAINTENANCE_SELECT = '*, truck:trucks(unit_number), trailer:trailers(unit_number)'
 
-function mapMaintenance(row: Row): MaintenanceRecord {
-  const truck = row.truck as { unit_number: string } | null
-  const trailer = row.trailer as { unit_number: string } | null
+type MaintenanceRow = Tables<'maintenance_records'> & {
+  truck: Pick<Tables<'trucks'>, 'unit_number'> | null
+  trailer: Pick<Tables<'trailers'>, 'unit_number'> | null
+}
+
+function mapMaintenance({ truck, trailer, ...row }: MaintenanceRow): MaintenanceRecord {
   return {
-    ...(row as unknown as MaintenanceRecord),
+    ...row,
     equipment_unit: row.equipment_type === 'truck' ? truck?.unit_number ?? null : trailer?.unit_number ?? null,
   }
 }
 
 export async function listMaintenance(): Promise<MaintenanceRecord[]> {
-  const rows = unwrap<Row[]>(
+  const rows = unwrap(
     await supabase.from('maintenance_records').select(MAINTENANCE_SELECT).order('date_completed', { ascending: false, nullsFirst: false }),
   )
   return rows.map(mapMaintenance)
 }
 
 export async function createMaintenance(payload: Row): Promise<MaintenanceRecord> {
-  return mapMaintenance(unwrap(await supabase.from('maintenance_records').insert(payload).select(MAINTENANCE_SELECT).single()))
+  return mapMaintenance(
+    unwrap(await supabase.from('maintenance_records').insert(payload as TablesInsert<'maintenance_records'>).select(MAINTENANCE_SELECT).single()),
+  )
 }
 
 export async function updateMaintenance(id: number, payload: Row): Promise<MaintenanceRecord> {
-  return mapMaintenance(unwrap(await supabase.from('maintenance_records').update(payload).eq('id', id).select(MAINTENANCE_SELECT).single()))
+  return mapMaintenance(
+    unwrap(await supabase.from('maintenance_records').update(payload as TablesUpdate<'maintenance_records'>).eq('id', id).select(MAINTENANCE_SELECT).single()),
+  )
 }
 
 // ---------- Loads ----------
@@ -168,20 +180,21 @@ export async function updateMaintenance(id: number, payload: Row): Promise<Maint
 const LOAD_SELECT =
   '*, customer:customers(company_name), driver:drivers(full_name), truck:trucks(unit_number), trailer:trailers(unit_number)'
 
-function mapLoad(row: Row): Load {
-  const customer = row.customer as { company_name: string } | null
-  const driver = row.driver as { full_name: string } | null
-  const truck = row.truck as { unit_number: string } | null
-  const trailer = row.trailer as { unit_number: string } | null
-  const rate = Number(row.rate)
-  const miles = Number(row.miles)
+type LoadRow = Tables<'loads'> & {
+  customer: Pick<Tables<'customers'>, 'company_name'> | null
+  driver: Pick<Tables<'drivers'>, 'full_name'> | null
+  truck: Pick<Tables<'trucks'>, 'unit_number'> | null
+  trailer: Pick<Tables<'trailers'>, 'unit_number'> | null
+}
+
+function mapLoad({ customer, driver, truck, trailer, ...load }: LoadRow): Load {
   return {
-    ...(row as unknown as Load),
+    ...load,
     customer_name: customer?.company_name ?? null,
     driver_name: driver?.full_name ?? null,
     truck_unit: truck?.unit_number ?? null,
     trailer_unit: trailer?.unit_number ?? null,
-    rate_per_mile: miles > 0 ? Math.round((rate / miles) * 100) / 100 : null,
+    rate_per_mile: load.miles > 0 ? Math.round((load.rate / load.miles) * 100) / 100 : null,
   }
 }
 
@@ -196,9 +209,9 @@ export interface LoadFilters {
 
 export async function listLoads(filters: LoadFilters = {}): Promise<Load[]> {
   let query = supabase.from('loads').select(LOAD_SELECT).order('created_at', { ascending: false }).limit(200)
-  if (filters.status) query = query.eq('status', filters.status)
-  if (filters.customer_id) query = query.eq('customer_id', filters.customer_id)
-  if (filters.driver_id) query = query.eq('driver_id', filters.driver_id)
+  if (filters.status) query = query.eq('status', filters.status as LoadStatus)
+  if (filters.customer_id) query = query.eq('customer_id', Number(filters.customer_id))
+  if (filters.driver_id) query = query.eq('driver_id', Number(filters.driver_id))
   if (filters.date_from) query = query.gte('pickup_time', filters.date_from)
   if (filters.date_to) query = query.lte('pickup_time', filters.date_to + 'T23:59:59')
   if (filters.q) {
@@ -209,12 +222,12 @@ export async function listLoads(filters: LoadFilters = {}): Promise<Load[]> {
       )
     }
   }
-  const rows = unwrap<Row[]>(await query)
+  const rows = unwrap(await query)
   return rows.map(mapLoad)
 }
 
 export async function getLoad(id: number | string): Promise<Load> {
-  return mapLoad(unwrap(await supabase.from('loads').select(LOAD_SELECT).eq('id', id).single()))
+  return mapLoad(unwrap(await supabase.from('loads').select(LOAD_SELECT).eq('id', Number(id)).single()))
 }
 
 // ---------- Load stops (multi-stop itinerary) ----------
@@ -231,14 +244,16 @@ export interface LoadStop {
 }
 
 export async function listStops(loadId: number | string): Promise<LoadStop[]> {
-  return unwrap(
-    await supabase.from('load_stops').select('*').eq('load_id', loadId).order('stop_type', { ascending: false }).order('seq'),
+  const rows = unwrap(
+    await supabase.from('load_stops').select('*').eq('load_id', Number(loadId)).order('stop_type', { ascending: false }).order('seq'),
   )
+  // stop_type is plain text in the schema; the app only ever writes these two values.
+  return rows.map((s) => ({ ...s, stop_type: s.stop_type as LoadStop['stop_type'] }))
 }
 
 /** Replace a load's full itinerary (delete + insert, seq renumbered). */
 export async function replaceStops(loadId: number | string, stops: Omit<LoadStop, 'id' | 'load_id' | 'seq'>[]): Promise<void> {
-  unwrap(await supabase.from('load_stops').delete().eq('load_id', loadId))
+  unwrap(await supabase.from('load_stops').delete().eq('load_id', Number(loadId)))
   if (stops.length === 0) return
   let pu = 0
   let del = 0
@@ -250,13 +265,15 @@ export async function replaceStops(loadId: number | string, stops: Omit<LoadStop
 }
 
 export async function createLoad(payload: Row, stops: Omit<LoadStop, 'id' | 'load_id' | 'seq'>[] = []): Promise<Load> {
-  const load = mapLoad(unwrap(await supabase.from('loads').insert(payload).select(LOAD_SELECT).single()))
+  const load = mapLoad(unwrap(await supabase.from('loads').insert(payload as TablesInsert<'loads'>).select(LOAD_SELECT).single()))
   if (stops.length > 0) await replaceStops(load.id, stops)
   return load
 }
 
 export async function updateLoad(id: number | string, payload: Row): Promise<Load> {
-  const load = mapLoad(unwrap(await supabase.from('loads').update(payload).eq('id', id).select(LOAD_SELECT).single()))
+  const load = mapLoad(
+    unwrap(await supabase.from('loads').update(payload as TablesUpdate<'loads'>).eq('id', Number(id)).select(LOAD_SELECT).single()),
+  )
   if (payload.driver_id != null) {
     void supabase.functions
       .invoke('notify', {
@@ -275,27 +292,31 @@ export async function changeLoadStatus(id: number | string, status: LoadStatus):
 
 const INVOICE_SELECT = '*, customer:customers(company_name), loads(id)'
 
-function mapInvoice(row: Row): Invoice {
-  const customer = row.customer as { company_name: string } | null
-  const loads = row.loads as { id: number }[] | null
+type InvoiceRow = Tables<'invoices'> & {
+  customer: Pick<Tables<'customers'>, 'company_name'> | null
+  loads: { id: number }[]
+}
+
+function mapInvoice({ customer, loads, ...invoice }: InvoiceRow): Invoice {
   return {
-    ...(row as unknown as Invoice),
+    ...invoice,
     customer_name: customer?.company_name ?? null,
-    load_count: loads?.length ?? 0,
+    load_count: loads.length,
   }
 }
 
 export async function listInvoices(): Promise<Invoice[]> {
-  const rows = unwrap<Row[]>(await supabase.from('invoices').select(INVOICE_SELECT).order('created_at', { ascending: false }))
+  const rows = unwrap(await supabase.from('invoices').select(INVOICE_SELECT).order('created_at', { ascending: false }))
   return rows.map(mapInvoice)
 }
 
 export async function createInvoice(customerId: number, loadIds: number[]): Promise<Invoice> {
-  return unwrap(await supabase.rpc('create_invoice', { p_customer_id: customerId, p_load_ids: loadIds }))
+  const invoice = unwrap(await supabase.rpc('create_invoice', { p_customer_id: customerId, p_load_ids: loadIds }))
+  return { ...invoice, customer_name: null, load_count: loadIds.length }
 }
 
 export async function setInvoiceStatus(id: number, status: string): Promise<void> {
-  unwrap(await supabase.rpc('set_invoice_status', { p_invoice_id: id, p_status: status }))
+  unwrap(await supabase.rpc('set_invoice_status', { p_invoice_id: id, p_status: status as Invoice['status'] }))
 }
 
 export async function voidInvoice(id: number): Promise<void> {
@@ -313,7 +334,7 @@ export interface InvoiceFull {
 }
 
 export async function getInvoiceFull(id: number): Promise<InvoiceFull> {
-  return unwrap<InvoiceFull>(
+  return unwrap(
     await supabase
       .from('invoices')
       .select('*, customer:customers(company_name, billing_address, payment_terms), loads(*)')
@@ -330,7 +351,7 @@ export async function listDocuments(entityType: string, entityId: number | strin
       .from('documents')
       .select('*')
       .eq('entity_type', entityType)
-      .eq('entity_id', entityId)
+      .eq('entity_id', Number(entityId))
       .order('uploaded_at', { ascending: false }),
   )
 }
@@ -385,19 +406,16 @@ export async function downloadDocument(doc: DocumentMeta): Promise<void> {
 // ---------- Activity / Notes ----------
 
 export async function listActivity(entityType: string, entityId: number | string): Promise<Activity[]> {
-  const rows = unwrap<Row[]>(
+  const rows = unwrap(
     await supabase
       .from('activity_log')
       .select('*, user:profiles(username, full_name)')
       .eq('entity_type', entityType)
-      .eq('entity_id', entityId)
+      .eq('entity_id', Number(entityId))
       .order('created_at', { ascending: false })
       .limit(200),
   )
-  return rows.map((row) => {
-    const user = row.user as { username: string; full_name: string } | null
-    return { ...(row as unknown as Activity), user_name: user ? user.full_name || user.username : null }
-  })
+  return rows.map(({ user, ...row }) => ({ ...row, user_name: user ? user.full_name || user.username : null }))
 }
 
 export async function addNote(entityType: string, entityId: number | string, detail: string): Promise<void> {
@@ -416,15 +434,15 @@ export async function addNote(entityType: string, entityId: number | string, det
 // ---------- Reports / Dashboard / Search ----------
 
 export async function weeklyReport(weekOf: string): Promise<WeeklyReport> {
-  return unwrap(await supabase.rpc('weekly_report', { p_week_of: weekOf }))
+  return unwrap(await supabase.rpc('weekly_report', { p_week_of: weekOf })) as unknown as WeeklyReport
 }
 
 export async function dashboardSummary(): Promise<DashboardSummary> {
-  return unwrap(await supabase.rpc('dashboard_summary'))
+  return unwrap(await supabase.rpc('dashboard_summary')) as unknown as DashboardSummary
 }
 
 export async function globalSearch(q: string): Promise<SearchResults> {
-  return unwrap(await supabase.rpc('global_search', { q }))
+  return unwrap(await supabase.rpc('global_search', { q })) as unknown as SearchResults
 }
 
 // ---------- Edge functions ----------
@@ -492,17 +510,14 @@ export async function listDriveFiles(drive: 'personal' | 'team', folder?: string
     .eq('drive', drive)
     .order('uploaded_at', { ascending: false })
   if (folder !== undefined) query = query.eq('folder', folder)
-  const rows = unwrap<Row[]>(await query)
-  return rows.map((row) => {
-    const owner = row.owner as { username: string; full_name: string } | null
-    return { ...(row as unknown as DriveFile), owner_name: owner ? owner.full_name || owner.username : null }
-  })
+  const rows = unwrap(await query)
+  return rows.map(({ owner, ...f }) => ({ ...f, drive, owner_name: owner ? owner.full_name || owner.username : null }))
 }
 
 /** Distinct folder labels present in a drive (for the folder filter). */
 export async function listDriveFolders(drive: 'personal' | 'team'): Promise<string[]> {
-  const rows = unwrap<Row[]>(await supabase.from('drive_files').select('folder').eq('drive', drive))
-  return [...new Set(rows.map((r) => String(r.folder)).filter(Boolean))].sort()
+  const rows = unwrap(await supabase.from('drive_files').select('folder').eq('drive', drive))
+  return [...new Set(rows.map((r) => r.folder).filter(Boolean))].sort()
 }
 
 export async function uploadDriveFile(drive: 'personal' | 'team', file: File, folder = ''): Promise<void> {
