@@ -782,6 +782,47 @@ export async function deleteDriveItems(drive: DriveName, ids: number[]): Promise
   }
 }
 
+/** Ensure a nested folder path exists (used by folder upload). */
+export async function ensureDrivePath(drive: DriveName, path: string): Promise<void> {
+  unwrap(await supabase.rpc('drive_ensure_path', { p_drive: drive, p_path: path }))
+}
+
+// ---------- public share links ----------
+
+export interface DriveShare {
+  id: number
+  token: string
+  drive_file_id: number
+  created_at: string
+  expires_at: string | null
+  revoked: boolean
+}
+
+/** Create a public download link for a file; returns the token. */
+export async function createDriveShare(fileId: number, expiresAt?: string): Promise<string> {
+  return unwrap(await supabase.rpc('drive_create_share', { p_file_id: fileId, p_expires_at: expiresAt })) as unknown as string
+}
+
+/** The public URL anyone can use to download the shared file. */
+export function driveShareUrl(token: string): string {
+  return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/drive-share?t=${token}`
+}
+
+export async function listDriveShares(fileId: number): Promise<DriveShare[]> {
+  return unwrap(
+    await supabase
+      .from('drive_shares')
+      .select('id, token, drive_file_id, created_at, expires_at, revoked')
+      .eq('drive_file_id', fileId)
+      .eq('revoked', false)
+      .order('created_at', { ascending: false }),
+  ) as unknown as DriveShare[]
+}
+
+export async function revokeDriveShare(id: number): Promise<void> {
+  unwrap(await supabase.from('drive_shares').update({ revoked: true }).eq('id', id))
+}
+
 // ---------- Company settings ----------
 
 export interface CompanySettings {

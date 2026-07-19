@@ -1,24 +1,36 @@
 /** Dropbox-like file area for Personal Drive (private) and Team Drive (shared).
- * Real nested folders (metadata: parent + is_folder), grid/list views,
- * drag-drop upload, previews via signed URLs, rename/move/delete. RLS on
- * drive_files + the storage buckets is the real access control. */
+ * Nested folders (metadata: parent + is_folder), grid/list views, drag-drop
+ * upload of files AND folders, in-app drag-to-move, previews and public share
+ * links via signed URLs, rename/move/delete. RLS on drive_files + the storage
+ * buckets is the real access control. */
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useRef, useState } from 'react'
 import {
   createDriveFolder,
+  createDriveShare,
   deleteDriveItems,
   downloadDriveItem,
+  driveShareUrl,
   driveSignedUrl,
+  ensureDrivePath,
   listDriveFolderPaths,
   listDriveItems,
+  listDriveShares,
   moveDriveItems,
   renameDriveItem,
+  revokeDriveShare,
   searchDriveItems,
   uploadDriveFile,
   type DriveItem,
 } from '../data'
 import { errorMessage } from '../supabase'
 import { Button, formatDateTime, Input, LoadError, Modal } from '../components/ui'
+
+type DriveName = 'personal' | 'team'
+interface UploadEntry {
+  file: File
+  rel: string
+}
 
 function fileSize(bytes: number): string {
   if (!bytes) return '—'
@@ -31,8 +43,8 @@ function fileSize(bytes: number): string {
 const fullPathOf = (i: DriveItem) => (i.parent === '' ? i.filename : `${i.parent}/${i.filename}`)
 const isImage = (i: DriveItem) => i.content_type.startsWith('image/')
 const isPdf = (i: DriveItem) => i.content_type === 'application/pdf'
+const isFileDrag = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files')
 
-/** Emoji + tile colour by type — a big step up from the old icon-less table. */
 function icon(i: DriveItem): { emoji: string; bg: string } {
   if (i.is_folder) return { emoji: '📁', bg: 'bg-amber-400/15' }
   const ct = i.content_type
@@ -49,7 +61,34 @@ function icon(i: DriveItem): { emoji: string; bg: string } {
   return { emoji: '📄', bg: 'bg-slate-400/15' }
 }
 
-/** Signed-URL image thumbnail (falls back to the type icon). */
+// ---- folder-drop traversal (webkitGetAsEntry) ----
+/* eslint-disable @typescript-eslint/no-explicit-any -- FileSystemEntry APIs are untyped */
+async function readEntry(entry: any, prefix: string, out: UploadEntry[]): Promise<void> {
+  if (entry.isFile) {
+    const file: File = await new Promise((res, rej) => entry.file(res, rej))
+    out.push({ file, rel: prefix + entry.name })
+  } else if (entry.isDirectory) {
+    const reader = entry.createReader()
+    for (;;) {
+      const batch: any[] = await new Promise((res, rej) => reader.readEntries(res, rej))
+      if (!batch.length) break
+      for (const child of batch) await readEntry(child, `${prefix}${entry.name}/`, out)
+    }
+  }
+}
+function entriesFromDrop(dt: DataTransfer): any[] | null {
+  if (!dt.items?.length) return null
+  const entries: any[] = []
+  for (let i = 0; i < dt.items.length; i++) {
+    const it = dt.items[i] as any
+    if (it.kind !== 'file' || !it.webkitGetAsEntry) continue
+    const en = it.webkitGetAsEntry()
+    if (en) entries.push(en)
+  }
+  return entries.length ? entries : null
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 function Thumb({ item, size }: { item: DriveItem; size: number }) {
   const q = useQuery({
     queryKey: ['drive-thumb', item.id],
@@ -68,10 +107,12 @@ function Thumb({ item, size }: { item: DriveItem; size: number }) {
   )
 }
 
-export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
+export default function Drive({ drive }: { drive: DriveName }) {
   const qc = useQueryClient()
   const isTeam = drive === 'team'
   const fileRef = useRef<HTMLInputElement>(null)
+  const folderRef = useRef<HTMLInputElement>(null)
+  const dragRef = useRef<number[] | null>(null)
 
   const [path, setPath] = useState('')
   const [view, setView] = useState<'grid' | 'list'>('grid')
@@ -83,7 +124,9 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
   const [renameVal, setRenameVal] = useState('')
   const [moving, setMoving] = useState<number[] | null>(null)
   const [newFolder, setNewFolder] = useState<string | null>(null)
+  const [sharing, setSharing] = useState<DriveItem | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState('')
 
@@ -126,25 +169,6 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
       return n
     })
   }
-
-  async function doUpload(files: FileList | File[]) {
-    const arr = Array.from(files)
-    if (!arr.length) return
-    setError('')
-    setUploading({ done: 0, total: arr.length })
-    for (let i = 0; i < arr.length; i++) {
-      try {
-        await uploadDriveFile(drive, arr[i], path)
-      } catch (e) {
-        setError(errorMessage(e))
-      }
-      setUploading({ done: i + 1, total: arr.length })
-    }
-    setUploading(null)
-    if (fileRef.current) fileRef.current.value = ''
-    invalidate()
-  }
-
   async function run(fn: () => Promise<void>) {
     try {
       await fn()
@@ -156,15 +180,108 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
     }
   }
 
+  // ---- uploads ----
+  async function doUpload(files: FileList | File[], basePath = path) {
+    const arr = Array.from(files)
+    if (!arr.length) return
+    setError('')
+    setUploading({ done: 0, total: arr.length })
+    for (let i = 0; i < arr.length; i++) {
+      try {
+        await uploadDriveFile(drive, arr[i], basePath)
+      } catch (e) {
+        setError(errorMessage(e))
+      }
+      setUploading({ done: i + 1, total: arr.length })
+    }
+    setUploading(null)
+    if (fileRef.current) fileRef.current.value = ''
+    invalidate()
+  }
+  async function doUploadEntries(entries: UploadEntry[], basePath = path) {
+    if (!entries.length) return
+    setError('')
+    setUploading({ done: 0, total: entries.length })
+    const ensured = new Set<string>()
+    for (let i = 0; i < entries.length; i++) {
+      const { file, rel } = entries[i]
+      const parts = rel.split('/')
+      parts.pop()
+      const relDir = parts.join('/')
+      const parent = relDir ? (basePath ? `${basePath}/${relDir}` : relDir) : basePath
+      try {
+        if (relDir && !ensured.has(parent)) {
+          await ensureDrivePath(drive, parent)
+          ensured.add(parent)
+        }
+        await uploadDriveFile(drive, file, parent)
+      } catch (e) {
+        setError(errorMessage(e))
+      }
+      setUploading({ done: i + 1, total: entries.length })
+    }
+    setUploading(null)
+    if (folderRef.current) folderRef.current.value = ''
+    invalidate()
+  }
+  function handleExternalDrop(e: React.DragEvent, base: string) {
+    const entries = entriesFromDrop(e.dataTransfer)
+    if (entries) readAllThenUpload(entries, base)
+    else if (e.dataTransfer.files?.length) doUpload(e.dataTransfer.files, base)
+  }
+  async function readAllThenUpload(entries: unknown[], base: string) {
+    const out: UploadEntry[] = []
+    for (const en of entries) await readEntry(en, '', out)
+    if (out.length) doUploadEntries(out, base)
+  }
+
+  // ---- drag to move ----
+  function onItemDragStart(e: React.DragEvent, item: DriveItem) {
+    const ids = selected.has(item.id) && selected.size > 0 ? [...selected] : [item.id]
+    dragRef.current = ids
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('application/x-trux', ids.join(','))
+  }
+  function onDropInto(e: React.DragEvent, dest: string, excludeId?: number) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDropTarget(null)
+    setDragOver(false)
+    if (isFileDrag(e)) {
+      handleExternalDrop(e, dest)
+      return
+    }
+    const ids = (dragRef.current ?? []).filter((id) => id !== excludeId)
+    dragRef.current = null
+    if (ids.length) run(() => moveDriveItems(ids, dest)).then(clearSel)
+  }
+  function targetProps(key: string, dest: string, excludeId?: number) {
+    return {
+      onDragOver: (e: React.DragEvent) => {
+        if (isFileDrag(e) || dragRef.current) {
+          e.preventDefault()
+          e.stopPropagation()
+          e.dataTransfer.dropEffect = isFileDrag(e) ? 'copy' : 'move'
+          if (dropTarget !== key) setDropTarget(key)
+        }
+      },
+      onDragLeave: () => setDropTarget((t) => (t === key ? null : t)),
+      onDrop: (e: React.DragEvent) => onDropInto(e, dest, excludeId),
+    }
+  }
+
   const selItems = items.filter((i) => selected.has(i.id))
+  const oneFile = selItems.length === 1 && !selItems[0].is_folder
   const crumbs = path === '' ? [] : path.split('/')
 
   return (
     <div
       className="space-y-3"
       onDragOver={(e) => {
-        e.preventDefault()
-        if (!dragOver) setDragOver(true)
+        if (isFileDrag(e)) {
+          e.preventDefault()
+          if (!dragOver) setDragOver(true)
+        }
       }}
       onDragLeave={(e) => {
         if (e.currentTarget === e.target) setDragOver(false)
@@ -172,7 +289,7 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
       onDrop={(e) => {
         e.preventDefault()
         setDragOver(false)
-        if (e.dataTransfer.files?.length) doUpload(e.dataTransfer.files)
+        if (isFileDrag(e)) handleExternalDrop(e, path)
       }}
     >
       {/* header */}
@@ -184,10 +301,26 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Input placeholder="Search this drive…" value={search} onChange={(e) => setSearch(e.target.value)} className="w-44 sm:w-56" />
-          <Button variant="secondary" onClick={() => setNewFolder('')}>＋ Folder</Button>
-          <Button onClick={() => fileRef.current?.click()}>⬆ Upload</Button>
+          <Input placeholder="Search this drive…" value={search} onChange={(e) => setSearch(e.target.value)} className="w-40 sm:w-52" />
+          <Button variant="secondary" onClick={() => setNewFolder('')} title="New folder">＋ Folder</Button>
+          <Button onClick={() => fileRef.current?.click()} title="Upload files">⬆ Files</Button>
+          <Button variant="secondary" onClick={() => folderRef.current?.click()} title="Upload a folder from your computer">⬆ Folder</Button>
           <input ref={fileRef} type="file" multiple className="hidden" onChange={(e) => e.target.files && doUpload(e.target.files)} />
+          <input
+            ref={folderRef}
+            type="file"
+            className="hidden"
+            /* @ts-expect-error non-standard directory-upload attributes */
+            webkitdirectory=""
+            directory=""
+            onChange={(e) => {
+              const files = e.target.files
+              if (files?.length) {
+                const entries: UploadEntry[] = Array.from(files).map((f) => ({ file: f, rel: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name }))
+                doUploadEntries(entries)
+              }
+            }}
+          />
           <div className="flex overflow-hidden rounded-lg border border-line">
             <button onClick={() => setView('grid')} className={`px-2.5 py-1.5 text-sm ${view === 'grid' ? 'bg-surface-2 text-body' : 'text-muted'}`} title="Grid">▦</button>
             <button onClick={() => setView('list')} className={`px-2.5 py-1.5 text-sm ${view === 'list' ? 'bg-surface-2 text-body' : 'text-muted'}`} title="List">☰</button>
@@ -195,10 +328,14 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
         </div>
       </div>
 
-      {/* breadcrumbs */}
+      {/* breadcrumbs (also move drop targets) */}
       {!searching && (
         <div className="flex flex-wrap items-center gap-1 text-sm">
-          <button onClick={() => go('')} className={`rounded px-1.5 py-0.5 hover:bg-surface-2 ${path === '' ? 'font-semibold text-body' : 'text-brand'}`}>
+          <button
+            onClick={() => go('')}
+            {...targetProps('croot', '')}
+            className={`rounded px-1.5 py-0.5 ${dropTarget === 'croot' ? 'bg-brand/15 ring-1 ring-brand' : 'hover:bg-surface-2'} ${path === '' ? 'font-semibold text-body' : 'text-brand'}`}
+          >
             {isTeam ? '🗂️ Team' : '📁 Home'}
           </button>
           {crumbs.map((c, i) => {
@@ -207,7 +344,13 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
             return (
               <span key={to} className="flex items-center gap-1">
                 <span className="text-muted">/</span>
-                <button onClick={() => go(to)} className={`rounded px-1.5 py-0.5 hover:bg-surface-2 ${last ? 'font-semibold text-body' : 'text-brand'}`}>{c}</button>
+                <button
+                  onClick={() => go(to)}
+                  {...targetProps(`c${to}`, to)}
+                  className={`rounded px-1.5 py-0.5 ${dropTarget === `c${to}` ? 'bg-brand/15 ring-1 ring-brand' : 'hover:bg-surface-2'} ${last ? 'font-semibold text-body' : 'text-brand'}`}
+                >
+                  {c}
+                </button>
               </span>
             )
           })}
@@ -215,24 +358,22 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
       )}
 
       {error && <p className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-300">{error}</p>}
-      {uploading && (
-        <p className="rounded-lg bg-blue-500/10 p-3 text-sm text-blue-700 dark:text-blue-300">Uploading {uploading.done}/{uploading.total}…</p>
-      )}
+      {uploading && <p className="rounded-lg bg-blue-500/10 p-3 text-sm text-blue-700 dark:text-blue-300">Uploading {uploading.done}/{uploading.total}…</p>}
 
       {/* selection toolbar */}
       {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm">
           <span className="font-medium">{selected.size} selected</span>
           <div className="ml-auto flex flex-wrap gap-2">
+            {oneFile && <Button variant="secondary" onClick={() => setSharing(selItems[0])}>Share</Button>}
             <Button variant="secondary" onClick={() => selItems.forEach((i) => !i.is_folder && downloadDriveItem(i).catch((e) => setError(errorMessage(e))))}>Download</Button>
             <Button variant="secondary" onClick={() => setMoving([...selected])}>Move</Button>
             {selected.size === 1 && (
               <Button
                 variant="secondary"
                 onClick={() => {
-                  const it = selItems[0]
-                  setRenaming(it)
-                  setRenameVal(it.filename)
+                  setRenaming(selItems[0])
+                  setRenameVal(selItems[0].filename)
                 }}
               >
                 Rename
@@ -262,18 +403,23 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
       ) : items.length === 0 ? (
         <div className="rounded-xl border-2 border-dashed border-line py-16 text-center">
           <p className="text-muted">{searching ? 'No matches.' : 'This folder is empty.'}</p>
-          {!searching && <p className="mt-1 text-sm text-muted">Drag files here, or use Upload.</p>}
+          {!searching && <p className="mt-1 text-sm text-muted">Drag files or folders here, or use Upload.</p>}
         </div>
       ) : view === 'grid' ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {items.map((i) => {
             const sel = selected.has(i.id)
+            const isTarget = i.is_folder && dropTarget === `f${i.id}`
             return (
               <div
                 key={i.id}
+                draggable
+                onDragStart={(e) => onItemDragStart(e, i)}
+                onDragEnd={() => (dragRef.current = null)}
                 onClick={() => toggle(i.id)}
                 onDoubleClick={() => open(i)}
-                className={`group relative cursor-pointer rounded-xl border p-3 transition-colors ${sel ? 'border-brand bg-brand/5' : 'border-line hover:bg-surface-2'}`}
+                {...(i.is_folder ? targetProps(`f${i.id}`, fullPathOf(i), i.id) : {})}
+                className={`group relative cursor-pointer rounded-xl border p-3 transition-colors ${isTarget ? 'border-brand ring-2 ring-brand' : sel ? 'border-brand bg-brand/5' : 'border-line hover:bg-surface-2'}`}
                 title={i.filename}
               >
                 <input
@@ -310,10 +456,7 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
                 </th>
                 {([['name', 'Name'], ['modified', 'Modified'], ['size', 'Size']] as const).map(([key, label]) => (
                   <th key={key} className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted">
-                    <button
-                      onClick={() => setSort((s) => ({ key, dir: s.key === key && s.dir === 'asc' ? 'desc' : 'asc' }))}
-                      className="inline-flex items-center gap-1 hover:text-body"
-                    >
+                    <button onClick={() => setSort((s) => ({ key, dir: s.key === key && s.dir === 'asc' ? 'desc' : 'asc' }))} className="inline-flex items-center gap-1 hover:text-body">
                       {label}
                       {sort.key === key && <span>{sort.dir === 'asc' ? '↑' : '↓'}</span>}
                     </button>
@@ -326,8 +469,18 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
               {items.map((i) => {
                 const sel = selected.has(i.id)
                 const ic = icon(i)
+                const isTarget = i.is_folder && dropTarget === `f${i.id}`
                 return (
-                  <tr key={i.id} className={`cursor-pointer ${sel ? 'bg-brand/5' : 'hover:bg-surface-2'}`} onClick={() => toggle(i.id)} onDoubleClick={() => open(i)}>
+                  <tr
+                    key={i.id}
+                    draggable
+                    onDragStart={(e) => onItemDragStart(e, i)}
+                    onDragEnd={() => (dragRef.current = null)}
+                    className={`cursor-pointer ${isTarget ? 'ring-2 ring-inset ring-brand' : sel ? 'bg-brand/5' : 'hover:bg-surface-2'}`}
+                    onClick={() => toggle(i.id)}
+                    onDoubleClick={() => open(i)}
+                    {...(i.is_folder ? targetProps(`f${i.id}`, fullPathOf(i), i.id) : {})}
+                  >
                     <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={sel} onChange={() => toggle(i.id)} className="h-4 w-4" />
                     </td>
@@ -355,7 +508,7 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
         </div>
       )}
 
-      {/* drag overlay */}
+      {/* drag overlay (file upload only) */}
       {dragOver && (
         <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-brand/10 backdrop-blur-sm">
           <div className="rounded-2xl border-2 border-dashed border-brand bg-surface px-8 py-6 text-lg font-semibold text-brand">Drop to upload to {path === '' ? 'this drive' : path}</div>
@@ -364,7 +517,16 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
 
       {/* preview */}
       <Modal title={preview?.filename ?? ''} open={!!preview} onClose={() => setPreview(null)}>
-        {preview && <PreviewBody item={preview} onDownload={() => downloadDriveItem(preview).catch((e) => setError(errorMessage(e)))} />}
+        {preview && (
+          <PreviewBody
+            item={preview}
+            onDownload={() => downloadDriveItem(preview).catch((e) => setError(errorMessage(e)))}
+            onShare={() => {
+              setSharing(preview)
+              setPreview(null)
+            }}
+          />
+        )}
       </Modal>
 
       {/* new folder */}
@@ -414,16 +576,18 @@ export default function Drive({ drive }: { drive: 'personal' | 'team' }) {
         onClose={() => setMoving(null)}
         onMove={(dest) => {
           const ids = moving ?? []
-          run(() => moveDriveItems(ids, dest))
+          run(() => moveDriveItems(ids, dest)).then(clearSel)
           setMoving(null)
-          clearSel()
         }}
       />
+
+      {/* share */}
+      <ShareModal item={sharing} open={!!sharing} onClose={() => setSharing(null)} />
     </div>
   )
 }
 
-function PreviewBody({ item, onDownload }: { item: DriveItem; onDownload: () => void }) {
+function PreviewBody({ item, onDownload, onShare }: { item: DriveItem; onDownload: () => void; onShare: () => void }) {
   const q = useQuery({ queryKey: ['drive-preview', item.id], queryFn: () => driveSignedUrl(item.drive, item.storage_path!, undefined), enabled: !!item.storage_path })
   return (
     <div className="space-y-3">
@@ -438,7 +602,8 @@ function PreviewBody({ item, onDownload }: { item: DriveItem; onDownload: () => 
       ) : (
         <p className="py-10 text-center text-muted">No inline preview for this file type.</p>
       )}
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button variant="secondary" onClick={onShare}>🔗 Share</Button>
         <Button onClick={onDownload}>⬇ Download</Button>
       </div>
     </div>
@@ -453,7 +618,7 @@ function MoveModal({
   onClose,
   onMove,
 }: {
-  drive: 'personal' | 'team'
+  drive: DriveName
   open: boolean
   movingIds: number[]
   currentParent: string
@@ -461,30 +626,78 @@ function MoveModal({
   onMove: (dest: string) => void
 }) {
   const foldersQ = useQuery({ queryKey: ['drive-folder-paths', drive], queryFn: () => listDriveFolderPaths(drive), enabled: open })
-  // Can't move an item into itself or its own subtree.
   const movingSet = new Set(movingIds)
   const dests = (foldersQ.data ?? []).filter((f) => !movingSet.has(f.id))
   return (
     <Modal title="Move to…" open={open} onClose={onClose}>
       <div className="max-h-[50vh] space-y-1 overflow-y-auto">
-        <button
-          disabled={currentParent === ''}
-          onClick={() => onMove('')}
-          className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2 disabled:opacity-40"
-        >
+        <button disabled={currentParent === ''} onClick={() => onMove('')} className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2 disabled:opacity-40">
           📁 {drive === 'team' ? 'Team' : 'Home'} (root)
         </button>
         {dests.map((f) => (
-          <button
-            key={f.id}
-            disabled={f.path === currentParent}
-            onClick={() => onMove(f.path)}
-            className="block w-full truncate rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2 disabled:opacity-40"
-          >
+          <button key={f.id} disabled={f.path === currentParent} onClick={() => onMove(f.path)} className="block w-full truncate rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2 disabled:opacity-40">
             📁 {f.path}
           </button>
         ))}
         {dests.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted">No other folders yet — create one first.</p>}
+      </div>
+    </Modal>
+  )
+}
+
+function ShareModal({ item, open, onClose }: { item: DriveItem | null; open: boolean; onClose: () => void }) {
+  const qc = useQueryClient()
+  const sharesQ = useQuery({ queryKey: ['drive-shares', item?.id], queryFn: () => listDriveShares(item!.id), enabled: open && !!item })
+  const [busy, setBusy] = useState(false)
+  const [copied, setCopied] = useState('')
+  const [err, setErr] = useState('')
+
+  async function create() {
+    if (!item) return
+    setBusy(true)
+    setErr('')
+    try {
+      await createDriveShare(item.id)
+      qc.invalidateQueries({ queryKey: ['drive-shares', item.id] })
+    } catch (e) {
+      setErr(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  async function revoke(id: number) {
+    await revokeDriveShare(id)
+    qc.invalidateQueries({ queryKey: ['drive-shares', item?.id] })
+  }
+  function copy(url: string) {
+    navigator.clipboard?.writeText(url)
+    setCopied(url)
+    setTimeout(() => setCopied(''), 1500)
+  }
+  const shares = sharesQ.data ?? []
+
+  return (
+    <Modal title={`Share "${item?.filename ?? ''}"`} open={open} onClose={onClose}>
+      <p className="mb-3 text-sm text-muted">Anyone with a link below can download this file — no sign-in needed. Revoke a link any time to turn it off.</p>
+      {err && <p className="mb-2 text-sm text-red-600">{err}</p>}
+      {shares.length === 0 ? (
+        <p className="py-2 text-sm text-muted">No links yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {shares.map((s) => {
+            const url = driveShareUrl(s.token)
+            return (
+              <li key={s.id} className="flex items-center gap-2 rounded-lg border border-line p-2">
+                <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} className="min-w-0 flex-1 truncate rounded bg-surface-2 px-2 py-1 text-xs" />
+                <Button variant="secondary" onClick={() => copy(url)}>{copied === url ? 'Copied' : 'Copy'}</Button>
+                <Button variant="danger" onClick={() => revoke(s.id)}>Revoke</Button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <div className="mt-4 flex justify-end">
+        <Button disabled={busy} onClick={create}>{busy ? 'Creating…' : '＋ Create link'}</Button>
       </div>
     </Modal>
   )

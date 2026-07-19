@@ -50,3 +50,7 @@ verify_jwt = false
 [functions.toll-sync]
 # admin JWT verified in-function via getCaller; cron uses the X-Toll-Key shared secret
 verify_jwt = false
+
+[functions.drive-share]
+# public download door: resolves a share token to a short-lived signed URL
+verify_jwt = false

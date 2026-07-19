@@ -276,6 +276,51 @@ export type Database = {
           },
         ]
       }
+      drive_shares: {
+        Row: {
+          created_at: string
+          created_by: string
+          drive_file_id: number
+          expires_at: string | null
+          id: number
+          revoked: boolean
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          drive_file_id: number
+          expires_at?: string | null
+          id?: never
+          revoked?: boolean
+          token: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          drive_file_id?: number
+          expires_at?: string | null
+          id?: never
+          revoked?: boolean
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drive_shares_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drive_shares_drive_file_id_fkey"
+            columns: ["drive_file_id"]
+            isOneToOne: false
+            referencedRelation: "drive_files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_duty: {
         Row: {
           driver_id: number
@@ -2100,7 +2145,15 @@ export type Database = {
       create_work_order_draft: { Args: { p: Json }; Returns: number }
       current_odometer: { Args: { p_truck_id: number }; Returns: number }
       dashboard_summary: { Args: never; Returns: Json }
+      drive_create_share: {
+        Args: { p_expires_at?: string; p_file_id: number }
+        Returns: string
+      }
       drive_delete: { Args: { p_ids: number[] }; Returns: string[] }
+      drive_ensure_path: {
+        Args: { p_drive: string; p_path: string }
+        Returns: undefined
+      }
       drive_move: {
         Args: { p_ids: number[]; p_new_parent: string }
         Returns: undefined
