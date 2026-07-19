@@ -49,14 +49,24 @@ row instead of duplicating. Re-running any time is safe.
    When it eventually expires, a scheduled run emails an alert and you repeat
    this step.
 
-## Cron (local time)
+## Cron — 03:00 & 16:00 Central America time (UTC−6, no DST)
 
-`0300` and `1600` local — set the crontab in the NAS's own timezone (confirm
-with `timedatectl`):
+Central America Standard Time has no daylight saving, so the UTC offset is
+fixed and the schedule never drifts: 03:00 → 09:00 UTC, 16:00 → 22:00 UTC.
+Two equivalent ways to set it:
 
 ```cron
+# A) TZ-explicit (self-documenting; America/Guatemala/Costa_Rica/Tegucigalpa are all UTC-6 no-DST)
+CRON_TZ=America/Guatemala
 0 3,16 * * *  cd /path/to/truxon/deploy/fuel && /usr/bin/node fetch-atob.mjs >> fuel.log 2>&1
+
+# B) Plain UTC (if the NAS cron ignores CRON_TZ) — same instants
+0 9,22 * * *  cd /path/to/truxon/deploy/fuel && /usr/bin/node fetch-atob.mjs >> fuel.log 2>&1
 ```
+
+(If you actually meant US Central Time, which *does* observe DST, use
+`CRON_TZ=America/Chicago` with `0 3,16 * * *` instead — do NOT use the fixed-UTC
+form, it would drift an hour across DST changes.)
 
 ## Manual import (no scheduler needed)
 
