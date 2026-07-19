@@ -823,6 +823,22 @@ export async function revokeDriveShare(id: number): Promise<void> {
   unwrap(await supabase.from('drive_shares').update({ revoked: true }).eq('id', id))
 }
 
+// ---------- Trux premium voice ----------
+
+/** POST answer text to the trux-tts edge function; returns MP3 audio (the key
+ * stays server-side). Throws on any non-2xx so the caller can fall back to the
+ * free browser voice. */
+export async function synthesizeSpeech(text: string): Promise<Blob> {
+  const { data } = await supabase.auth.getSession()
+  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/trux-tts`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  if (!res.ok) throw new Error(`Voice ${res.status}`)
+  return res.blob()
+}
+
 // ---------- Company settings ----------
 
 export interface CompanySettings {

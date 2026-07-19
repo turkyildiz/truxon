@@ -16,6 +16,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { errorMessage } from '../supabase'
+import { synthesizeSpeech } from '../data'
 import { LoadError } from '../components/ui'
 import { truxAgent, ToolResult, type Proposal } from '../components/TruxChat'
 
@@ -144,6 +145,13 @@ export default function Trux() {
   const [phase, setPhaseState] = useState<Phase>('idle')
   const [interim, setInterim] = useState('')
   const [micDenied, setMicDenied] = useState(false)
+  const [premium, setPremium] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('trux_premium_voice') === '1'
+    } catch {
+      return false
+    }
+  })
 
   // Refs let the async Web Speech callbacks (which capture an old render) read
   // the *current* intent instead of a stale snapshot.
@@ -151,6 +159,22 @@ export default function Trux() {
   const handsFreeRef = useRef(false)
   const phaseRef = useRef<Phase>('idle')
   const startListeningRef = useRef<() => void>(() => {})
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const speakSeqRef = useRef(0)
+  const premiumRef = useRef(premium)
+  premiumRef.current = premium
+
+  function togglePremium() {
+    setPremium((p) => {
+      const n = !p
+      try {
+        localStorage.setItem('trux_premium_voice', n ? '1' : '0')
+      } catch {
+        /* ignore */
+      }
+      return n
+    })
+  }
 
   function setPhase(p: Phase) {
     phaseRef.current = p
@@ -209,7 +233,13 @@ export default function Trux() {
   })
 
   function cancelSpeech() {
+    // Bump the sequence so any in-flight fetch/utterance is ignored on return.
+    speakSeqRef.current++
     if (SYNTH_OK) window.speechSynthesis.cancel()
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
   }
 
   function stopRecognition() {
@@ -227,17 +257,51 @@ export default function Trux() {
   }
 
   /** Speak an answer aloud; `resume` chains back into the hands-free loop when
-   * the utterance finishes (barge-in-safe: any new query cancels it). */
-  function speak(md: string, resume: boolean) {
-    if (!SYNTH_OK) {
-      if (resume && handsFreeRef.current) startListeningRef.current()
-      return
-    }
-    window.speechSynthesis.cancel()
+   * playback finishes. Barge-in-safe: cancelSpeech bumps a sequence so an
+   * in-flight fetch or utterance is ignored. Premium mode streams a British
+   * male neural voice from the trux-tts function; browser speechSynthesis is the
+   * free fallback (also used if premium fails). */
+  async function speak(md: string, resume: boolean) {
+    cancelSpeech()
+    const seq = speakSeqRef.current
     const spoken = toSpeech(md)
+    const resumeOrIdle = () => {
+      if (seq !== speakSeqRef.current) return
+      if (resume && handsFreeRef.current) startListeningRef.current()
+      else if (phaseRef.current === 'speaking') setPhase('idle')
+    }
     if (!spoken) {
       if (resume && handsFreeRef.current) startListeningRef.current()
       else setPhase('idle')
+      return
+    }
+    setPhase('speaking')
+    if (premiumRef.current) {
+      try {
+        const blob = await synthesizeSpeech(spoken)
+        if (seq !== speakSeqRef.current) return // barged in during the fetch
+        const url = URL.createObjectURL(blob)
+        const audio = new Audio(url)
+        audioRef.current = audio
+        const end = () => {
+          URL.revokeObjectURL(url)
+          resumeOrIdle()
+        }
+        audio.onended = end
+        audio.onerror = end
+        await audio.play()
+        return
+      } catch {
+        if (seq !== speakSeqRef.current) return
+        // fall through to the free browser voice
+      }
+    }
+    browserSpeak(spoken, resumeOrIdle)
+  }
+
+  function browserSpeak(spoken: string, resumeOrIdle: () => void) {
+    if (!SYNTH_OK) {
+      resumeOrIdle()
       return
     }
     const u = new SpeechSynthesisUtterance(spoken)
@@ -249,13 +313,8 @@ export default function Trux() {
     }
     u.rate = 0.97
     u.pitch = 0.9
-    const done = () => {
-      if (resume && handsFreeRef.current) startListeningRef.current()
-      else if (phaseRef.current === 'speaking') setPhase('idle')
-    }
-    u.onend = done
-    u.onerror = done
-    setPhase('speaking')
+    u.onend = resumeOrIdle
+    u.onerror = resumeOrIdle
     window.speechSynthesis.speak(u)
   }
 
@@ -461,6 +520,17 @@ export default function Trux() {
                 : 'Enter to ask · Any action Trux proposes needs your confirmation'}
             </p>
             <div className="flex items-center gap-2">
+              <button
+                onClick={togglePremium}
+                title={premium ? 'Premium British-male (JARVIS) voice is on — tap for the free browser voice' : 'Use the premium British-male (JARVIS) voice'}
+                aria-pressed={premium}
+                className={
+                  'rounded-full border px-3 py-1 text-xs font-semibold ' +
+                  (premium ? 'border-navy-600 bg-navy-500/15 text-navy-700 dark:text-navy-200' : 'border-line bg-surface text-muted hover:bg-surface-2')
+                }
+              >
+                🎩 JARVIS voice{premium ? ' · on' : ''}
+              </button>
               {handsFree && (
                 <span className={'rounded-full px-2.5 py-1 text-xs font-semibold ' + PILL[phase].cls}>{PILL[phase].label}</span>
               )}
