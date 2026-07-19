@@ -233,9 +233,11 @@ export type Database = {
           filename: string
           folder: string
           id: number
+          is_folder: boolean
           owner_id: string
+          parent: string
           size_bytes: number
-          storage_path: string
+          storage_path: string | null
           uploaded_at: string
         }
         Insert: {
@@ -244,9 +246,11 @@ export type Database = {
           filename: string
           folder?: string
           id?: never
+          is_folder?: boolean
           owner_id: string
+          parent?: string
           size_bytes?: number
-          storage_path: string
+          storage_path?: string | null
           uploaded_at?: string
         }
         Update: {
@@ -255,9 +259,11 @@ export type Database = {
           filename?: string
           folder?: string
           id?: never
+          is_folder?: boolean
           owner_id?: string
+          parent?: string
           size_bytes?: number
-          storage_path?: string
+          storage_path?: string | null
           uploaded_at?: string
         }
         Relationships: [
@@ -2094,6 +2100,15 @@ export type Database = {
       create_work_order_draft: { Args: { p: Json }; Returns: number }
       current_odometer: { Args: { p_truck_id: number }; Returns: number }
       dashboard_summary: { Args: never; Returns: Json }
+      drive_delete: { Args: { p_ids: number[] }; Returns: string[] }
+      drive_move: {
+        Args: { p_ids: number[]; p_new_parent: string }
+        Returns: undefined
+      }
+      drive_rename: {
+        Args: { p_id: number; p_new_name: string }
+        Returns: undefined
+      }
       driver_add_document: {
         Args: {
           p_content_type?: string

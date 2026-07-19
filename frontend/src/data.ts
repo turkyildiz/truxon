@@ -645,75 +645,141 @@ export async function updateUser(id: string, payload: Row): Promise<void> {
   await invokeAdminUsers({ method: 'PATCH', body: { id, ...payload } })
 }
 
-// ---------- Personal / Team drives ----------
+// ---------- Personal / Team drives (nested folders) ----------
+// Storage bytes stay flat in the bucket; the folder tree is metadata (parent +
+// is_folder). Move/rename are RPCs that rewrite descendant paths.
 
-export interface DriveFile {
+export type DriveName = 'personal' | 'team'
+
+export interface DriveItem {
   id: number
-  drive: 'personal' | 'team'
+  drive: DriveName
   owner_id: string
   filename: string
-  storage_path: string
+  storage_path: string | null
   content_type: string
   size_bytes: number
-  folder: string
+  parent: string
+  is_folder: boolean
   uploaded_at: string
   owner_name?: string | null
 }
 
-export async function listDriveFiles(drive: 'personal' | 'team', folder?: string): Promise<DriveFile[]> {
-  let query = supabase
-    .from('drive_files')
-    .select('*, owner:profiles(username, full_name)')
-    .eq('drive', drive)
-    .order('uploaded_at', { ascending: false })
-  if (folder !== undefined) query = query.eq('folder', folder)
-  const rows = unwrap(await query)
-  return rows.map(({ owner, ...f }) => ({ ...f, drive, owner_name: owner ? owner.full_name || owner.username : null }))
+export interface DriveFolderPath {
+  id: number
+  path: string
 }
 
-/** Distinct folder labels present in a drive (for the folder filter). */
-export async function listDriveFolders(drive: 'personal' | 'team'): Promise<string[]> {
-  const rows = unwrap(await supabase.from('drive_files').select('folder').eq('drive', drive))
-  return [...new Set(rows.map((r) => r.folder).filter(Boolean))].sort()
+type DriveRow = Tables<'drive_files'> & { owner: Pick<Tables<'profiles'>, 'username' | 'full_name'> | null }
+
+function mapDriveItem(drive: DriveName, { owner, ...f }: DriveRow): DriveItem {
+  return { ...f, drive, owner_name: owner ? owner.full_name || owner.username : null }
 }
 
-export async function uploadDriveFile(drive: 'personal' | 'team', file: File, folder = ''): Promise<void> {
+/** Items directly inside `parent` ('' = root); folders first, then by name. */
+export async function listDriveItems(drive: DriveName, parent: string): Promise<DriveItem[]> {
+  const rows = unwrap(
+    await supabase
+      .from('drive_files')
+      .select('*, owner:profiles(username, full_name)')
+      .eq('drive', drive)
+      .eq('parent', parent)
+      .order('is_folder', { ascending: false })
+      .order('filename', { ascending: true }),
+  )
+  return (rows as unknown as DriveRow[]).map((r) => mapDriveItem(drive, r))
+}
+
+/** Name-match across the whole drive (folders + files) for the search box. */
+export async function searchDriveItems(drive: DriveName, q: string): Promise<DriveItem[]> {
+  const term = sanitizeSearchTerm(q)
+  if (!term) return []
+  const rows = unwrap(
+    await supabase
+      .from('drive_files')
+      .select('*, owner:profiles(username, full_name)')
+      .eq('drive', drive)
+      .ilike('filename', `%${term}%`)
+      .order('is_folder', { ascending: false })
+      .order('filename', { ascending: true })
+      .limit(200),
+  )
+  return (rows as unknown as DriveRow[]).map((r) => mapDriveItem(drive, r))
+}
+
+/** Every folder as a full path (for the "Move to…" picker). */
+export async function listDriveFolderPaths(drive: DriveName): Promise<DriveFolderPath[]> {
+  const rows = unwrap(await supabase.from('drive_files').select('id, filename, parent').eq('drive', drive).eq('is_folder', true))
+  return rows
+    .map((r) => ({ id: r.id as number, path: r.parent ? `${r.parent}/${r.filename}` : (r.filename as string) }))
+    .sort((a, b) => a.path.localeCompare(b.path))
+}
+
+export async function createDriveFolder(drive: DriveName, parent: string, name: string): Promise<void> {
   const { data: userData } = await supabase.auth.getUser()
   const uid = userData.user?.id
   if (!uid) throw new Error('Not signed in')
-  const safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_')
-  const safeFolder = folder ? `${folder.replace(/[^A-Za-z0-9._ -]/g, '_')}/` : ''
-  const path = `${uid}/${safeFolder}${crypto.randomUUID().slice(0, 12)}_${safeName}`
-  const { error: upErr } = await supabase.storage.from(drive).upload(path, file, { contentType: file.type })
-  if (upErr) throw new Error(upErr.message)
+  const clean = name.trim().replace(/[/\\]/g, '_')
+  if (!clean) throw new Error('Folder name required')
   unwrap(
     await supabase.from('drive_files').insert({
-      drive,
-      owner_id: uid,
-      filename: file.name,
-      storage_path: path,
-      content_type: file.type || 'application/octet-stream',
-      size_bytes: file.size,
-      folder,
+      drive, owner_id: uid, filename: clean, storage_path: null, content_type: '', size_bytes: 0, parent, is_folder: true,
     }),
   )
 }
 
-export async function downloadDriveFile(f: DriveFile): Promise<void> {
-  const { data, error } = await supabase.storage.from(f.drive).download(f.storage_path)
-  if (error) throw new Error(error.message)
-  const url = URL.createObjectURL(data)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = f.filename
-  a.click()
-  URL.revokeObjectURL(url)
+export async function uploadDriveFile(drive: DriveName, file: File, parent = ''): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser()
+  const uid = userData.user?.id
+  if (!uid) throw new Error('Not signed in')
+  const safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_')
+  const path = `${uid}/${crypto.randomUUID().slice(0, 12)}_${safeName}`
+  const { error: upErr } = await supabase.storage.from(drive).upload(path, file, { contentType: file.type })
+  if (upErr) throw new Error(upErr.message)
+  unwrap(
+    await supabase.from('drive_files').insert({
+      drive, owner_id: uid, filename: file.name, storage_path: path,
+      content_type: file.type || 'application/octet-stream', size_bytes: file.size, parent, is_folder: false,
+    }),
+  )
 }
 
-export async function deleteDriveFile(f: DriveFile): Promise<void> {
-  const { error: storageErr } = await supabase.storage.from(f.drive).remove([f.storage_path])
-  if (storageErr) throw new Error(storageErr.message)
-  unwrap(await supabase.from('drive_files').delete().eq('id', f.id))
+/** Short-lived signed URL for preview/download (no in-memory blob). */
+export async function driveSignedUrl(drive: DriveName, path: string, downloadName?: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(drive).createSignedUrl(path, 3600, downloadName ? { download: downloadName } : undefined)
+  if (error) throw new Error(error.message)
+  return data.signedUrl
+}
+
+export async function downloadDriveItem(item: DriveItem): Promise<void> {
+  if (!item.storage_path) return
+  const url = await driveSignedUrl(item.drive, item.storage_path, item.filename)
+  const a = document.createElement('a')
+  a.href = url
+  a.rel = 'noopener'
+  a.click()
+}
+
+export async function renameDriveItem(id: number, name: string): Promise<void> {
+  unwrap(await supabase.rpc('drive_rename', { p_id: id, p_new_name: name }))
+}
+
+export async function moveDriveItems(ids: number[], parent: string): Promise<void> {
+  unwrap(await supabase.rpc('drive_move', { p_ids: ids, p_new_parent: parent }))
+}
+
+/** Delete items (folders take their subtree); the RPC returns storage paths to
+ * purge, which we then remove from the bucket in chunks. */
+export async function deleteDriveItems(drive: DriveName, ids: number[]): Promise<void> {
+  const raw = unwrap(await supabase.rpc('drive_delete', { p_ids: ids })) as unknown
+  const paths: string[] = Array.isArray(raw)
+    ? raw
+        .map((x) => (typeof x === 'string' ? x : x && typeof x === 'object' ? String(Object.values(x)[0] ?? '') : ''))
+        .filter((p) => p)
+    : []
+  for (let i = 0; i < paths.length; i += 100) {
+    await supabase.storage.from(drive).remove(paths.slice(i, i + 100))
+  }
 }
 
 // ---------- Company settings ----------
