@@ -26,13 +26,11 @@ Ordered by risk. ✅ confirmed · ⬜ open (in our hands) · 🔶 needs Ilker / 
       board / CPM) and monthly budgets (budget-variance).
 - ⬜ **Company/invoice details** — logo, address, invoice numbering, payment terms
       correct before the first real invoice reaches a broker.
-- ⬜ **API-key rotation fallout** — the API keys were rotated to the new format
-      (2026-07-19). The raw service key's role claim no longer resolves to
-      `service_role`, so RPCs gated on `auth.role() = 'service_role'` fail when
-      called by a pure service client. trux-sentinel now mints an admin session
-      instead (fixed). Still to verify before their crons go live:
-      `import_fuel_transactions` / `import_toll_transactions` via the shared-key
-      path. Long-term fix: switch those gates to `auth.uid() is null`.
+- ✅ **API-key rotation fallout** — after the 2026-07-19 key rotation the raw
+      service key's role claim no longer reports `service_role`, breaking every
+      RPC gated on it. Swept all 14 such functions (fuel/toll importers, sentinel,
+      maintenance, work-order draft) to `auth.uid() is null`; trux-sentinel also
+      mints an admin session. Fixed & deployed.
 
 ## Now / next
 
