@@ -102,8 +102,10 @@ async function main() {
 
   // 3. bulk upload (CLI is linked in PROJECT_DIR). cp -r keeps the source dir's
   // basename as the remote prefix, so upload the <owner-uid> dir itself.
+  // stdio ignored: the CLI logs one JSON line per file — thousands of files
+  // overflow a piped buffer (ENOBUFS).
   execFileSync('supabase', ['storage', 'cp', '-r', stage, 'ss:///team/', '--experimental'],
-    { cwd: PROJECT, stdio: 'pipe' })
+    { cwd: PROJECT, stdio: 'ignore' })
 
   // 4. register metadata in batches of 40
   let ins = 0, fold = 0, skip = 0
