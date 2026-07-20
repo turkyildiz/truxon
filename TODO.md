@@ -113,7 +113,7 @@ Ordered by risk. ✅ confirmed · ⬜ open (in our hands) · 🔶 needs Ilker / 
 
 ## Roadmap — bigger bets
 
-- [ ] **Instrumentation toward the 1,000-metric Owner's Playbook** (now 75 live).
+- [ ] **Instrumentation toward the 1,000-metric Owner's Playbook** (now 86 live).
       Highest leverage next: detention & accessorials (COO/CFO revenue leak),
       driver lifecycle (~136 CHRO metrics: turnover, cost-per-hire, tenure),
       then external feeds (ELD/telematics, FMCSA SMS, DAT rates, insurance).
