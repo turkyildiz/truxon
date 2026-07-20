@@ -1575,6 +1575,38 @@ export async function detentionEvents(days = 45): Promise<DetentionEvent[]> {
   return (data as unknown as DetentionEvent[]) ?? []
 }
 
+// ---------- Owner's Playbook: 1000-metric coverage registry ----------
+
+export interface PlaybookCoverage {
+  total: number
+  by_status: Record<string, number>
+  by_category: { category: string; live: number; total: number }[]
+}
+export interface PlaybookMetric {
+  number: number
+  name: string
+  definition: string
+  owner_role: string
+  category: string
+  status: 'live' | 'needs_data' | 'external' | 'qualitative'
+  source: string
+  target: string
+}
+
+/** Playbook coverage: how many of the 1000 metrics are live, by status/category. */
+export async function playbookCoverage(): Promise<PlaybookCoverage | null> {
+  const data = unwrap(await supabase.rpc('playbook_coverage'))
+  return (data as unknown as PlaybookCoverage) ?? null
+}
+
+/** Filterable list of playbook metrics (capped at 300 server-side). */
+export async function playbookMetrics(status?: string, owner?: string, search?: string): Promise<PlaybookMetric[]> {
+  const data = unwrap(await supabase.rpc('playbook_metrics_list', {
+    p_status: status || undefined, p_owner: owner || undefined, p_search: search || undefined,
+  }))
+  return (data as unknown as PlaybookMetric[]) ?? []
+}
+
 export interface RevenueForecastWeek {
   week_start: string
   week_number: number
