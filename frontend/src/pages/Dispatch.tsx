@@ -3,7 +3,7 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Button, Card, Field, Input, money, Select, Textarea } from '../components/ui'
-import { calculateDistance, createCustomer, createLoad, estimateLoadMargin, extractPdf, fleetCostBasis, type ExtractedStop } from '../data'
+import { calculateDistance, createCustomer, createLoad, customerRateProfile, estimateLoadMargin, extractPdf, fleetCostBasis, type ExtractedStop } from '../data'
 import { errorMessage } from '../supabase'
 import { ReferenceDataBanner, useReferenceData } from '../useReferenceData'
 import FleetMap from './FleetMap'
@@ -197,6 +197,18 @@ export default function Dispatch() {
     ? estimateLoadMargin(rate, miles, parseFloat(form.empty_miles) || 0, costBasis)
     : null
 
+  // Northstar: what this broker has historically paid us per mile.
+  const custId = form.customer_id ? parseInt(form.customer_id, 10) : 0
+  const { data: brokerRates } = useQuery({
+    queryKey: ['customer-rate-profile', custId],
+    queryFn: () => customerRateProfile(custId),
+    enabled: custId > 0,
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  })
+  const brokerAvgRpm = brokerRates && brokerRates.load_count > 0 ? brokerRates.avg_rpm ?? null : null
+  const loadRpm = rate > 0 && miles > 0 ? rate / miles : null
+
   return (
     <div className="space-y-4">
       <FleetMap />
@@ -300,6 +312,17 @@ export default function Dispatch() {
                   On {Math.round(margin.total_miles)} mi: fuel {money(margin.fuel)} · driver {money(margin.driver)} · fixed {money(margin.fixed)}
                   {margin.tolls >= 1 ? ` · tolls ${money(margin.tolls)}` : ''} — a predicted estimate from your recent cost basis
                 </div>
+                {brokerAvgRpm != null && (
+                  <div className="mt-1 border-t border-line/50 pt-1 text-xs text-muted">
+                    📊 This broker has paid <span className="font-semibold text-body">${brokerAvgRpm.toFixed(2)}/mi</span> avg over{' '}
+                    {brokerRates?.load_count} load{brokerRates?.load_count === 1 ? '' : 's'} (180 days)
+                    {loadRpm != null && (
+                      <span className={loadRpm >= brokerAvgRpm ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}>
+                        {' · '}this load ${Math.abs(loadRpm - brokerAvgRpm).toFixed(2)} {loadRpm >= brokerAvgRpm ? 'above' : 'below'} their norm
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

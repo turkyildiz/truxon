@@ -1599,6 +1599,21 @@ export async function fleetCostBasis(): Promise<FleetCostBasis> {
   return unwrap(await supabase.rpc('fleet_cost_basis')) as unknown as FleetCostBasis
 }
 
+export interface CustomerRateProfile {
+  load_count: number
+  avg_rpm?: number | null
+  median_rpm?: number | null
+  avg_rate?: number | null
+  avg_miles?: number | null
+  last_rpm?: number | null
+}
+
+/** What a broker has historically paid us per mile (trailing 180 days). */
+export async function customerRateProfile(customerId: number): Promise<CustomerRateProfile> {
+  const data = unwrap(await supabase.rpc('customer_rate_profile', { p_customer_id: customerId }))
+  return (data as unknown as CustomerRateProfile) ?? { load_count: 0 }
+}
+
 /** Predict a load's net from its rate/miles using the fleet cost basis. Pure. */
 export function estimateLoadMargin(rate: number, miles: number, emptyMiles: number, b: FleetCostBasis): LoadMargin {
   const total = Math.max(miles + emptyMiles, 0)

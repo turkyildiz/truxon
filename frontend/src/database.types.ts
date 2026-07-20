@@ -3190,6 +3190,7 @@ export type Database = {
           paid_count: number
         }[]
       }
+      customer_rate_profile: { Args: { p_customer_id: number }; Returns: Json }
       dashboard_summary: { Args: never; Returns: Json }
       delete_customer: { Args: { p_id: number }; Returns: undefined }
       delete_invoice_payment: {
