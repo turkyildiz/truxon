@@ -3074,6 +3074,18 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_load_geocode: {
+        Args: {
+          p_delivery_lat: number
+          p_delivery_lon: number
+          p_delivery_state: string
+          p_load_id: number
+          p_pickup_lat: number
+          p_pickup_lon: number
+          p_pickup_state: string
+        }
+        Returns: undefined
+      }
       ar_aging: {
         Args: never
         Returns: {
@@ -3276,6 +3288,28 @@ export type Database = {
       delete_invoice_payment: {
         Args: { p_payment_id: number }
         Returns: undefined
+      }
+      detention_events: {
+        Args: {
+          p_days?: number
+          p_free_min?: number
+          p_radius_mi?: number
+          p_rate?: number
+        }
+        Returns: {
+          appointment: string
+          arrival: string
+          customer: string
+          departure: string
+          detention_min: number
+          dwell_min: number
+          est_pay: number
+          free_min: number
+          load_id: number
+          load_number: string
+          stop_state: string
+          stop_type: string
+        }[]
       }
       drive_create_share: {
         Args: { p_expires_at?: string; p_file_id: number }
@@ -3814,6 +3848,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      trux_miles: {
+        Args: { lat1: number; lat2: number; lon1: number; lon2: number }
+        Returns: number
       }
       trux_query: { Args: { p_sql: string }; Returns: Json }
       trux_week_end: { Args: { d: string }; Returns: string }

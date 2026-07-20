@@ -1554,6 +1554,27 @@ export async function slowPayRisk(): Promise<SlowPayRow[]> {
   return (data as unknown as SlowPayRow[]) ?? []
 }
 
+export interface DetentionEvent {
+  load_id: number
+  load_number: string
+  customer: string
+  stop_type: 'pickup' | 'delivery'
+  stop_state: string | null
+  appointment: string
+  arrival: string
+  departure: string
+  dwell_min: number
+  free_min: number
+  detention_min: number
+  est_pay: number
+}
+
+/** Billable detention measured from ELD dwell at each stop vs. free time. */
+export async function detentionEvents(days = 45): Promise<DetentionEvent[]> {
+  const data = unwrap(await supabase.rpc('detention_events', { p_days: days }))
+  return (data as unknown as DetentionEvent[]) ?? []
+}
+
 export interface RevenueForecastWeek {
   week_start: string
   week_number: number

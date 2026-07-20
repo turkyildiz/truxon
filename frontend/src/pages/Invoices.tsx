@@ -11,7 +11,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Too
 import { Badge, Button, Card, Field, formatDate, LoadError, Modal, money, Select, Table } from '../components/ui'
 import {
   acctAging, acctMarginMonthly, acctRevenueByCustomer, acctRevenueMonthly, acctSummary, acctUnbilledLoads,
-  cashflowForecast, createInvoice, deleteInvoicePayment, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
+  cashflowForecast, createInvoice, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
   glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
   qboConnectUrl, qboStatus, recordInvoicePayment, revenueForecast, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
 } from '../data'
@@ -19,7 +19,7 @@ import { downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
 import { errorMessage } from '../supabase'
 import type { Invoice } from '../types'
 
-type Tab = 'overview' | 'receivables' | 'aging' | 'unbilled' | 'forecast' | 'reports'
+type Tab = 'overview' | 'receivables' | 'aging' | 'unbilled' | 'detention' | 'forecast' | 'reports'
 type Filter = 'all' | 'unpaid' | 'pastdue' | 'paid' | 'draft' | 'void'
 
 const TABS: { key: Tab; label: string }[] = [
@@ -27,6 +27,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'receivables', label: 'Receivables' },
   { key: 'aging', label: 'Aging' },
   { key: 'unbilled', label: 'Unbilled' },
+  { key: 'detention', label: '⏱️ Detention' },
   { key: 'forecast', label: '🔮 Forecast' },
   { key: 'reports', label: 'Reports' },
 ]
@@ -104,7 +105,7 @@ function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: 
 export default function Invoices() {
   const qc = useQueryClient()
   const [params] = useSearchParams()
-  const initialTab = (['overview', 'receivables', 'aging', 'unbilled', 'forecast', 'reports'] as Tab[])
+  const initialTab = (['overview', 'receivables', 'aging', 'unbilled', 'detention', 'forecast', 'reports'] as Tab[])
     .find((t) => t === params.get('tab')) ?? 'overview'
   const [tab, setTab] = useState<Tab>(initialTab)
   const [filter, setFilter] = useState<Filter>('unpaid')
@@ -351,6 +352,7 @@ export default function Invoices() {
 
       {tab === 'aging' && <AgingTab />}
       {tab === 'unbilled' && <UnbilledTab onBill={billCustomer} />}
+      {tab === 'detention' && <DetentionTab />}
       {tab === 'forecast' && <ForecastTab />}
       {tab === 'reports' && <ReportsTab />}
 
@@ -585,6 +587,45 @@ function UnbilledTab({ onBill }: { onBill: (customerId: number) => void }) {
           </tr>
         ))}
       </Table>
+    </>
+  )
+}
+
+// ── Detention (Northstar: ELD dwell vs free time) ────────────────────────────
+function DetentionTab() {
+  const q = useQuery({ queryKey: ['detention'], queryFn: () => detentionEvents(45), retry: false })
+  if (q.isLoading) return <p className="py-8 text-center text-muted">Measuring dwell from ELD breadcrumbs…</p>
+  if (q.isError) return <LoadError error={q.error} onRetry={() => q.refetch()} />
+  const rows = q.data ?? []
+  const total = rows.reduce((s, r) => s + Number(r.est_pay), 0)
+  const hrs = (m: number) => `${Math.floor(m / 60)}h ${m % 60}m`
+  return (
+    <>
+      <p className="mb-3 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+        {rows.length === 0
+          ? 'No detention detected in the last 45 days (needs ELD coverage over the stop window). As breadcrumb history grows, held-up loads will surface here.'
+          : <>⏱️ <strong>{money(total)}</strong> in billable detention across {rows.length} stop{rows.length === 1 ? '' : 's'} (last 45 days) — measured from actual GPS dwell past 2h free time. Bill it back before the broker forgets.</>}
+      </p>
+      {rows.length > 0 && (
+        <Table headers={['Load #', 'Customer', 'Stop', 'State', 'Arrived', 'Left', 'Dwell', 'Over free', 'Est. owed']}>
+          {rows.map((r) => (
+            <tr key={`${r.load_id}:${r.stop_type}`} className="hover:bg-surface-2">
+              <td className="px-3 py-2.5 font-medium text-brand">{r.load_number}</td>
+              <td className="px-3 py-2.5">{r.customer}</td>
+              <td className="px-3 py-2.5 capitalize">{r.stop_type}</td>
+              <td className="px-3 py-2.5 text-muted">{r.stop_state ?? '—'}</td>
+              <td className="px-3 py-2.5 text-muted">{formatDate(r.arrival)}</td>
+              <td className="px-3 py-2.5 text-muted">{formatDate(r.departure)}</td>
+              <td className="px-3 py-2.5">{hrs(r.dwell_min)}</td>
+              <td className="px-3 py-2.5 font-semibold text-amber-700 dark:text-amber-300">{hrs(r.detention_min)}</td>
+              <td className="px-3 py-2.5 font-semibold">{money(Number(r.est_pay))}</td>
+            </tr>
+          ))}
+        </Table>
+      )}
+      {rows.length > 0 && (
+        <p className="mt-2 text-xs text-muted">Estimate at $50/hr after 2h free time; confirm each broker's rate confirmation terms before billing.</p>
+      )}
     </>
   )
 }
