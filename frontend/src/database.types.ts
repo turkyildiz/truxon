@@ -3204,6 +3204,15 @@ export type Database = {
         Args: { p_delivery?: string; p_pickup?: string; p_ref: string }
         Returns: string
       }
+      pod_archive_candidate_file: {
+        Args: { p_load_id: number }
+        Returns: {
+          content_type: string
+          drive_file_id: number
+          filename: string
+          storage_path: string
+        }[]
+      }
       qbo_mark_voided: { Args: { p_qbo_ids: Json }; Returns: number }
       qbo_status: { Args: never; Returns: Json }
       qbo_upsert_invoices: { Args: { p_rows: Json }; Returns: Json }
@@ -3327,6 +3336,7 @@ export type Database = {
           violations: number
         }[]
       }
+      trux_first_monday: { Args: { p_year: number }; Returns: string }
       trux_insights_feed: {
         Args: { p_include_resolved?: boolean }
         Returns: {
@@ -3354,6 +3364,18 @@ export type Database = {
         }
       }
       trux_query: { Args: { p_sql: string }; Returns: Json }
+      trux_week_end: { Args: { d: string }; Returns: string }
+      trux_week_label: { Args: { d: string }; Returns: string }
+      trux_week_number: { Args: { d: string }; Returns: number }
+      trux_week_range: {
+        Args: { p_week: number; p_year: number }
+        Returns: {
+          week_end: string
+          week_start: string
+        }[]
+      }
+      trux_week_start: { Args: { d: string }; Returns: string }
+      trux_week_year: { Args: { d: string }; Returns: number }
       uncancel_load: {
         Args: { p_load_id: number }
         Returns: {

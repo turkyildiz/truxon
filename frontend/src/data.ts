@@ -1368,3 +1368,29 @@ export async function listEquipmentConflicts(): Promise<EquipmentConflict[]> {
 export async function resolveEquipmentConflict(logId: number, action: 'keep' | 'accept'): Promise<void> {
   unwrap(await supabase.rpc('resolve_equipment_conflict', { p_log_id: logId, p_action: action }))
 }
+
+// ---------- Missing POD: attach from the PODs archive ----------
+
+/** The Team-Drive PODs file that matches a load, ready to copy in. null if none. */
+export interface PodArchiveFile {
+  drive_file_id: number
+  filename: string
+  storage_path: string
+  content_type: string | null
+}
+
+export async function podArchiveCandidate(loadId: number): Promise<PodArchiveFile | null> {
+  const rows = unwrap(await supabase.rpc('pod_archive_candidate_file', { p_load_id: loadId })) as unknown as PodArchiveFile[]
+  return rows?.[0] ?? null
+}
+
+/** Copy the matching archive file into the load's Documents as a POD. */
+export async function attachPodFromArchive(loadId: number): Promise<string> {
+  const cand = await podArchiveCandidate(loadId)
+  if (!cand) throw new Error('No matching file found in the PODs archive')
+  const { data: blob, error } = await supabase.storage.from('team').download(cand.storage_path)
+  if (error || !blob) throw new Error(error?.message ?? 'Could not read the archive file')
+  const type = cand.content_type || blob.type || 'application/octet-stream'
+  await uploadDocument('load', loadId, new File([blob], cand.filename, { type }), 'POD')
+  return cand.filename
+}
