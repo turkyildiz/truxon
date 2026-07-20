@@ -117,6 +117,7 @@ async function main() {
         }
         const res = await edge({ customer_id: t.customer_id, source_document_id: t.doc_id, fields: { contact_person: f.contact_person, phone: f.phone, email: f.email, billing_address: f.billing_address, mc_number: f.mc_number, usdot_number: f.usdot_number, notes: f.notes } })
         const n = Number(res.filled) || 0
+        if (Array.isArray(res.conflicts) && res.conflicts.length) log(`⚠ ${t.company_name} conflicts: ${res.conflicts.join('; ')}`)
         if (n > 0) { filled += n; touched++; log(`+${n} ${t.company_name}`) }
         else log(`0  ${t.company_name}${res.error ? ` [${res.error}]` : ''}`)
       } catch (e) {

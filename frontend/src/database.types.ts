@@ -47,6 +47,42 @@ export type Database = {
           },
         ]
       }
+      ai_corrections: {
+        Row: {
+          corrected_by: string | null
+          created_at: string
+          entity_id: number
+          entity_type: string
+          field: string
+          human_value: string
+          id: number
+          model: string | null
+          model_value: string
+        }
+        Insert: {
+          corrected_by?: string | null
+          created_at?: string
+          entity_id: number
+          entity_type?: string
+          field: string
+          human_value: string
+          id?: never
+          model?: string | null
+          model_value: string
+        }
+        Update: {
+          corrected_by?: string | null
+          created_at?: string
+          entity_id?: number
+          entity_type?: string
+          field?: string
+          human_value?: string
+          id?: never
+          model?: string | null
+          model_value?: string
+        }
+        Relationships: []
+      }
       bs_snapshot: {
         Row: {
           ap: number | null
@@ -2892,6 +2928,16 @@ export type Database = {
           entity_id: number
           entity_type: string
           filename: string
+          similarity: number
+        }[]
+      }
+      match_extraction_examples: {
+        Args: { p_count?: number; p_document_id: number }
+        Returns: {
+          company_name: string
+          customer_id: number
+          document_id: number
+          fields: Json
           similarity: number
         }[]
       }

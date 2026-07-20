@@ -102,6 +102,14 @@ async function runBatch(svc: SupabaseClient, o: BatchOpts) {
     let sourceDocId: number | null = null
     let docsUsed = 0
     const skipped: string[] = []
+    const conflicts: string[] = []
+    // memory: what we already know to be true for this customer — the model
+    // validates against it, and disagreements are surfaced, never written
+    const known: Record<string, string> = {}
+    for (const k of ['contact_person', 'phone', 'email', 'billing_address', 'mc_number', 'usdot_number']) {
+      const val = String((c as Record<string, unknown>)[k] ?? '').trim()
+      if (val) known[k] = val
+    }
     for (const d of docs) {
       if (!/pdf/i.test(d.content_type) && !/\.pdf$/i.test(d.filename)) { skipped.push(`${d.filename}: not a PDF`); continue }
       // Big PDFs are almost always scanned images (no text layer) — parsing them
@@ -123,18 +131,39 @@ async function runBatch(svc: SupabaseClient, o: BatchOpts) {
       } catch { skipped.push(`${d.filename}: read error`); continue }
       if (!text.trim()) { skipped.push(`${d.filename}: scanned/no text layer`); continue }
 
+      // memory: few-shot examples from similar already-verified documents
+      // (reuses the doc-search embeddings; empty until a doc is indexed)
+      let memory = ''
+      try {
+        const { data: ex } = await svc.rpc('match_extraction_examples', { p_document_id: d.id, p_count: 2 })
+        if (Array.isArray(ex) && ex.length) {
+          memory = '\n\nSolved examples from similar documents (previously verified field maps):\n' +
+            ex.map((e: Record<string, unknown>) => `- ${e.company_name}: ${JSON.stringify(e.fields)}`).join('\n')
+        }
+      } catch { /* memory is optional */ }
+      const knownBlock = Object.keys(known).length
+        ? `\n\nKnown verified data for this customer: ${JSON.stringify(known)} — if the document shows different values, report what the document shows.`
+        : ''
+
       let fields: Record<string, unknown>
-      try { fields = await extractFields(o.apiKey, o.model, customerPrompt(o.carrier) + '\n\nDocument text:\n' + sliceText(text)) }
+      try { fields = await extractFields(o.apiKey, o.model, customerPrompt(o.carrier) + memory + knownBlock + '\n\nDocument text:\n' + sliceText(text)) }
       catch { skipped.push(`${d.filename}: extraction failed`); continue }
 
       // name-match guard — don't let a mis-filed doc poison this customer
       if (!nameMatches(c.company_name as string, fields.company_name)) { skipped.push(`${d.filename}: broker name mismatch`); continue }
       docsUsed++
-      const mc = fields.mc_number ? `MC# ${String(fields.mc_number).trim()}` : ''
-      const noteVal = [mc, fields.notes ? String(fields.notes).trim() : ''].filter(Boolean).join(' — ')
+      // validate-not-guess: extraction disagreeing with known data is flagged
+      // (blanks-only writes make overwrites impossible; this makes them VISIBLE)
+      for (const [k, kv] of Object.entries(known)) {
+        const got = String(fields[k] ?? '').trim()
+        if (got && got.replace(/\W/g, '').toLowerCase() !== kv.replace(/\W/g, '').toLowerCase()) {
+          conflicts.push(`${d.filename}: ${k} "${got}" vs known "${kv}"`)
+        }
+      }
       const candidate: Record<string, unknown> = {
         contact_person: fields.contact_person, phone: fields.phone, email: fields.email,
-        billing_address: fields.billing_address, notes: noteVal || null,
+        billing_address: fields.billing_address, mc_number: fields.mc_number,
+        usdot_number: fields.usdot_number, notes: fields.notes || null,
       }
       for (const [k, v] of Object.entries(candidate)) {
         const val = v == null ? '' : String(v).trim()
@@ -158,7 +187,7 @@ async function runBatch(svc: SupabaseClient, o: BatchOpts) {
       filled = Number(n) || 0
       filledTotal += filled
     }
-    report.push({ id: c.id, company_name: c.company_name, docsUsed, filled, proposed: Object.keys(proposed), skipped })
+    report.push({ id: c.id, company_name: c.company_name, docsUsed, filled, proposed: Object.keys(proposed), skipped, conflicts })
     lastId = c.id as number
   }
 
@@ -220,11 +249,24 @@ Deno.serve(async (req) => {
       contact_person: f.contact_person, phone: f.phone, email: f.email,
       billing_address: f.billing_address, mc_number: f.mc_number, usdot_number: f.usdot_number, notes: f.notes || null,
     }
+    // memory: flag disagreements with known-verified data (blanks-only writes
+    // already make overwrites impossible — this makes disagreements VISIBLE)
+    const conflicts: string[] = []
+    const { data: cur } = await svc.from('customers')
+      .select('contact_person, phone, email, billing_address, mc_number, usdot_number')
+      .eq('id', Number(body.customer_id)).maybeSingle()
+    for (const [k, kv] of Object.entries(cur ?? {})) {
+      const knownVal = String(kv ?? '').trim()
+      const got = String(fields[k] ?? '').trim()
+      if (knownVal && got && got.replace(/\W/g, '').toLowerCase() !== knownVal.replace(/\W/g, '').toLowerCase()) {
+        conflicts.push(`${k}: "${got}" vs known "${knownVal}"`)
+      }
+    }
     const { data: n, error: rpcErr } = await svc.rpc('apply_customer_enrichment', {
       p_customer_id: Number(body.customer_id), p_fields: fields, p_source_document_id: body.source_document_id ?? null, p_model: 'vision:ratecon',
     })
     if (rpcErr) return json({ error: rpcErr.message }, 500)
-    return json({ filled: Number(n) || 0 })
+    return json({ filled: Number(n) || 0, conflicts })
   }
 
   // ── dupes_report: duplicate-customer groups (normalized-name key) ──
