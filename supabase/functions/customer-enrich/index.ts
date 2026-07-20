@@ -229,6 +229,62 @@ Deno.serve(async (req) => {
     return json({ filled: Number(n) || 0 })
   }
 
+  // ── vision pipeline (NAS rasterizes, edge holds the secrets) ──
+  // vision_targets: hand out customers still missing contact info + a signed URL
+  // to one of their loads' rate cons. The NAS downloads + rasterizes, then posts
+  // the page images to vision_apply. Bypasses extract-pdf's per-user rate limit.
+  if (body.mode === 'vision_targets') {
+    const afterId = Number(body.after_id) || 0
+    const limit = Math.min(Math.max(Number(body.limit) || 8, 1), 25)
+    const { data: custs } = await svc.from('customers').select('id, company_name')
+      .or('contact_person.eq.,phone.eq.,email.eq.').gt('id', afterId).order('id', { ascending: true }).limit(limit)
+    const targets: Array<Record<string, unknown>> = []
+    let lastId = afterId
+    for (const c of custs ?? []) {
+      lastId = c.id as number
+      const { data: loads } = await svc.from('loads').select('id').eq('customer_id', c.id).limit(80)
+      const loadIds = (loads ?? []).map((l) => l.id)
+      if (!loadIds.length) continue
+      const { data: docs } = await svc.from('documents').select('id, storage_path, filename, content_type')
+        .eq('entity_type', 'load').in('entity_id', loadIds).order('uploaded_at', { ascending: false }).limit(4)
+      const pdf = (docs ?? []).find((d) => /pdf/i.test(d.content_type) || /\.pdf$/i.test(d.filename))
+      if (!pdf) continue
+      const { data: signed } = await svc.storage.from('documents').createSignedUrl(pdf.storage_path, 900)
+      if (!signed?.signedUrl) continue
+      targets.push({ customer_id: c.id, company_name: c.company_name, doc_id: pdf.id, url: signed.signedUrl })
+    }
+    return json({ targets, lastId, queried: (custs ?? []).length })
+  }
+
+  // vision_apply: run the cloud vision model on the rasterized rate-con pages and
+  // fill blanks. Name-match guard so a mis-filed doc can't poison this customer.
+  if (body.mode === 'vision_apply') {
+    const images = (body.images as string[]) || []
+    if (!body.customer_id || !images.length) return json({ error: 'need customer_id + images' }, 400)
+    const visionModel = Deno.env.get('LLM_VISION_MODEL') ?? 'meta-llama/llama-4-scout-17b-16e-instruct'
+    // deno-lint-ignore no-explicit-any
+    const parts: any = [{ type: 'text', text: customerPrompt(carrier) + '\n\nThe rate confirmation pages follow as images.' }]
+    for (const img of images.slice(0, 4)) parts.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${img}` } })
+    let f: Record<string, unknown>
+    try { f = await extractFields(apiKey, visionModel, parts) } catch (e) { return json({ error: String(e).slice(0, 200) }, 502) }
+    if (body.company_name && f.company_name) {
+      const a = norm(String(body.company_name)), b = norm(String(f.company_name))
+      let hit = false
+      for (const t of b) if (a.has(t)) hit = true
+      if (!hit) return json({ filled: 0, skipped: 'name mismatch' })
+    }
+    const mc = f.mc_number ? `MC# ${String(f.mc_number).trim()}` : ''
+    const noteVal = [mc, f.notes ? String(f.notes).trim() : ''].filter(Boolean).join(' — ')
+    const fields: Record<string, unknown> = {
+      contact_person: f.contact_person, phone: f.phone, email: f.email, billing_address: f.billing_address, notes: noteVal || null,
+    }
+    const { data: n, error } = await svc.rpc('apply_customer_enrichment', {
+      p_customer_id: Number(body.customer_id), p_fields: fields, p_source_document_id: body.doc_id ?? null, p_model: 'vision:ratecon:nas',
+    })
+    if (error) return json({ error: error.message }, 500)
+    return json({ filled: Number(n) || 0 })
+  }
+
   // ── cron / anon: maintenance sweep (apply, loop under a time budget) ──
   // Honours optional limit / max_batches so a first run can be kept small and
   // watched; returns the customers it actually filled for observability.

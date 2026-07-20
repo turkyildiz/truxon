@@ -1,0 +1,7 @@
+{
+  "name": "truxon-vision-enrich",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "NAS rasterize + cloud-vision enrichment of scanned rate cons (no local secrets)"
+}
