@@ -2,7 +2,7 @@
 -- re-scan, auto-resolve when the condition clears, and acknowledge works.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(8);
+select plan(9);
 
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-0000000000d1'::uuid, 'sentinel@test.local');
 update public.profiles set role = 'admin' where id = '00000000-0000-4000-8000-0000000000d1';
@@ -72,6 +72,13 @@ select is(
 select is(
   (select status from public.trux_insights where dedup_key = 'toll_violation:'||(select id from public.toll_transactions where toll_id='sn-v1')),
   'acknowledged', 'a still-firing acknowledged insight is not reset'
+);
+
+-- Delivering that load left it with no POD on file → the missing-POD nudge fires
+-- (one summary insight, category 'cash').
+select is(
+  (select category from public.trux_insights where dedup_key = 'missing_pods' and status <> 'resolved'),
+  'cash', 'a delivered load with no POD fires the missing-POD cash nudge'
 );
 
 select * from finish();
