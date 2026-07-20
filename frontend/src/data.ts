@@ -1339,3 +1339,32 @@ export async function calculateDistance(
 export async function importFuelCsv(csvText: string): Promise<FuelImportResult> {
   return invokeFunction<FuelImportResult>('fuel-import', { body: { csv: csvText } })
 }
+
+// ---------- Equipment enrichment: registration conflicts ----------
+
+/** An open enrichment conflict: a registration/title value that disagrees with
+ *  what's already on the truck/trailer record. Admin resolves each one. */
+export interface EquipmentConflict {
+  log_id: number
+  equipment_type: 'truck' | 'trailer'
+  equipment_id: number
+  unit_number: string | null
+  field: string
+  old_value: string | null
+  new_value: string
+  source_document_id: number | null
+  source_filename: string | null
+  model: string | null
+  created_at: string
+}
+
+/** Admin-only: open conflicts awaiting a keep/accept decision. */
+export async function listEquipmentConflicts(): Promise<EquipmentConflict[]> {
+  const data = unwrap(await supabase.rpc('equipment_conflicts'))
+  return (data as unknown as EquipmentConflict[]) ?? []
+}
+
+/** Resolve one conflict: 'keep' the value on file, or 'accept' the document's. */
+export async function resolveEquipmentConflict(logId: number, action: 'keep' | 'accept'): Promise<void> {
+  unwrap(await supabase.rpc('resolve_equipment_conflict', { p_log_id: logId, p_action: action }))
+}

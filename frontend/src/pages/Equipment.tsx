@@ -1,7 +1,73 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import ResourcePage from '../components/ResourcePage'
 import { Badge, formatDate, money } from '../components/ui'
-import { trailersApi, trucksApi } from '../data'
+import { listEquipmentConflicts, resolveEquipmentConflict, trailersApi, trucksApi } from '../data'
 import type { Equipment } from '../types'
+
+const FIELD_LABEL: Record<string, string> = {
+  vin: 'VIN', plate_number: 'Plate number', plate_expiry: 'Plate expiration',
+  make: 'Make', model: 'Model', year: 'Year',
+}
+
+/** Admin review: registration/title values that disagree with what's on file.
+ *  Forest never overwrites — the owner keeps the record value or accepts the doc. */
+function EnrichmentConflicts({ entityType }: { entityType: 'truck' | 'trailer' }) {
+  const qc = useQueryClient()
+  const q = useQuery({ queryKey: ['equipment-conflicts'], queryFn: listEquipmentConflicts, staleTime: 30_000 })
+  const [busy, setBusy] = useState<number | null>(null)
+  const resolve = useMutation({
+    mutationFn: ({ logId, action }: { logId: number; action: 'keep' | 'accept' }) => resolveEquipmentConflict(logId, action),
+    onMutate: (v) => setBusy(v.logId),
+    onSettled: () => {
+      setBusy(null)
+      qc.invalidateQueries({ queryKey: ['equipment-conflicts'] })
+      qc.invalidateQueries({ queryKey: [entityType === 'truck' ? 'trucks' : 'trailers'] })
+    },
+  })
+  const rows = (q.data ?? []).filter((c) => c.equipment_type === entityType)
+  if (rows.length === 0) return null
+  return (
+    <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+      <div className="mb-2 text-sm font-semibold text-amber-700 dark:text-amber-300">
+        ⚠️ {rows.length} registration detail{rows.length === 1 ? '' : 's'} disagree with what's on file — Forest left the record unchanged for you to decide
+      </div>
+      <div className="space-y-2">
+        {rows.map((c) => (
+          <div key={c.log_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-1 px-3 py-2 text-sm">
+            <div className="min-w-0">
+              <span className="font-medium">{entityType === 'truck' ? 'Truck' : 'Trailer'} #{c.unit_number ?? '?'}</span>
+              <span className="text-muted"> · {FIELD_LABEL[c.field] ?? c.field}</span>
+              <div className="text-xs text-muted">
+                On file: <span className="font-mono text-body">{c.old_value || '—'}</span>
+                {'  →  '}document says: <span className="font-mono text-body">{c.new_value}</span>
+                {c.source_filename && <span className="text-muted"> ({c.source_filename})</span>}
+              </div>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <button
+                onClick={() => resolve.mutate({ logId: c.log_id, action: 'keep' })}
+                disabled={busy === c.log_id}
+                className="rounded-md border border-line px-2.5 py-1 text-xs font-medium text-muted hover:bg-surface-2 hover:text-body disabled:opacity-50"
+                title="Keep the value already on the record"
+              >
+                Keep current
+              </button>
+              <button
+                onClick={() => resolve.mutate({ logId: c.log_id, action: 'accept' })}
+                disabled={busy === c.log_id}
+                className="rounded-md border border-amber-500 bg-amber-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+                title="Replace the record with the document's value"
+              >
+                Use document
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 const STATUS_OPTIONS = [
   { value: 'available', label: 'Available' },
@@ -61,5 +127,15 @@ function EquipmentPage({ title, api, queryKey, entityType }: { title: string; ap
   )
 }
 
-export const Trucks = () => <EquipmentPage title="Trucks" api={trucksApi} queryKey="trucks" entityType="truck" />
-export const Trailers = () => <EquipmentPage title="Trailers" api={trailersApi} queryKey="trailers" entityType="trailer" />
+export const Trucks = () => (
+  <div>
+    <EnrichmentConflicts entityType="truck" />
+    <EquipmentPage title="Trucks" api={trucksApi} queryKey="trucks" entityType="truck" />
+  </div>
+)
+export const Trailers = () => (
+  <div>
+    <EnrichmentConflicts entityType="trailer" />
+    <EquipmentPage title="Trailers" api={trailersApi} queryKey="trailers" entityType="trailer" />
+  </div>
+)

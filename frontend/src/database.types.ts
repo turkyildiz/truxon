@@ -694,6 +694,62 @@ export type Database = {
           },
         ]
       }
+      equipment_enrichment_log: {
+        Row: {
+          action: string
+          created_at: string
+          equipment_id: number
+          equipment_type: string
+          field: string
+          id: number
+          model: string | null
+          new_value: string
+          old_value: string | null
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          source_document_id: number | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          equipment_id: number
+          equipment_type: string
+          field: string
+          id?: never
+          model?: string | null
+          new_value: string
+          old_value?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source_document_id?: number | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          equipment_id?: number
+          equipment_type?: string
+          field?: string
+          id?: never
+          model?: string | null
+          new_value?: string
+          old_value?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source_document_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_enrichment_log_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fuel_transactions: {
         Row: {
           amount: number
@@ -1784,6 +1840,7 @@ export type Database = {
       trailers: {
         Row: {
           created_at: string
+          enriched_at: string | null
           id: number
           in_service_date: string | null
           make: string
@@ -1801,6 +1858,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          enriched_at?: string | null
           id?: never
           in_service_date?: string | null
           make?: string
@@ -1818,6 +1876,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          enriched_at?: string | null
           id?: never
           in_service_date?: string | null
           make?: string
@@ -1838,6 +1897,7 @@ export type Database = {
       trucks: {
         Row: {
           created_at: string
+          enriched_at: string | null
           id: number
           in_service_date: string | null
           make: string
@@ -1855,6 +1915,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          enriched_at?: string | null
           id?: never
           in_service_date?: string | null
           make?: string
@@ -1872,6 +1933,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          enriched_at?: string | null
           id?: never
           in_service_date?: string | null
           make?: string
@@ -2627,6 +2689,16 @@ export type Database = {
         }
         Returns: number
       }
+      apply_equipment_enrichment: {
+        Args: {
+          p_equipment_id: number
+          p_equipment_type: string
+          p_fields: Json
+          p_model?: string
+          p_source_document_id?: number
+        }
+        Returns: Json
+      }
       ar_aging: {
         Args: never
         Returns: {
@@ -2861,6 +2933,22 @@ export type Database = {
       enqueue_doc_search: {
         Args: { p_entity_type?: string; p_query: string }
         Returns: number
+      }
+      equipment_conflicts: {
+        Args: never
+        Returns: {
+          created_at: string
+          equipment_id: number
+          equipment_type: string
+          field: string
+          log_id: number
+          model: string
+          new_value: string
+          old_value: string
+          source_document_id: number
+          source_filename: string
+          unit_number: string
+        }[]
       }
       fleet_odometers: {
         Args: never
@@ -3149,6 +3237,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      resolve_equipment_conflict: {
+        Args: { p_action: string; p_log_id: number }
+        Returns: undefined
       }
       safety_summary: {
         Args: { p_end: string; p_start: string }
