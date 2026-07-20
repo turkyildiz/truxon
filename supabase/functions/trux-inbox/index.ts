@@ -127,6 +127,20 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
   const svc = svcClient()
 
+  // ── status: recent processing log + latest equipment docs (debug read) ──
+  const peek = await req.clone().json().catch(() => ({})) as Record<string, unknown>
+  if (peek.mode === 'status') {
+    const { data: log } = await svc.from('trux_inbox_log').select('status, detail, created_at').order('created_at', { ascending: false }).limit(8)
+    const { data: docs } = await svc.from('documents').select('entity_type, entity_id, doc_type, filename, uploaded_at').in('entity_type', ['truck', 'trailer']).order('uploaded_at', { ascending: false }).limit(6)
+    // resolve entity_id → unit_number so filing lands are legible
+    const withUnit = []
+    for (const d of docs ?? []) {
+      const { data: t } = await svc.from(d.entity_type === 'truck' ? 'trucks' : 'trailers').select('unit_number').eq('id', d.entity_id).maybeSingle()
+      withUnit.push({ ...d, unit_number: t?.unit_number ?? '?' })
+    }
+    return json({ recent_log: log ?? [], recent_equipment_docs: withUnit })
+  }
+
   // Atomic throttle: only one real poll per 30s regardless of invocations.
   const { data: claimed } = await svc
     .from('trux_inbox_state')
