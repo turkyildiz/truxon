@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useAuth } from '../auth'
 import { Badge, Button, Card, cityState, formatDate, formatDateTime, LoadError, money, StatCard } from '../components/ui'
-import { dashboardSummary } from '../data'
+import { cashflowForecast, dashboardSummary, slowPayRisk } from '../data'
 import { weekTitle } from '../lib/week'
 import type { TrendPoint } from '../types'
 
@@ -76,6 +76,71 @@ function LegendChip({ color, label }: { color: string; label: string }) {
 
 /** Shortens "FirstName LastName" / long company names for bar chart ticks. */
 const shortName = (n: string) => (n.length > 11 ? `${n.slice(0, 10)}…` : n)
+
+// The forecast RPCs (cashflow_forecast, slow_pay_risk) are admin/accountant only.
+const FINANCE_ROLES = ['admin', 'accountant']
+
+function Mini({ label, value, tone }: { label: string; value: string; tone: 'pos' | 'neg' }) {
+  return (
+    <div className="rounded-lg bg-surface-2 px-3 py-2">
+      <p className="text-xs text-muted">{label}</p>
+      <p className={`text-sm font-bold ${tone === 'pos' ? 'text-emerald-600' : 'text-red-600'}`}>{value}</p>
+    </div>
+  )
+}
+
+/** Home-screen glance at the predictive layer: next-4-week cash + who'll pay late. */
+function ForecastGlance() {
+  const cfQ = useQuery({ queryKey: ['dash-cashflow'], queryFn: () => cashflowForecast(4), refetchInterval: 300_000 })
+  const spQ = useQuery({ queryKey: ['dash-slowpay'], queryFn: slowPayRisk, refetchInterval: 300_000 })
+  const weeks = cfQ.data ?? []
+  const totalIn = weeks.reduce((s, w) => s + Number(w.expected_in), 0)
+  const totalOut = weeks.reduce((s, w) => s + Number(w.expected_out), 0)
+  const net = totalIn - totalOut
+  const risks = (spQ.data ?? []).filter((r) => r.predicted_days_late > 0).slice(0, 3)
+
+  return (
+    <Card
+      title="🔮 4-Week Outlook"
+      actions={
+        <Link to="/invoices?tab=forecast" className="text-xs font-semibold text-brand">
+          Open forecast →
+        </Link>
+      }
+    >
+      {cfQ.isLoading ? (
+        <p className="py-6 text-center text-sm text-muted">Projecting…</p>
+      ) : weeks.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted">Not enough billing history to forecast yet.</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-3 gap-3">
+            <Mini label="Expected in" value={money(totalIn)} tone="pos" />
+            <Mini label="Expected out" value={money(totalOut)} tone="neg" />
+            <Mini label="Net (4 wk)" value={money(net)} tone={net >= 0 ? 'pos' : 'neg'} />
+          </div>
+          <div>
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Predicted to pay late</p>
+            {risks.length === 0 ? (
+              <p className="text-sm text-muted">No open invoices are predicted to slip. 👍</p>
+            ) : (
+              <ul className="space-y-1 text-sm">
+                {risks.map((r) => (
+                  <li key={r.invoice_id} className="flex items-center justify-between gap-2">
+                    <span className="truncate">{r.customer}</span>
+                    <span className="shrink-0 text-amber-600">
+                      {money(Number(r.total))} · ~{r.predicted_days_late}d late
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </Card>
+  )
+}
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -181,6 +246,8 @@ export default function Dashboard() {
           ))}
         </span>
       </div>
+
+      {FINANCE_ROLES.includes(user?.role ?? '') && <ForecastGlance />}
 
       {/* Revenue trend */}
       <Card title="Revenue Trend" actions={<PeriodSelect value={period} onChange={setPeriod} />}>

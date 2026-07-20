@@ -6,6 +6,7 @@
  * dependency. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Badge, Button, Card, Field, formatDate, LoadError, Modal, money, Select, Table } from '../components/ui'
 import {
@@ -102,7 +103,10 @@ function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: 
 
 export default function Invoices() {
   const qc = useQueryClient()
-  const [tab, setTab] = useState<Tab>('overview')
+  const [params] = useSearchParams()
+  const initialTab = (['overview', 'receivables', 'aging', 'unbilled', 'forecast', 'reports'] as Tab[])
+    .find((t) => t === params.get('tab')) ?? 'overview'
+  const [tab, setTab] = useState<Tab>(initialTab)
   const [filter, setFilter] = useState<Filter>('unpaid')
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
