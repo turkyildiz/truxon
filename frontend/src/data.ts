@@ -1608,6 +1608,36 @@ export interface CustomerRateProfile {
   last_rpm?: number | null
 }
 
+export interface LaneRate {
+  load_count: number
+  origin?: string
+  dest?: string
+  avg_rpm?: number | null
+  median_rpm?: number | null
+  avg_rate?: number | null
+  avg_miles?: number | null
+}
+
+/** Resolve one address to its 2-letter state via the cache-backed geocode fn. */
+async function geocodeState(address: string): Promise<string | null> {
+  try {
+    const res = await invokeFunction<{ geo: { state?: string } | null }>('geocode', { body: { address } })
+    return res?.geo?.state || null
+  } catch {
+    return null
+  }
+}
+
+/** Lane rate history for a route: geocode both ends to states (cache-backed),
+ *  then look up what that origin→destination lane has paid us per mile. Returns
+ *  null when either end can't be resolved. */
+export async function laneRateForRoute(pickup: string, delivery: string): Promise<LaneRate | null> {
+  const [o, d] = await Promise.all([geocodeState(pickup), geocodeState(delivery)])
+  if (!o || !d) return null
+  const data = unwrap(await supabase.rpc('lane_rate_history', { p_origin_state: o, p_dest_state: d }))
+  return (data as unknown as LaneRate) ?? null
+}
+
 /** What a broker has historically paid us per mile (trailing 180 days). */
 export async function customerRateProfile(customerId: number): Promise<CustomerRateProfile> {
   const data = unwrap(await supabase.rpc('customer_rate_profile', { p_customer_id: customerId }))

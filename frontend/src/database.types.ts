@@ -1170,6 +1170,51 @@ export type Database = {
           },
         ]
       }
+      geocode_cache: {
+        Row: {
+          city: string
+          country: string
+          formatted: string
+          geocoded_at: string
+          lat: number | null
+          location_type: string
+          lon: number | null
+          norm_address: string
+          partial: boolean
+          postal: string
+          source: string
+          state: string
+        }
+        Insert: {
+          city?: string
+          country?: string
+          formatted?: string
+          geocoded_at?: string
+          lat?: number | null
+          location_type?: string
+          lon?: number | null
+          norm_address: string
+          partial?: boolean
+          postal?: string
+          source?: string
+          state?: string
+        }
+        Update: {
+          city?: string
+          country?: string
+          formatted?: string
+          geocoded_at?: string
+          lat?: number | null
+          location_type?: string
+          lon?: number | null
+          norm_address?: string
+          partial?: boolean
+          postal?: string
+          source?: string
+          state?: string
+        }
+        Relationships: []
+      }
       gl_monthly: {
         Row: {
           account: string
@@ -1406,18 +1451,25 @@ export type Database = {
           created_at: string
           customer_id: number
           delivery_address: string
+          delivery_lat: number | null
+          delivery_lon: number | null
           delivery_number: string
+          delivery_state: string | null
           delivery_time: string | null
           driver_id: number | null
           empty_miles: number
           equipment_type: string
+          geocoded_at: string | null
           id: number
           invoice_id: number | null
           load_number: string
           miles: number
           notes: string
           pickup_address: string
+          pickup_lat: number | null
+          pickup_lon: number | null
           pickup_number: string
+          pickup_state: string | null
           pickup_time: string | null
           rate: number
           reference_number: string
@@ -1433,18 +1485,25 @@ export type Database = {
           created_at?: string
           customer_id: number
           delivery_address?: string
+          delivery_lat?: number | null
+          delivery_lon?: number | null
           delivery_number?: string
+          delivery_state?: string | null
           delivery_time?: string | null
           driver_id?: number | null
           empty_miles?: number
           equipment_type?: string
+          geocoded_at?: string | null
           id?: never
           invoice_id?: number | null
           load_number: string
           miles?: number
           notes?: string
           pickup_address?: string
+          pickup_lat?: number | null
+          pickup_lon?: number | null
           pickup_number?: string
+          pickup_state?: string | null
           pickup_time?: string | null
           rate?: number
           reference_number?: string
@@ -1460,18 +1519,25 @@ export type Database = {
           created_at?: string
           customer_id?: number
           delivery_address?: string
+          delivery_lat?: number | null
+          delivery_lon?: number | null
           delivery_number?: string
+          delivery_state?: string | null
           delivery_time?: string | null
           driver_id?: number | null
           empty_miles?: number
           equipment_type?: string
+          geocoded_at?: string | null
           id?: never
           invoice_id?: number | null
           load_number?: string
           miles?: number
           notes?: string
           pickup_address?: string
+          pickup_lat?: number | null
+          pickup_lon?: number | null
           pickup_number?: string
+          pickup_state?: string | null
           pickup_time?: string | null
           rate?: number
           reference_number?: string
@@ -3049,18 +3115,25 @@ export type Database = {
           created_at: string
           customer_id: number
           delivery_address: string
+          delivery_lat: number | null
+          delivery_lon: number | null
           delivery_number: string
+          delivery_state: string | null
           delivery_time: string | null
           driver_id: number | null
           empty_miles: number
           equipment_type: string
+          geocoded_at: string | null
           id: number
           invoice_id: number | null
           load_number: string
           miles: number
           notes: string
           pickup_address: string
+          pickup_lat: number | null
+          pickup_lon: number | null
           pickup_number: string
+          pickup_state: string | null
           pickup_time: string | null
           rate: number
           reference_number: string
@@ -3101,18 +3174,25 @@ export type Database = {
           created_at: string
           customer_id: number
           delivery_address: string
+          delivery_lat: number | null
+          delivery_lon: number | null
           delivery_number: string
+          delivery_state: string | null
           delivery_time: string | null
           driver_id: number | null
           empty_miles: number
           equipment_type: string
+          geocoded_at: string | null
           id: number
           invoice_id: number | null
           load_number: string
           miles: number
           notes: string
           pickup_address: string
+          pickup_lat: number | null
+          pickup_lon: number | null
           pickup_number: string
+          pickup_state: string | null
           pickup_time: string | null
           rate: number
           reference_number: string
@@ -3377,6 +3457,10 @@ export type Database = {
       invoice_balance: {
         Args: { i: Database["public"]["Tables"]["invoices"]["Row"] }
         Returns: number
+      }
+      lane_rate_history: {
+        Args: { p_dest_state: string; p_origin_state: string }
+        Returns: Json
       }
       list_invoice_payments: {
         Args: { p_invoice_id: number }
@@ -3752,18 +3836,25 @@ export type Database = {
           created_at: string
           customer_id: number
           delivery_address: string
+          delivery_lat: number | null
+          delivery_lon: number | null
           delivery_number: string
+          delivery_state: string | null
           delivery_time: string | null
           driver_id: number | null
           empty_miles: number
           equipment_type: string
+          geocoded_at: string | null
           id: number
           invoice_id: number | null
           load_number: string
           miles: number
           notes: string
           pickup_address: string
+          pickup_lat: number | null
+          pickup_lon: number | null
           pickup_number: string
+          pickup_state: string | null
           pickup_time: string | null
           rate: number
           reference_number: string

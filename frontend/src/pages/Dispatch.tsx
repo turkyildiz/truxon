@@ -3,7 +3,7 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Button, Card, Field, Input, money, Select, Textarea } from '../components/ui'
-import { calculateDistance, createCustomer, createLoad, customerRateProfile, estimateLoadMargin, extractPdf, fleetCostBasis, type ExtractedStop } from '../data'
+import { calculateDistance, createCustomer, createLoad, customerRateProfile, estimateLoadMargin, extractPdf, fleetCostBasis, laneRateForRoute, type ExtractedStop } from '../data'
 import { errorMessage } from '../supabase'
 import { ReferenceDataBanner, useReferenceData } from '../useReferenceData'
 import FleetMap from './FleetMap'
@@ -209,6 +209,18 @@ export default function Dispatch() {
   const brokerAvgRpm = brokerRates && brokerRates.load_count > 0 ? brokerRates.avg_rpm ?? null : null
   const loadRpm = rate > 0 && miles > 0 ? rate / miles : null
 
+  // Northstar: what this lane (origin→destination state) has historically paid.
+  // Gated on miles being set so we geocode a stable route, not every keystroke.
+  const laneRoute = routeOf(stops)
+  const { data: laneRate } = useQuery({
+    queryKey: ['lane-rate', laneRoute.origin, laneRoute.destination],
+    queryFn: () => laneRateForRoute(laneRoute.origin, laneRoute.destination),
+    enabled: laneRoute.origin.length > 4 && laneRoute.destination.length > 4 && miles > 0,
+    staleTime: 30 * 60 * 1000,
+    retry: false,
+  })
+  const laneAvgRpm = laneRate && laneRate.load_count > 0 ? laneRate.avg_rpm ?? null : null
+
   return (
     <div className="space-y-4">
       <FleetMap />
@@ -319,6 +331,17 @@ export default function Dispatch() {
                     {loadRpm != null && (
                       <span className={loadRpm >= brokerAvgRpm ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}>
                         {' · '}this load ${Math.abs(loadRpm - brokerAvgRpm).toFixed(2)} {loadRpm >= brokerAvgRpm ? 'above' : 'below'} their norm
+                      </span>
+                    )}
+                  </div>
+                )}
+                {laneAvgRpm != null && (
+                  <div className="mt-1 text-xs text-muted">
+                    🛣️ Lane {laneRate?.origin}→{laneRate?.dest} has paid <span className="font-semibold text-body">${laneAvgRpm.toFixed(2)}/mi</span> avg over{' '}
+                    {laneRate?.load_count} load{laneRate?.load_count === 1 ? '' : 's'} (180 days)
+                    {loadRpm != null && (
+                      <span className={loadRpm >= laneAvgRpm ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}>
+                        {' · '}this load ${Math.abs(loadRpm - laneAvgRpm).toFixed(2)} {loadRpm >= laneAvgRpm ? 'above' : 'below'} the lane
                       </span>
                     )}
                   </div>
