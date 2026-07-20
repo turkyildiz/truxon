@@ -16,11 +16,11 @@ class TruxTurn {
   final List<Map<String, dynamic>> proposals;
 }
 
-/// Feature 2 — Trux as a spoken assistant with a British, Jarvis-like voice.
+/// Feature 2 — Forest as a spoken assistant with a warm, steady American voice.
 ///
 /// On-device speech recognition (speech_to_text) captures the driver; the text
 /// goes to the `trux-agent` edge function (same brain as the web chat, scoped
-/// to the driver's permissions); the reply is spoken back through an en-GB TTS
+/// to the driver's permissions); the reply is spoken back through an en-US TTS
 /// voice. No audio or LLM keys ever leave via the client — trux-agent owns that.
 class TruxVoiceController extends ChangeNotifier {
   TruxVoiceController(this._api);
@@ -40,13 +40,13 @@ class TruxVoiceController extends ChangeNotifier {
   bool get isBusy => state != VoiceState.idle;
 
   Future<void> init() async {
-    // TTS — pick a British voice for the Jarvis effect.
+    // TTS — pick a warm American voice for Forest.
     try {
       await _tts.awaitSpeakCompletion(true);
       await _tts.setLanguage(AppConfig.truxVoiceLocale);
       await _tts.setPitch(1.0);
       await _tts.setSpeechRate(0.48); // measured, unhurried cadence
-      await _selectBritishVoice();
+      await _selectAmericanVoice();
       _tts.setCompletionHandler(_onSpeakDone);
       _voiceReady = true;
     } catch (e) {
@@ -66,21 +66,21 @@ class TruxVoiceController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _selectBritishVoice() async {
+  Future<void> _selectAmericanVoice() async {
     try {
       final voices = (await _tts.getVoices) as List?;
       if (voices == null) return;
-      final gb = voices
+      final us = voices
           .map((v) => Map<String, dynamic>.from(v as Map))
-          .where((v) => (v['locale'] ?? '').toString().toLowerCase().contains('en-gb'))
+          .where((v) => (v['locale'] ?? '').toString().toLowerCase().contains('en-us'))
           .toList();
-      if (gb.isEmpty) return;
-      // Prefer a male "Jarvis" timbre when the engine exposes one.
-      final male = gb.firstWhere(
+      if (us.isEmpty) return;
+      // Prefer a warm male American timbre when the engine exposes one.
+      final male = us.firstWhere(
         (v) => (v['name'] ?? '').toString().toLowerCase().contains('male') ||
-            (v['name'] ?? '').toString().toLowerCase().contains('en-gb-x-gbd') ||
+            (v['name'] ?? '').toString().toLowerCase().contains('en-us-x-iom') ||
             (v['name'] ?? '').toString().toLowerCase().contains('#male'),
-        orElse: () => gb.first,
+        orElse: () => us.first,
       );
       await _tts.setVoice({
         'name': male['name'].toString(),

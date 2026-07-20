@@ -14,10 +14,10 @@ class AppConfig {
 
   // ---- Trux voice (Feature 2) ----
   /// Preferred TTS locale — a British voice, Jarvis-style. Overridable at build
-  /// time with --dart-define=TRUX_VOICE_LOCALE=en-GB.
+  /// time with --dart-define=TRUX_VOICE_LOCALE=en-US.
   static const truxVoiceLocale = String.fromEnvironment(
     'TRUX_VOICE_LOCALE',
-    defaultValue: 'en-GB',
+    defaultValue: 'en-US',
   );
 
   // ---- Mumble PTT (Feature 5) ----

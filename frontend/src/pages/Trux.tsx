@@ -91,15 +91,15 @@ const RECOGNITION_CTOR: SpeechRecognitionCtor | undefined =
 const SYNTH_OK = typeof window !== 'undefined' && 'speechSynthesis' in window
 const STT_OK = RECOGNITION_CTOR != null
 
-// A calm, refined British male voice — the closest a legal, built-in system
-// voice gets to a JARVIS-style assistant (no cloning of any real/fictional
-// performance). Picks the best available voice; browsers expose different sets,
-// so we score by name then fall back to any en-GB, then any English male.
+// Forest's voice: warm, steady, plainspoken American — sincere and unhurried
+// (a licensed/built-in system voice; never a clone of any real person's voice).
+// Picks the best available voice; browsers expose different sets, so we score
+// by name then fall back to any en-US, then any English male.
 const PREFERRED_VOICES = [
-  'google uk english male', 'daniel', 'arthur', 'oliver', 'microsoft george',
-  'microsoft ryan', 'microsoft george online', 'rishi', 'ryan',
+  'google us english', 'microsoft guy', 'microsoft davis', 'microsoft andrew',
+  'microsoft eric', 'microsoft david', 'alex', 'aaron', 'fred', 'tom',
 ]
-const MALE_HINTS = ['male', 'daniel', 'george', 'ryan', 'james', 'arthur', 'oliver', 'thomas', 'guy', 'david', 'mark', 'fred', 'albert', 'rishi']
+const MALE_HINTS = ['male', 'guy', 'davis', 'andrew', 'eric', 'david', 'alex', 'aaron', 'fred', 'tom', 'james', 'mark', 'daniel', 'george', 'ryan']
 const FEMALE_HINTS = ['female', 'samantha', 'victoria', 'karen', 'moira', 'tessa', 'fiona', 'serena', 'kate', 'hazel', 'susan', 'zira', 'sonia', 'libby', 'catherine', 'emily', 'amelie']
 
 let cachedVoice: SpeechSynthesisVoice | null = null
@@ -112,13 +112,13 @@ function chooseVoice(): SpeechSynthesisVoice | null {
     const v = named(p)
     if (v) return v
   }
-  const gb = voices.filter((v) => v.lang.toLowerCase().startsWith('en-gb'))
+  const us = voices.filter((v) => v.lang.toLowerCase().startsWith('en-us'))
   const has = (v: SpeechSynthesisVoice, hints: string[]) => hints.some((h) => v.name.toLowerCase().includes(h))
   return (
-    gb.find((v) => has(v, MALE_HINTS)) ??
-    gb.find((v) => !has(v, FEMALE_HINTS)) ??
+    us.find((v) => has(v, MALE_HINTS)) ??
+    us.find((v) => !has(v, FEMALE_HINTS)) ??
     voices.find((v) => v.lang.toLowerCase().startsWith('en') && has(v, MALE_HINTS)) ??
-    gb[0] ??
+    us[0] ??
     voices.find((v) => v.lang.toLowerCase().startsWith('en')) ??
     null
   )
@@ -137,7 +137,7 @@ if (SYNTH_OK) {
 // Premium-voice delivery tuning: louder (gain above 100%) and a touch faster,
 // pitch-preserved so the speed-up doesn't undo the voice's depth.
 const VOICE_GAIN = 1.6
-const VOICE_RATE = 1.08
+const VOICE_RATE = 1.0 // Forest speaks unhurried
 let audioCtx: AudioContext | null = null
 function boostGain(audio: HTMLAudioElement): void {
   try {

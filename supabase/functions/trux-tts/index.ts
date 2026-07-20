@@ -1,12 +1,12 @@
 // Trux premium voice — proxies answer text to ElevenLabs TTS with a stock
-// British-male voice and returns MP3, keeping ELEVENLABS_API_KEY server-side.
+// warm American-male voice and returns MP3, keeping ELEVENLABS_API_KEY server-side.
 // Any signed-in staff member may use it; text is capped to bound cost. This is a
 // legal, built-in neural voice with a JARVIS-style delivery — NOT a clone of any
 // real or fictional performance. Without the key it 503s and the frontend falls
 // back to the free browser voice.
 import { corsResponse, getCaller, json } from '../_shared/auth.ts'
 
-const DEFAULT_VOICE = 'JBFqnCBsd6RMkjVDRZzb' // ElevenLabs stock "George" — warm British male (louder/faster tuning stays on the client)
+const DEFAULT_VOICE = 'pqHfZKP75CvOlQylNhV4' // ElevenLabs stock "Bill" — warm, steady American male (louder/faster tuning stays on the client)
 const DEFAULT_MODEL = 'eleven_turbo_v2_5'
 
 Deno.serve(async (req) => {
