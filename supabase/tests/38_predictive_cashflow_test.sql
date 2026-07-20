@@ -2,7 +2,7 @@
 -- late-trending open invoice, cashflow_forecast buckets expected money in.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(7);
+select plan(8);
 
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-00000000cf01'::uuid, 'cash@test.local');
 update public.profiles set role = 'admin' where id = '00000000-0000-4000-8000-00000000cf01';
@@ -18,6 +18,11 @@ insert into public.invoices (invoice_number, customer_id, invoice_date, total, s
 -- an OPEN invoice for Slow Broker, due in 15 days (its 45-day habit → ~30 days late)
 insert into public.invoices (invoice_number, customer_id, invoice_date, due_date, total, status)
   select 'OPEN1', id, now(), now() + interval '15 days', 5000, 'sent' from public.customers where company_name='Slow Broker';
+
+-- a recent completed repair ($8000) so the outflow must reflect maintenance spend
+insert into public.trucks (unit_number, status) values ('CF1', 'available');
+insert into public.maintenance_records (equipment_type, truck_id, status, cost, date_completed, is_planned)
+  select 'truck', id, 'completed', 8000, current_date - 10, false from public.trucks where unit_number='CF1';
 
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-00000000cf01"}', true);
 
@@ -36,6 +41,8 @@ select is((select count(*)::int from public.slow_pay_risk()), 1, 'only open (sen
 select is((select count(*)::int from public.cashflow_forecast(8)), 8, 'forecast returns one row per week of the horizon');
 select cmp_ok((select sum(expected_in) from public.cashflow_forecast(8)), '>=', 5000::numeric, 'the open $5000 is projected as money in');
 select cmp_ok((select max(expected_out) from public.cashflow_forecast(8)), '>=', 0::numeric, 'each week carries a projected outflow');
+-- outflow now includes maintenance: $8000 repair ÷ 8-week trailing ⇒ ≥ $1000/wk
+select cmp_ok((select max(expected_out) from public.cashflow_forecast(8)), '>=', 1000::numeric, 'weekly outflow includes trailing maintenance spend');
 
 select * from finish();
 rollback;
