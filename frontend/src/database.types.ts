@@ -161,6 +161,54 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_enrichment_log: {
+        Row: {
+          created_at: string
+          customer_id: number
+          field: string
+          id: number
+          model: string | null
+          new_value: string
+          old_value: string | null
+          source_document_id: number | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id: number
+          field: string
+          id?: never
+          model?: string | null
+          new_value: string
+          old_value?: string | null
+          source_document_id?: number | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: number
+          field?: string
+          id?: never
+          model?: string | null
+          new_value?: string
+          old_value?: string | null
+          source_document_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_enrichment_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_enrichment_log_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           billing_address: string
@@ -168,6 +216,7 @@ export type Database = {
           contact_person: string
           created_at: string
           email: string
+          enriched_at: string | null
           fax: string
           id: number
           is_active: boolean
@@ -187,6 +236,7 @@ export type Database = {
           contact_person?: string
           created_at?: string
           email?: string
+          enriched_at?: string | null
           fax?: string
           id?: never
           is_active?: boolean
@@ -206,6 +256,7 @@ export type Database = {
           contact_person?: string
           created_at?: string
           email?: string
+          enriched_at?: string | null
           fax?: string
           id?: never
           is_active?: boolean
@@ -2279,6 +2330,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      apply_customer_enrichment: {
+        Args: {
+          p_customer_id: number
+          p_fields: Json
+          p_model?: string
+          p_source_document_id?: number
+        }
+        Returns: number
       }
       ar_aging: {
         Args: never

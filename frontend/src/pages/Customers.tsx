@@ -1,15 +1,44 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useAuth } from '../auth'
 import PdfDrop from '../components/PdfDrop'
 import ResourcePage from '../components/ResourcePage'
 import { Badge } from '../components/ui'
-import { createCustomer, extractCustomerPdf, listCustomers, updateCustomer } from '../data'
+import { createCustomer, enrichCustomersBatch, extractCustomerPdf, listCustomers, updateCustomer } from '../data'
 import { errorMessage } from '../supabase'
 import type { Customer } from '../types'
 
 export default function Customers() {
+  const { user } = useAuth()
+  const qc = useQueryClient()
   const [prefill, setPrefill] = useState<Record<string, unknown> | null>(null)
   const [note, setNote] = useState('')
+  const [enriching, setEnriching] = useState(false)
+  const [enrichNote, setEnrichNote] = useState('')
+
+  async function runEnrich() {
+    setEnriching(true)
+    setEnrichNote('Reading customer documents…')
+    let afterId = 0, scanned = 0, filled = 0, touched = 0
+    try {
+      // page through every customer with blanks; the RPC only ever fills empties
+      for (let i = 0; i < 200; i++) {
+        const r = await enrichCustomersBatch(afterId, true)
+        if (r.processed === 0 || r.lastId <= afterId) break
+        scanned += r.processed
+        filled += r.filledTotal
+        touched += r.customers.filter((c) => c.filled > 0).length
+        afterId = r.lastId
+        setEnrichNote(`Scanned ${scanned} customers… filled ${filled} blank fields on ${touched} so far`)
+      }
+      setEnrichNote(`✓ Done — filled ${filled} blank field(s) across ${touched} customer(s) from their documents (${scanned} scanned).`)
+      qc.invalidateQueries({ queryKey: ['customers-all'] })
+    } catch (e) {
+      setEnrichNote(errorMessage(e))
+    } finally {
+      setEnriching(false)
+    }
+  }
 
   const extract = useMutation({
     mutationFn: async (file: File) => {
@@ -53,6 +82,21 @@ export default function Customers() {
         note={note}
         onFile={(f) => extract.mutate(f)}
       />
+      {user?.role === 'admin' && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+          <button
+            type="button"
+            onClick={runEnrich}
+            disabled={enriching}
+            className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {enriching ? 'Filling…' : 'Fill blanks from documents'}
+          </button>
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {enrichNote || 'Trux reads each customer’s paperwork and fills only the empty fields — never overwrites what’s there.'}
+          </span>
+        </div>
+      )}
       <ResourcePage<Customer>
         title="Customers"
         queryKey="customers-all"

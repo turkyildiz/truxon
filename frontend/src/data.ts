@@ -82,6 +82,24 @@ export async function updateCustomer(id: number, payload: Row): Promise<Customer
   return unwrap(await supabase.from('customers').update(payload as TablesUpdate<'customers'>).eq('id', id).select().single())
 }
 
+export interface EnrichBatch {
+  processed: number
+  lastId: number
+  filledTotal: number
+  apply: boolean
+  customers: Array<{ id: number; company_name: string; docsUsed: number; filled: number; proposed: string[]; skipped: string[] }>
+}
+
+/** One page of customer enrichment (admin only). The caller advances `afterId`
+ *  with the returned `lastId` until `processed` is 0. */
+export async function enrichCustomersBatch(afterId: number, apply: boolean): Promise<EnrichBatch> {
+  const { data, error } = await supabase.functions.invoke('customer-enrich', {
+    body: { after_id: afterId, apply, limit: 25 },
+  })
+  if (error) throw error
+  return data as EnrichBatch
+}
+
 // ---------- Drivers ----------
 
 export async function listDrivers(q?: string): Promise<Driver[]> {
