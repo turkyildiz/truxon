@@ -173,13 +173,8 @@ export default function Trux() {
   const [phase, setPhaseState] = useState<Phase>('idle')
   const [interim, setInterim] = useState('')
   const [micDenied, setMicDenied] = useState(false)
-  const [premium, setPremium] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('trux_premium_voice') === '1'
-    } catch {
-      return false
-    }
-  })
+  // Forest always speaks in his own (premium) voice — no on/off toggle;
+  // premiumRef stays true so the async speak path always uses it.
 
   // Refs let the async Web Speech callbacks (which capture an old render) read
   // the *current* intent instead of a stale snapshot.
@@ -189,20 +184,7 @@ export default function Trux() {
   const startListeningRef = useRef<() => void>(() => {})
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const speakSeqRef = useRef(0)
-  const premiumRef = useRef(premium)
-  premiumRef.current = premium
-
-  function togglePremium() {
-    setPremium((p) => {
-      const n = !p
-      try {
-        localStorage.setItem('trux_premium_voice', n ? '1' : '0')
-      } catch {
-        /* ignore */
-      }
-      return n
-    })
-  }
+  const premiumRef = useRef(true)
 
   function setPhase(p: Phase) {
     phaseRef.current = p
@@ -570,17 +552,6 @@ export default function Trux() {
                 : 'Enter to ask · Any action Forest proposes needs your confirmation'}
             </p>
             <div className="flex items-center gap-2">
-              <button
-                onClick={togglePremium}
-                title={premium ? "Forest's premium voice is on — tap for the free browser voice" : "Use Forest's premium voice"}
-                aria-pressed={premium}
-                className={
-                  'rounded-full border px-3 py-1 text-xs font-semibold ' +
-                  (premium ? 'border-navy-600 bg-navy-500/15 text-navy-700 dark:text-navy-200' : 'border-line bg-surface text-muted hover:bg-surface-2')
-                }
-              >
-                🌲 Forest voice{premium ? ' · on' : ''}
-              </button>
               {handsFree && (
                 <span className={'rounded-full px-2.5 py-1 text-xs font-semibold ' + PILL[phase].cls}>{PILL[phase].label}</span>
               )}
