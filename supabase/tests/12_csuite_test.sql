@@ -2,7 +2,7 @@
 -- Sentinel safety + concentration insights.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(12);
+select plan(14);
 
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-0000000000c5'::uuid, 'csuite@test.local');
 update public.profiles set role = 'admin' where id = '00000000-0000-4000-8000-0000000000c5';
@@ -52,6 +52,9 @@ select is((public.company_scorecard('2026-07-01','2026-08-01')->'safety'->>'acci
 select is((public.company_scorecard('2026-07-01','2026-08-01')->'safety'->>'preventable_accidents_in_window')::int, 1, 'scorecard safety: preventable accident captured');
 -- detention/telematics present (zero here — no ELD seed), and no longer in not_captured
 select ok(not (public.company_scorecard('2026-07-01','2026-08-01')->'not_captured' @> '["detention hours"]'::jsonb), 'detention no longer listed as not-captured');
+-- sales pipeline folded into the scorecard; bids no longer 'not captured'
+select isnt(public.company_scorecard('2026-07-01','2026-08-01')->'sales', null, 'scorecard carries a sales section');
+select ok(not (public.company_scorecard('2026-07-01','2026-08-01')->'not_captured' @> '["bids/win-rate/pipeline"]'::jsonb), 'bids/win-rate no longer not-captured');
 
 -- ---------- sentinel v2 ----------
 select public.sentinel_scan();
