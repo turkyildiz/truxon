@@ -14,7 +14,7 @@ function isCronBearer(req: Request): boolean {
   } catch { return false }
 }
 
-const DEFAULT_VOICE = 'A18diVRGRYJH7dKHIDMo' // ElevenLabs "Jesse" — warm, friendly Georgia-Southern baritone (Forest). Louder/faster tuning stays on the client.
+const DEFAULT_VOICE = 'dtVZnErhiiosqofxDzSH' // ElevenLabs "Havoc" — gritty deep Southern narrator (Forest). Louder/faster tuning stays on the client.
 const DEFAULT_MODEL = 'eleven_turbo_v2_5'
 
 Deno.serve(async (req) => {
