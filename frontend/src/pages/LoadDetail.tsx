@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom'
 import DocsNotes from '../components/DocsNotes'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Badge, Button, Card, Field, formatDateTime, Input, LoadError, money, Select, Textarea } from '../components/ui'
-import { cancelLoad, changeLoadStatus, getLoad, listStops, replaceStops, uncancelLoad, updateLoad } from '../data'
+import { cancelLoad, changeLoadStatus, getLoad, listStops, replaceStops, setLoadPaperwork, uncancelLoad, updateLoad } from '../data'
 import { errorMessage } from '../supabase'
 import { ReferenceDataBanner, useReferenceData } from '../useReferenceData'
 import { LOAD_STATUSES, type Load } from '../types'
@@ -83,6 +83,12 @@ export default function LoadDetail() {
       setError('')
       refresh()
     },
+    onError: (err) => setError(errorMessage(err)),
+  })
+
+  const paperwork = useMutation({
+    mutationFn: (awaiting: boolean) => setLoadPaperwork(Number(id), awaiting),
+    onSuccess: () => { setError(''); refresh() },
     onError: (err) => setError(errorMessage(err)),
   })
 
@@ -172,6 +178,11 @@ export default function LoadDetail() {
           </div>
           <div className="flex items-center gap-3">
             <Badge status={load.status} />
+            {load.awaiting_paperwork && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-600 dark:text-amber-300">
+                📄 Awaiting paperwork
+              </span>
+            )}
             {editable && !editForm && (
               <Button variant="secondary" onClick={startEdit}>
                 Edit
@@ -194,6 +205,24 @@ export default function LoadDetail() {
             </div>
           ) : (
             <StatusStepper load={load} onAdvance={(s) => advance.mutate(s)} busy={advance.isPending} />
+          )}
+          {editable && (
+            load.awaiting_paperwork ? (
+              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-amber-500/10 px-4 py-2.5">
+                <span className="text-sm text-amber-700 dark:text-amber-300">📄 Booked — waiting on the final rate confirmation / paperwork.</span>
+                <Button variant="secondary" className="!py-1.5" disabled={paperwork.isPending} onClick={() => paperwork.mutate(false)}>
+                  Mark paperwork received
+                </Button>
+              </div>
+            ) : (
+              <button
+                className="mt-3 text-sm text-muted hover:text-amber-600"
+                disabled={paperwork.isPending}
+                onClick={() => paperwork.mutate(true)}
+              >
+                📄 Flag as awaiting paperwork
+              </button>
+            )
           )}
         </div>
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}

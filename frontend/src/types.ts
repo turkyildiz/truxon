@@ -240,6 +240,7 @@ export interface Load {
   special_terms: string
   notes: string
   cancel_reason: string
+  awaiting_paperwork: boolean
   invoice_id: number | null
   created_at: string
 }

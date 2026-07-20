@@ -1036,6 +1036,7 @@ export type Database = {
       }
       loads: {
         Row: {
+          awaiting_paperwork: boolean
           cancel_reason: string
           created_at: string
           customer_id: number
@@ -1062,6 +1063,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          awaiting_paperwork?: boolean
           cancel_reason?: string
           created_at?: string
           customer_id: number
@@ -1088,6 +1090,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          awaiting_paperwork?: boolean
           cancel_reason?: string
           created_at?: string
           customer_id?: number
@@ -2600,6 +2603,7 @@ export type Database = {
       cancel_load: {
         Args: { p_load_id: number; p_reason?: string }
         Returns: {
+          awaiting_paperwork: boolean
           cancel_reason: string
           created_at: string
           customer_id: number
@@ -2638,6 +2642,7 @@ export type Database = {
           p_status: Database["public"]["Enums"]["load_status"]
         }
         Returns: {
+          awaiting_paperwork: boolean
           cancel_reason: string
           created_at: string
           customer_id: number
@@ -3128,6 +3133,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_load_paperwork: {
+        Args: { p_awaiting: boolean; p_id: number }
+        Returns: undefined
+      }
       toll_by_agency: {
         Args: { p_end: string; p_start: string }
         Returns: {
@@ -3177,6 +3186,7 @@ export type Database = {
       uncancel_load: {
         Args: { p_load_id: number }
         Returns: {
+          awaiting_paperwork: boolean
           cancel_reason: string
           created_at: string
           customer_id: number

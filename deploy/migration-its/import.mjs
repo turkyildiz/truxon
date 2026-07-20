@@ -223,6 +223,8 @@ for (const L of loads) {
     miles: parseFloat(L.total_miles) || 0,
     special_terms: '',
     notes,
+    // booked but not fully papered: no real stops, or no rate yet
+    awaiting_paperwork: (!firstPu && !lastDel) || (parseFloat(L.total_rate) || 0) === 0,
     ...(iso(firstPu) ? { created_at: iso(firstPu) } : {}),
   }
   if (!DRY) {

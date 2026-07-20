@@ -21,6 +21,7 @@ export default function Loads() {
       return next
     })
   const statusList = [...statuses].sort()
+  const [awaitingOnly, setAwaitingOnly] = useState(false)
   const [customerId, setCustomerId] = useState('')
   const [driverId, setDriverId] = useState('')
   const [dateFrom, setDateFrom] = useState('')
@@ -30,8 +31,8 @@ export default function Loads() {
   const { data: customers = [] } = useQuery({ queryKey: ['customers-all', ''], queryFn: () => listCustomers(undefined, { includeInactive: true }) })
   const { data: drivers = [] } = useQuery({ queryKey: ['drivers', ''], queryFn: () => listDrivers() })
   const loadsQ = useQuery({
-    queryKey: ['loads', q, statusList.join(','), customerId, driverId, dateFrom, dateTo],
-    queryFn: () => listLoads({ q, statuses: statusList, customer_id: customerId, driver_id: driverId, date_from: dateFrom, date_to: dateTo }),
+    queryKey: ['loads', q, statusList.join(','), awaitingOnly, customerId, driverId, dateFrom, dateTo],
+    queryFn: () => listLoads({ q, statuses: statusList, awaiting_paperwork: awaitingOnly, customer_id: customerId, driver_id: driverId, date_from: dateFrom, date_to: dateTo }),
   })
   const { data: loads = [], isLoading } = loadsQ
 
@@ -59,6 +60,16 @@ export default function Loads() {
             Show all
           </button>
         )}
+        <span className="mx-1 h-5 w-px self-center bg-line" />
+        <button
+          onClick={() => setAwaitingOnly((v) => !v)}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+            awaitingOnly ? 'border-amber-500 bg-amber-500 text-white' : 'border-line text-muted hover:bg-surface-2 hover:text-body'
+          }`}
+          title="Show only loads awaiting final paperwork"
+        >
+          📄 Awaiting paperwork
+        </button>
       </div>
       <div className="mb-4 flex flex-wrap gap-3">
         <Input placeholder="Search load #, broker #, address…" value={q} onChange={(e) => setQ(e.target.value)} className="w-full sm:w-64" />
@@ -125,7 +136,14 @@ export default function Loads() {
                   <td className="px-3 py-3">{money(load.rate)}</td>
                   <td className="px-3 py-3">{load.rate_per_mile != null ? `$${load.rate_per_mile.toFixed(2)}` : '—'}</td>
                   <td className="px-3 py-3">
-                    <Badge status={load.status} />
+                    <div className="flex flex-col items-start gap-1">
+                      <Badge status={load.status} />
+                      {load.awaiting_paperwork && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-300" title="Booked — final paperwork not received yet">
+                          📄 Awaiting paperwork
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
