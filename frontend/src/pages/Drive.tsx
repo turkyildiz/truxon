@@ -416,8 +416,8 @@ export default function Drive({ drive }: { drive: DriveName }) {
                 draggable
                 onDragStart={(e) => onItemDragStart(e, i)}
                 onDragEnd={() => (dragRef.current = null)}
-                onClick={() => toggle(i.id)}
-                onDoubleClick={() => open(i)}
+                onClick={() => (i.is_folder ? open(i) : toggle(i.id))}
+                onDoubleClick={() => !i.is_folder && open(i)}
                 {...(i.is_folder ? targetProps(`f${i.id}`, fullPathOf(i), i.id) : {})}
                 className={`group relative cursor-pointer rounded-xl border p-3 transition-colors ${isTarget ? 'border-brand ring-2 ring-brand' : sel ? 'border-brand bg-brand/5' : 'border-line hover:bg-surface-2'}`}
                 title={i.filename}
@@ -477,8 +477,8 @@ export default function Drive({ drive }: { drive: DriveName }) {
                     onDragStart={(e) => onItemDragStart(e, i)}
                     onDragEnd={() => (dragRef.current = null)}
                     className={`cursor-pointer ${isTarget ? 'ring-2 ring-inset ring-brand' : sel ? 'bg-brand/5' : 'hover:bg-surface-2'}`}
-                    onClick={() => toggle(i.id)}
-                    onDoubleClick={() => open(i)}
+                    onClick={() => (i.is_folder ? open(i) : toggle(i.id))}
+                    onDoubleClick={() => !i.is_folder && open(i)}
                     {...(i.is_folder ? targetProps(`f${i.id}`, fullPathOf(i), i.id) : {})}
                   >
                     <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
