@@ -1548,3 +1548,19 @@ export async function slowPayRisk(): Promise<SlowPayRow[]> {
   const data = unwrap(await supabase.rpc('slow_pay_risk'))
   return (data as unknown as SlowPayRow[]) ?? []
 }
+
+export interface RevenueForecastWeek {
+  week_start: string
+  week_number: number
+  week_label: string
+  forecast_revenue: number
+  trailing_avg: number
+  last_year_revenue: number | null
+  loads_per_truck: number | null
+  basis: string
+}
+/** Weekly revenue outlook (trailing avg blended with same week last year). */
+export async function revenueForecast(weeks = 6): Promise<RevenueForecastWeek[]> {
+  const data = unwrap(await supabase.rpc('revenue_forecast', { p_weeks: weeks }))
+  return (data as unknown as RevenueForecastWeek[]) ?? []
+}

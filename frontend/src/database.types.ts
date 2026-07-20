@@ -3611,6 +3611,19 @@ export type Database = {
         Args: { p_action: string; p_log_id: number }
         Returns: undefined
       }
+      revenue_forecast: {
+        Args: { p_weeks?: number }
+        Returns: {
+          basis: string
+          forecast_revenue: number
+          last_year_revenue: number
+          loads_per_truck: number
+          trailing_avg: number
+          week_label: string
+          week_number: number
+          week_start: string
+        }[]
+      }
       safety_summary: {
         Args: { p_end: string; p_start: string }
         Returns: Json

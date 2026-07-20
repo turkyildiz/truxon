@@ -12,7 +12,7 @@ import {
   acctAging, acctMarginMonthly, acctRevenueByCustomer, acctRevenueMonthly, acctSummary, acctUnbilledLoads,
   cashflowForecast, createInvoice, deleteInvoicePayment, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
   glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
-  qboConnectUrl, qboStatus, recordInvoicePayment, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
+  qboConnectUrl, qboStatus, recordInvoicePayment, revenueForecast, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
 } from '../data'
 import { downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
 import { errorMessage } from '../supabase'
@@ -423,7 +423,9 @@ function OverviewCharts() {
 function ForecastTab() {
   const cfQ = useQuery({ queryKey: ['cashflow-forecast'], queryFn: () => cashflowForecast(8), retry: false })
   const spQ = useQuery({ queryKey: ['slow-pay-risk'], queryFn: slowPayRisk, retry: false })
+  const rvQ = useQuery({ queryKey: ['revenue-forecast'], queryFn: () => revenueForecast(6), retry: false })
   const weeks = cfQ.data ?? []
+  const outlook = rvQ.data ?? []
   const risky = (spQ.data ?? []).filter((r) => r.risk !== 'low')
   const chart = weeks.map((w) => ({ label: `W${w.week_number}`, In: w.expected_in, Out: -w.expected_out, Net: w.net, Running: w.cumulative_net }))
   const riskColor = (r: string) => (r === 'high' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400')
@@ -462,6 +464,30 @@ function ForecastTab() {
               ))}
             </Table>
           </>
+        )}
+      </Card>
+
+      <Card title="Revenue outlook — next 6 weeks">
+        <p className="mb-3 text-xs text-muted">
+          Trailing 8-week average, blended with the <strong>same week last year</strong> where we have the history — so a seasonal dip or bump is expected, not a shock.
+        </p>
+        {rvQ.isLoading ? (
+          <p className="py-6 text-center text-muted">Loading…</p>
+        ) : rvQ.isError ? (
+          <LoadError error={rvQ.error} onRetry={() => rvQ.refetch()} />
+        ) : (
+          <Table headers={['Week', 'Forecast', 'Trailing avg', 'Same wk last yr', 'Loads/truck', 'Basis']}>
+            {outlook.map((w) => (
+              <tr key={w.week_start} className="border-b border-line">
+                <td className="px-3 py-2 font-medium">{w.week_label}</td>
+                <td className="px-3 py-2 font-semibold text-body">{money(w.forecast_revenue)}</td>
+                <td className="px-3 py-2 text-muted">{money(w.trailing_avg)}</td>
+                <td className="px-3 py-2 text-muted">{w.last_year_revenue != null ? money(w.last_year_revenue) : '—'}</td>
+                <td className="px-3 py-2 text-muted">{w.loads_per_truck ?? '—'}</td>
+                <td className="px-3 py-2 text-xs text-muted">{w.basis}</td>
+              </tr>
+            ))}
+          </Table>
         )}
       </Card>
 
