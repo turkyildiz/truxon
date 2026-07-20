@@ -49,30 +49,41 @@ function parseGoogle(result: any): Geo {
   }
 }
 
-// Resolve one address: cache first, then Google. `cached` reports whether this
-// avoided a (billable) Google call. `geo` is null only for an empty address.
-async function geocodeOne(addr: string, svc: SupabaseClient, key: string): Promise<{ geo: Geo | null; cached: boolean }> {
+// Resolve one address: cache first, then Google.
+//   ok=false  → transient failure (REQUEST_DENIED, quota, network) — NOT cached
+//               and the caller must NOT stamp the load done, so it retries later.
+//   cached    → whether a (billable) Google call was avoided.
+//   geo=null  → empty address (nothing to do).
+async function geocodeOne(addr: string, svc: SupabaseClient, key: string): Promise<{ geo: Geo | null; cached: boolean; ok: boolean }> {
   const clean = (addr ?? '').trim()
-  if (!clean) return { geo: null, cached: true }
+  if (!clean) return { geo: null, cached: true, ok: true }
   const nk = norm(clean)
 
   const { data: hit } = await svc.from('geocode_cache').select('*').eq('norm_address', nk).maybeSingle()
-  if (hit) return { geo: hit as unknown as Geo, cached: true }
+  if (hit) return { geo: hit as unknown as Geo, cached: true, ok: true }
 
   const url = new URL('https://maps.googleapis.com/maps/api/geocode/json')
   url.searchParams.set('address', clean)
   url.searchParams.set('key', key)
-  const resp = await fetch(url)
-  const body = await resp.json().catch(() => ({}))
-  if (body.status !== 'OK' || !Array.isArray(body.results) || body.results.length === 0) {
-    // Cache a negative result too, so a bad address isn't retried every run.
-    const empty: Geo = { formatted: '', lat: null, lon: null, city: '', state: '', postal: '', country: '', location_type: body.status ?? 'ZERO_RESULTS', partial: false }
+  let body: { status?: string; results?: unknown[] } = {}
+  try {
+    const resp = await fetch(url)
+    body = await resp.json().catch(() => ({}))
+  } catch {
+    return { geo: null, cached: false, ok: false } // network error — transient
+  }
+  // A genuine "no such place" is cacheable; a config/quota/transient error is not.
+  if (body.status === 'ZERO_RESULTS') {
+    const empty: Geo = { formatted: '', lat: null, lon: null, city: '', state: '', postal: '', country: '', location_type: 'ZERO_RESULTS', partial: false }
     await svc.from('geocode_cache').upsert({ norm_address: nk, ...empty }, { onConflict: 'norm_address' })
-    return { geo: empty, cached: false }
+    return { geo: empty, cached: false, ok: true }
+  }
+  if (body.status !== 'OK' || !Array.isArray(body.results) || body.results.length === 0) {
+    return { geo: null, cached: false, ok: false } // REQUEST_DENIED / OVER_QUERY_LIMIT / UNKNOWN — retry later
   }
   const geo = parseGoogle(body.results[0])
   await svc.from('geocode_cache').upsert({ norm_address: nk, ...geo }, { onConflict: 'norm_address' })
-  return { geo, cached: false }
+  return { geo, cached: false, ok: true }
 }
 
 Deno.serve(async (req) => {
@@ -102,14 +113,15 @@ Deno.serve(async (req) => {
   if (body.mode === 'load' && body.load_id != null) {
     const { data: load } = await svc.from('loads').select('id, pickup_address, delivery_address').eq('id', body.load_id).single()
     if (!load) return json({ error: 'load not found' }, 404)
-    const { geo: pu } = await geocodeOne(load.pickup_address ?? '', svc, key)
-    const { geo: de } = await geocodeOne(load.delivery_address ?? '', svc, key)
+    const pu = await geocodeOne(load.pickup_address ?? '', svc, key)
+    const de = await geocodeOne(load.delivery_address ?? '', svc, key)
+    if (!pu.ok || !de.ok) return json({ load_id: load.id, error: 'geocoder unavailable (transient) — not stamped', pickup: pu.geo, delivery: de.geo }, 200)
     await svc.from('loads').update({
-      pickup_lat: pu?.lat ?? null, pickup_lon: pu?.lon ?? null, pickup_state: pu?.state || null,
-      delivery_lat: de?.lat ?? null, delivery_lon: de?.lon ?? null, delivery_state: de?.state || null,
+      pickup_lat: pu.geo?.lat ?? null, pickup_lon: pu.geo?.lon ?? null, pickup_state: pu.geo?.state || null,
+      delivery_lat: de.geo?.lat ?? null, delivery_lon: de.geo?.lon ?? null, delivery_state: de.geo?.state || null,
       geocoded_at: now,
     }).eq('id', load.id)
-    return json({ load_id: load.id, pickup: pu, delivery: de })
+    return json({ load_id: load.id, pickup: pu.geo, delivery: de.geo })
   }
 
   // ---- bounded backfill of ungeocoded loads ----
@@ -121,12 +133,15 @@ Deno.serve(async (req) => {
     .order('delivery_time', { ascending: false, nullsFirst: false })
     .limit(limit)
 
-  let done = 0, googleCalls = 0
+  let done = 0, skipped = 0, googleCalls = 0
   for (const l of loads ?? []) {
     const pu = await geocodeOne(l.pickup_address ?? '', svc, key)
     const de = await geocodeOne(l.delivery_address ?? '', svc, key)
     if (!pu.cached) googleCalls++
     if (!de.cached) googleCalls++
+    // A transient geocoder failure must not stamp the load done — leave it for
+    // the next run so it retries once the key/quota recovers.
+    if (!pu.ok || !de.ok) { skipped++; continue }
     await svc.from('loads').update({
       pickup_lat: pu.geo?.lat ?? null, pickup_lon: pu.geo?.lon ?? null, pickup_state: pu.geo?.state || null,
       delivery_lat: de.geo?.lat ?? null, delivery_lon: de.geo?.lon ?? null, delivery_state: de.geo?.state || null,
@@ -140,5 +155,5 @@ Deno.serve(async (req) => {
     .is('geocoded_at', null)
     .or('pickup_address.neq.,delivery_address.neq.')
 
-  return json({ geocoded: done, approx_google_calls: googleCalls, remaining: remaining ?? 0 })
+  return json({ geocoded: done, skipped_transient: skipped, approx_google_calls: googleCalls, remaining: remaining ?? 0 })
 })
