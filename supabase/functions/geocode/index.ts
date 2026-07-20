@@ -86,6 +86,16 @@ async function geocodeOne(addr: string, svc: SupabaseClient, key: string): Promi
   return { geo, cached: false, ok: true, status: 'OK' }
 }
 
+// Write geocode metadata via the RPC (bypasses the billed-load update lock).
+// deno-lint-ignore no-explicit-any
+function stampLoad(svc: SupabaseClient, loadId: number, pu: Geo | null, de: Geo | null): Promise<{ error: any }> {
+  return svc.rpc('apply_load_geocode', {
+    p_load_id: loadId,
+    p_pickup_lat: pu?.lat ?? null, p_pickup_lon: pu?.lon ?? null, p_pickup_state: pu?.state || '',
+    p_delivery_lat: de?.lat ?? null, p_delivery_lon: de?.lon ?? null, p_delivery_state: de?.state || '',
+  }) as unknown as Promise<{ error: any }>
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
 
@@ -101,7 +111,6 @@ Deno.serve(async (req) => {
   if (!key) return json({ error: 'GOOGLE_MAPS_API_KEY not configured' }, 200)
   const svc = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   const body = await req.json().catch(() => ({})) as Record<string, unknown>
-  const now = new Date().toISOString()
 
   // ---- single address ----
   if (typeof body.address === 'string' && !body.mode) {
@@ -116,11 +125,8 @@ Deno.serve(async (req) => {
     const pu = await geocodeOne(load.pickup_address ?? '', svc, key)
     const de = await geocodeOne(load.delivery_address ?? '', svc, key)
     if (!pu.ok || !de.ok) return json({ load_id: load.id, error: 'geocoder unavailable (transient) — not stamped', pickup: pu.geo, delivery: de.geo }, 200)
-    await svc.from('loads').update({
-      pickup_lat: pu.geo?.lat ?? null, pickup_lon: pu.geo?.lon ?? null, pickup_state: pu.geo?.state || null,
-      delivery_lat: de.geo?.lat ?? null, delivery_lon: de.geo?.lon ?? null, delivery_state: de.geo?.state || null,
-      geocoded_at: now,
-    }).eq('id', load.id)
+    const { error: upErr } = await stampLoad(svc, load.id, pu.geo, de.geo)
+    if (upErr) return json({ load_id: load.id, error: upErr.message }, 200)
     return json({ load_id: load.id, pickup: pu.geo, delivery: de.geo })
   }
 
@@ -142,11 +148,8 @@ Deno.serve(async (req) => {
     // A transient geocoder failure must not stamp the load done — leave it for
     // the next run so it retries once the key/quota recovers.
     if (!pu.ok || !de.ok) { skipped++; continue }
-    await svc.from('loads').update({
-      pickup_lat: pu.geo?.lat ?? null, pickup_lon: pu.geo?.lon ?? null, pickup_state: pu.geo?.state || null,
-      delivery_lat: de.geo?.lat ?? null, delivery_lon: de.geo?.lon ?? null, delivery_state: de.geo?.state || null,
-      geocoded_at: now,
-    }).eq('id', l.id)
+    const { error: upErr } = await stampLoad(svc, l.id, pu.geo, de.geo)
+    if (upErr) { skipped++; continue }
     done++
   }
 
