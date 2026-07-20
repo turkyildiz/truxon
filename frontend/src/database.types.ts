@@ -209,6 +209,32 @@ export type Database = {
           },
         ]
       }
+      customer_qbo_aliases: {
+        Row: {
+          created_at: string
+          customer_id: number
+          qbo_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: number
+          qbo_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: number
+          qbo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_qbo_aliases_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           billing_address: string
@@ -221,6 +247,7 @@ export type Database = {
           fax: string
           id: number
           is_active: boolean
+          mc_number: string
           notes: string
           payment_terms: string
           phone: string
@@ -242,6 +269,7 @@ export type Database = {
           fax?: string
           id?: never
           is_active?: boolean
+          mc_number?: string
           notes?: string
           payment_terms?: string
           phone?: string
@@ -263,6 +291,7 @@ export type Database = {
           fax?: string
           id?: never
           is_active?: boolean
+          mc_number?: string
           notes?: string
           payment_terms?: string
           phone?: string
@@ -2661,6 +2690,13 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      duplicate_customer_groups: {
+        Args: never
+        Returns: {
+          members: Json
+          norm_key: string
+        }[]
+      }
       enqueue_doc_search: {
         Args: { p_entity_type?: string; p_query: string }
         Returns: number
@@ -2856,6 +2892,10 @@ export type Database = {
           similarity: number
         }[]
       }
+      merge_customers: {
+        Args: { p_dupe: number; p_keep: number }
+        Returns: Json
+      }
       my_driver_id: { Args: never; Returns: number }
       my_role: {
         Args: never
@@ -2863,6 +2903,7 @@ export type Database = {
       }
       next_invoice_number: { Args: never; Returns: string }
       next_load_number: { Args: never; Returns: string }
+      normalize_company_name: { Args: { p: string }; Returns: string }
       playbook_coverage: { Args: never; Returns: Json }
       playbook_metrics_list: {
         Args: { p_owner?: string; p_search?: string; p_status?: string }

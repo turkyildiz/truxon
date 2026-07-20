@@ -216,17 +216,56 @@ Deno.serve(async (req) => {
   // vision model (extract-pdf), then posts the fields here; we apply blanks-only.
   if (body.customer_id && body.fields && typeof body.fields === 'object') {
     const f = body.fields as Record<string, unknown>
-    const mc = f.mc_number ? `MC# ${String(f.mc_number).trim()}` : ''
-    const noteVal = [mc, f.notes ? String(f.notes).trim() : ''].filter(Boolean).join(' — ')
     const fields: Record<string, unknown> = {
       contact_person: f.contact_person, phone: f.phone, email: f.email,
-      billing_address: f.billing_address, notes: noteVal || null,
+      billing_address: f.billing_address, mc_number: f.mc_number, notes: f.notes || null,
     }
     const { data: n, error: rpcErr } = await svc.rpc('apply_customer_enrichment', {
       p_customer_id: Number(body.customer_id), p_fields: fields, p_source_document_id: body.source_document_id ?? null, p_model: 'vision:ratecon',
     })
     if (rpcErr) return json({ error: rpcErr.message }, 500)
     return json({ filled: Number(n) || 0 })
+  }
+
+  // ── dupes_report: duplicate-customer groups (normalized-name key) ──
+  if (body.mode === 'dupes_report') {
+    const { data, error } = await svc.rpc('duplicate_customer_groups')
+    if (error) return json({ error: error.message }, 500)
+    return json({ groups: data ?? [] })
+  }
+
+  // ── merge_auto: merge duplicate groups; the server decides every pair ──
+  // Callers can only say "go" (or dry_run) — which merges happen is computed
+  // here: keeper = most loads/invoices/oldest (the report's member order); a
+  // pair is SKIPPED when both sides carry MC numbers that differ (same name,
+  // different company).
+  if (body.mode === 'merge_auto') {
+    const dry = !!body.dry_run
+    const { data: groups, error } = await svc.rpc('duplicate_customer_groups')
+    if (error) return json({ error: error.message }, 500)
+    type Member = { id: number; company_name: string; mc_number: string; qbo_id: string | null; loads: number; invoices: number }
+    const results: Array<Record<string, unknown>> = []
+    let merged = 0, skipped = 0
+    for (const g of (groups ?? []) as Array<{ norm_key: string; members: Member[] }>) {
+      const keeper = g.members[0]
+      for (const dupe of g.members.slice(1)) {
+        const mcA = (keeper.mc_number ?? '').replace(/\D/g, '')
+        const mcB = (dupe.mc_number ?? '').replace(/\D/g, '')
+        if (mcA && mcB && mcA !== mcB) {
+          skipped++
+          results.push({ group: g.norm_key, skipped: dupe.company_name, reason: `MC mismatch (${mcA} vs ${mcB})` })
+          continue
+        }
+        if (dry) {
+          results.push({ group: g.norm_key, would_merge: `${dupe.company_name} (#${dupe.id})`, into: `${keeper.company_name} (#${keeper.id})`, dupe_loads: dupe.loads, dupe_invoices: dupe.invoices })
+          continue
+        }
+        const { data: res, error: mErr } = await svc.rpc('merge_customers', { p_keep: keeper.id, p_dupe: dupe.id })
+        if (mErr) { results.push({ group: g.norm_key, dupe: dupe.id, error: mErr.message }); skipped++ }
+        else { merged++; results.push(res as Record<string, unknown>) }
+      }
+    }
+    return json({ groups: (groups ?? []).length, merged, skipped, dry_run: dry, results })
   }
 
   // ── llm_diag: report the configured LLM endpoint + its model list (no key) ──
