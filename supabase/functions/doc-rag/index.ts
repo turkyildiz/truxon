@@ -157,9 +157,14 @@ Deno.serve(async (req) => {
       const base = storagePath.split('/').pop()!
       const { data: found } = await svc.storage.from('team').list(dir, { search: base, limit: 1 })
       if (!found?.length) { skipped++; continue }
-      // already registered?
+      // already registered? (exact object, or the same file re-imported from a
+      // later zip: same name + folder + size ⇒ skip, don't duplicate)
       const { data: dupe } = await svc.from('drive_files').select('id').eq('storage_path', storagePath).limit(1)
       if (dupe?.length) { skipped++; continue }
+      const { data: sameFile } = await svc.from('drive_files').select('id')
+        .eq('drive', 'team').eq('filename', filename).eq('parent', parent)
+        .eq('size_bytes', Number(f.size_bytes) || 0).eq('is_folder', false).limit(1)
+      if (sameFile?.length) { skipped++; continue }
       // ensure ancestor folder rows exist (parent 'A/B/C' → rows A, A/B, A/B/C)
       const segs = parent ? parent.split('/') : []
       for (let i = 0; i < segs.length; i++) {
