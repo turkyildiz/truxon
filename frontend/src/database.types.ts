@@ -821,15 +821,7 @@ export type Database = {
           updated_at?: string
           username?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "eld_driver_status_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: true
-            referencedRelation: "eld_drivers"
-            referencedColumns: ["driver_id"]
-          },
-        ]
+        Relationships: []
       }
       eld_drivers: {
         Row: {
@@ -923,13 +915,6 @@ export type Database = {
             referencedRelation: "trucks"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "eld_location_history_vehicle_id_fkey"
-            columns: ["vehicle_id"]
-            isOneToOne: false
-            referencedRelation: "eld_vehicles"
-            referencedColumns: ["vehicle_id"]
-          },
         ]
       }
       eld_vehicle_status: {
@@ -978,15 +963,7 @@ export type Database = {
           vehicle_id?: string
           vin?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "eld_vehicle_status_vehicle_id_fkey"
-            columns: ["vehicle_id"]
-            isOneToOne: true
-            referencedRelation: "eld_vehicles"
-            referencedColumns: ["vehicle_id"]
-          },
-        ]
+        Relationships: []
       }
       eld_vehicles: {
         Row: {

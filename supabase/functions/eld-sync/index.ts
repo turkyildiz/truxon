@@ -75,10 +75,13 @@ Deno.serve(async (req) => {
     const cnt = async (t: string, f = '*') => (await svc.from(t).select(f, { count: 'exact', head: true })).count ?? 0
     const withGps = (await svc.from('eld_vehicle_status').select('vehicle_id', { count: 'exact', head: true }).not('lat', 'is', null)).count ?? 0
     const linked = (await svc.from('eld_vehicles').select('vehicle_id', { count: 'exact', head: true }).not('truck_id', 'is', null)).count ?? 0
+    const { data: map } = await svc.from('eld_vehicles').select('number, truck_id, trucks(unit_number)').order('number').limit(20)
     return json({
       eld_vehicles: await cnt('eld_vehicles'), linked_to_trucks: linked,
       vehicle_status: await cnt('eld_vehicle_status'), status_with_gps: withGps,
       driver_status: await cnt('eld_driver_status'), location_history: await cnt('eld_location_history'),
+      // deno-lint-ignore no-explicit-any
+      unit_map: (map ?? []).map((m: any) => ({ eld: m.number, truck: m.trucks?.unit_number ?? null })),
     })
   }
 

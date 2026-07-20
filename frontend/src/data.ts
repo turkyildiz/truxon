@@ -1473,8 +1473,9 @@ export async function eldSyncNow(): Promise<Record<string, unknown>> {
   return invokeFunction('eld-sync', { body: {} })
 }
 
-/** Merged live fleet for the map: ELD is the source of truth (accurate, always
- *  on); the phone-GPS snapshot fills in only trucks the ELD doesn't cover. */
+/** Merged live fleet for the map: the ELD is the source of truth (accurate,
+ *  always on). Our companion tablets are FAILOVER ONLY — a tablet pin appears
+ *  solely for a fleet truck the ELD isn't currently reporting. */
 export async function fleetLive(): Promise<FleetPin[]> {
   const [eld, mobile] = await Promise.all([
     eldFleetLive().catch(() => [] as EldFleetRow[]),
@@ -1482,14 +1483,16 @@ export async function fleetLive(): Promise<FleetPin[]> {
   ])
   const pins: FleetPin[] = []
   const covered = new Set<number>()
+  // The ELD pads some units (e.g. "003"); show the 2-digit fleet form ("03").
+  const tidyUnit = (u: string | null | undefined) => (u ?? '').replace(/^0(?=\d\d)/, '') || null
   eld.forEach((e, i) => {
     if (e.lat == null || e.lng == null) return
     if (e.truck_id) covered.add(e.truck_id)
     pins.push({
       driver_id: -(e.truck_id ?? i + 1), // synthetic (negative) key; no collision with real driver ids
-      driver_name: e.driver_name ?? `Unit ${e.unit ?? '?'}`,
+      driver_name: e.driver_name ?? `Unit ${tidyUnit(e.unit) ?? '?'}`,
       truck_id: e.truck_id ?? null,
-      truck_unit: e.unit ?? null,
+      truck_unit: tidyUnit(e.unit),
       load_id: null,
       load_number: null,
       lat: Number(e.lat),
@@ -1505,8 +1508,10 @@ export async function fleetLive(): Promise<FleetPin[]> {
       eld_status: e.status,
     })
   })
+  // Failover only: skip tablets not tied to a fleet truck, and any truck the ELD
+  // already covers — so no redundant tablet pins clutter the map.
   for (const m of mobile) {
-    if (m.truck_id && covered.has(m.truck_id)) continue // ELD already has this truck
+    if (!m.truck_id || covered.has(m.truck_id)) continue
     pins.push({ ...m, source: 'mobile' })
   }
   return pins
