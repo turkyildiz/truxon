@@ -4,7 +4,7 @@ import { useAuth } from '../auth'
 import PdfDrop from '../components/PdfDrop'
 import ResourcePage from '../components/ResourcePage'
 import { Badge } from '../components/ui'
-import { createCustomer, deleteCustomer, enrichCustomersBatch, extractCustomerPdf, listCustomers, updateCustomer } from '../data'
+import { createCustomer, deleteCustomer, enrichCustomersBatch, enrichCustomersFromQbo, extractCustomerPdf, listCustomers, updateCustomer } from '../data'
 import { errorMessage } from '../supabase'
 import type { Customer } from '../types'
 
@@ -18,10 +18,16 @@ export default function Customers() {
 
   async function runEnrich() {
     setEnriching(true)
-    setEnrichNote('Reading customer documents…')
-    let afterId = 0, scanned = 0, filled = 0, touched = 0
+    let filled = 0, touched = 0
     try {
-      // page through every customer with blanks; the RPC only ever fills empties
+      // 1) QuickBooks first — structured, fast, best for billing/email/contact
+      setEnrichNote('Pulling contact details from QuickBooks…')
+      const qbo = await enrichCustomersFromQbo()
+      filled += qbo.filledTotal
+      touched += qbo.touched
+      setEnrichNote(`QuickBooks filled ${qbo.filledTotal} fields on ${qbo.touched} customers. Now checking documents…`)
+      // 2) Documents — fills any remaining blanks where a text rate-con exists
+      let afterId = 0, scanned = 0
       for (let i = 0; i < 200; i++) {
         const r = await enrichCustomersBatch(afterId, true)
         if (r.processed === 0 || r.lastId <= afterId) break
@@ -29,9 +35,9 @@ export default function Customers() {
         filled += r.filledTotal
         touched += r.customers.filter((c) => c.filled > 0).length
         afterId = r.lastId
-        setEnrichNote(`Scanned ${scanned} customers… filled ${filled} blank fields on ${touched} so far`)
+        setEnrichNote(`QuickBooks + documents: filled ${filled} blank fields on ${touched} customers so far…`)
       }
-      setEnrichNote(`✓ Done — filled ${filled} blank field(s) across ${touched} customer(s) from their documents (${scanned} scanned).`)
+      setEnrichNote(`✓ Done — filled ${filled} blank field(s) across ${touched} customer(s) from QuickBooks + documents.`)
       qc.invalidateQueries({ queryKey: ['customers-all'] })
     } catch (e) {
       setEnrichNote(errorMessage(e))
@@ -90,10 +96,10 @@ export default function Customers() {
             disabled={enriching}
             className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
           >
-            {enriching ? 'Filling…' : 'Fill blanks from documents'}
+            {enriching ? 'Filling…' : 'Fill blanks (QuickBooks + documents)'}
           </button>
           <span className="text-sm text-gray-500 dark:text-gray-400">
-            {enrichNote || 'Trux reads each customer’s paperwork and fills only the empty fields — never overwrites what’s there.'}
+            {enrichNote || 'Trux fills only the empty fields from QuickBooks and each customer’s paperwork — never overwrites what’s there.'}
           </span>
         </div>
       )}

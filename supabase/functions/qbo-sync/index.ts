@@ -176,6 +176,61 @@ async function syncPnl(s: SupabaseClient, at: { token: string; realm: string }):
   return { gl_rows: n, bs: snap.cash != null || snap.ap != null }
 }
 
+// ── Customer profile enrichment: fill blank Truxon customer fields from QBO ──
+// QBO holds structured contact/address data for the customers it created (and
+// the ones matched by name). Writes go through the same blanks-only RPC as the
+// document enrichment, so the two sources cover each other — whichever fills a
+// blank first wins, the other fills what's left.
+async function syncCustomers(s: SupabaseClient, at: { token: string; realm: string }): Promise<Record<string, unknown>> {
+  const page = 100
+  let start = 1, matched = 0, filledTotal = 0, touched = 0
+  const filledCustomers: Array<Record<string, unknown>> = []
+  for (let guard = 0; guard < 60; guard++) {
+    const q = `SELECT * FROM Customer STARTPOSITION ${start} MAXRESULTS ${page}`
+    const out = await qboGet(at.token, `/v3/company/${at.realm}/query?query=${encodeURIComponent(q)}&minorversion=75`)
+    // deno-lint-ignore no-explicit-any
+    const rows = ((out?.QueryResponse as any)?.Customer ?? []) as any[]
+    if (!rows.length) break
+    for (const qc of rows) {
+      // match by qbo_id first, then by exact name for customers without one
+      type Cust = { id: number; company_name: string }
+      let cust: Cust | null = null
+      const { data: byId } = await s.from('customers').select('id, company_name').eq('qbo_id', String(qc.Id)).maybeSingle()
+      if (byId) cust = byId as unknown as Cust
+      if (!cust) {
+        const name = String(qc.DisplayName || qc.CompanyName || '').trim()
+        if (name) {
+          const { data: byName } = await s.from('customers').select('id, company_name').ilike('company_name', name).is('qbo_id', null).limit(1)
+          const hit = (byName?.[0] ?? null) as unknown as Cust | null
+          if (hit) { cust = hit; await s.from('customers').update({ qbo_id: String(qc.Id) }).eq('id', hit.id) }
+        }
+      }
+      if (!cust) continue
+      matched++
+      const a = qc.BillAddr ?? {}
+      const cityLine = [a.City, a.CountrySubDivisionCode, a.PostalCode].filter(Boolean).join(', ')
+      const billing = [a.Line1, a.Line2, cityLine].filter(Boolean).join('\n')
+      const fields: Record<string, unknown> = {
+        contact_person: [qc.GivenName, qc.FamilyName].filter(Boolean).join(' ') || null,
+        phone: qc.PrimaryPhone?.FreeFormNumber ?? null,
+        email: qc.PrimaryEmailAddr?.Address ?? null,
+        fax: qc.Fax?.FreeFormNumber ?? null,
+        secondary_phone: qc.AlternatePhone?.FreeFormNumber ?? null,
+        billing_address: billing || null,
+        notes: qc.Notes ?? null,
+      }
+      const { data: n } = await s.rpc('apply_customer_enrichment', {
+        p_customer_id: cust.id, p_fields: fields, p_source_document_id: null, p_model: 'qbo:Customer',
+      })
+      const f = Number(n) || 0
+      if (f > 0) { touched++; filledTotal += f; if (filledCustomers.length < 60) filledCustomers.push({ id: cust.id, company_name: cust.company_name, filled: f }) }
+    }
+    if (rows.length < page) break
+    start += page
+  }
+  return { matched, filledTotal, touched, filledCustomers }
+}
+
 async function pull(s: SupabaseClient): Promise<Response> {
   const at = await accessToken(s)
   if (!at) {
@@ -352,6 +407,29 @@ Deno.serve(async (req) => {
     if (!at) return json({ error: 'QBO not connected' }, 409)
     try {
       return json({ ok: true, ...(await syncPnl(s, at)) })
+    } catch (e) {
+      return json({ error: String(e).slice(0, 300) }, 502)
+    }
+  }
+
+  if (body.mode === 'customers') {
+    // same gate as pull/pnl: cron anon bearer or an admin session
+    const auth = req.headers.get('Authorization') ?? ''
+    let ok = false
+    try {
+      const payload = JSON.parse(atob((auth.replace('Bearer ', '').split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/')))
+      const ref = new URL(Deno.env.get('SUPABASE_URL')!).hostname.split('.')[0]
+      ok = payload?.role === 'anon' && payload?.ref === ref
+    } catch { /* not a JWT */ }
+    if (!ok) {
+      const caller = await getCaller(req)
+      if (caller instanceof Response) return caller
+      if (caller.role !== 'admin') return json({ error: 'Admin only' }, 403)
+    }
+    const at = await accessToken(s)
+    if (!at) return json({ error: 'QBO not connected' }, 409)
+    try {
+      return json({ ok: true, ...(await syncCustomers(s, at)) })
     } catch (e) {
       return json({ error: String(e).slice(0, 300) }, 502)
     }

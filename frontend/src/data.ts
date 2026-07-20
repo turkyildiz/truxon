@@ -97,6 +97,14 @@ export interface EnrichBatch {
   customers: Array<{ id: number; company_name: string; docsUsed: number; filled: number; proposed: string[]; skipped: string[] }>
 }
 
+/** Enrich blank customer fields from QuickBooks (structured contact/address).
+ *  Fast, one shot; fills billing address / email / contact best. */
+export async function enrichCustomersFromQbo(): Promise<{ matched: number; filledTotal: number; touched: number }> {
+  const { data, error } = await supabase.functions.invoke('qbo-sync', { body: { mode: 'customers' } })
+  if (error) throw error
+  return data as { matched: number; filledTotal: number; touched: number }
+}
+
 /** One page of customer enrichment (admin only). The caller advances `afterId`
  *  with the returned `lastId` until `processed` is 0. */
 export async function enrichCustomersBatch(afterId: number, apply: boolean): Promise<EnrichBatch> {
