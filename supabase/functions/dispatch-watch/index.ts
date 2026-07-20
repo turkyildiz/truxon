@@ -47,6 +47,16 @@ Use null when unknown. Do not invent details.`
 Deno.serve(async (req) => {
   if (!isCron(req)) return json({ error: 'cron only' }, 403)
   const svc = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+  const body = await req.json().catch(() => ({})) as Record<string, unknown>
+
+  // ── recent: read the shadow ledger (for a quick look / the review feed) ──
+  if (body.mode === 'recent') {
+    const { data } = await svc.from('trux_observations')
+      .select('received_at, sender_name, sender_email, subject, classification, summary, would_action, would_detail, confidence')
+      .order('received_at', { ascending: false }).limit(Number(body.limit) || 30)
+    const { count } = await svc.from('trux_observations').select('id', { count: 'exact', head: true })
+    return json({ total: count ?? 0, recent: data ?? [] })
+  }
   const apiKey = Deno.env.get('LLM_API_KEY')
   const model = Deno.env.get('LLM_MODEL') ?? 'meta-llama/llama-3.1-8b-instruct'
   if (!apiKey) return json({ skipped: 'no LLM key' })
