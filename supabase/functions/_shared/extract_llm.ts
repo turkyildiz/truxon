@@ -14,8 +14,8 @@ export function sliceText(text: string): string {
   return text.slice(0, TEXT_HEAD) + '\n...[middle of document omitted]...\n' + text.slice(-TEXT_TAIL)
 }
 
-export async function callLlm(apiKey: string, model: string, content: LlmContent): Promise<string> {
-  const url = `${Deno.env.get('LLM_BASE_URL') ?? 'https://openrouter.ai/api/v1'}/chat/completions`
+export async function callLlm(apiKey: string, model: string, content: LlmContent, baseUrl?: string): Promise<string> {
+  const url = `${baseUrl ?? Deno.env.get('LLM_BASE_URL') ?? 'https://openrouter.ai/api/v1'}/chat/completions`
   const body = (jsonMode: boolean) =>
     JSON.stringify({
       model,
@@ -42,7 +42,7 @@ export async function callLlm(apiKey: string, model: string, content: LlmContent
       const data = await resp.json()
       return data.choices[0].message.content.trim()
     }
-    await resp.body?.cancel()
+    const errText = await resp.text().catch(() => '')
     if (resp.status === 400 && jsonMode) {
       jsonMode = false
       continue
@@ -52,7 +52,7 @@ export async function callLlm(apiKey: string, model: string, content: LlmContent
       await new Promise((r) => setTimeout(r, Math.min(retryAfter > 0 ? retryAfter * 1000 : attempt * 4000, 15000)))
       continue
     }
-    throw new Error(`LLM API returned ${resp.status}`)
+    throw new Error(`LLM API returned ${resp.status}: ${errText.slice(0, 200)}`)
   }
 }
 
@@ -67,15 +67,15 @@ export function parseFields(content: string): Record<string, unknown> {
 
 /** Call the model, and if the reply isn't parseable JSON retry once with a
  * sharper instruction before giving up. */
-export async function extractFields(apiKey: string, model: string, content: LlmContent): Promise<Record<string, unknown>> {
+export async function extractFields(apiKey: string, model: string, content: LlmContent, baseUrl?: string): Promise<Record<string, unknown>> {
   try {
-    return parseFields(await callLlm(apiKey, model, content))
+    return parseFields(await callLlm(apiKey, model, content, baseUrl))
   } catch {
     const stricter =
       typeof content === 'string'
         ? content + '\n\nIMPORTANT: Your ENTIRE response must be one valid JSON object. No prose, no tables, no explanations.'
         : [...content, { type: 'text', text: 'IMPORTANT: Your ENTIRE response must be one valid JSON object. No prose, no tables, no explanations.' }]
-    return parseFields(await callLlm(apiKey, model, stricter))
+    return parseFields(await callLlm(apiKey, model, stricter, baseUrl))
   }
 }
 

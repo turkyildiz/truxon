@@ -229,6 +229,25 @@ Deno.serve(async (req) => {
     return json({ filled: Number(n) || 0 })
   }
 
+  // ── llm_diag: report the configured LLM endpoint + its model list (no key) ──
+  if (body.mode === 'llm_diag') {
+    const base = Deno.env.get('LLM_BASE_URL') ?? 'https://openrouter.ai/api/v1'
+    let models: string[] = []
+    try {
+      const r = await fetch(`${base}/models`, { headers: { Authorization: `Bearer ${apiKey}` } })
+      const j = await r.json()
+      // deno-lint-ignore no-explicit-any
+      models = ((j?.data ?? j?.models ?? []) as any[]).map((m) => String(m.id ?? m.name ?? '')).filter(Boolean)
+    } catch { /* ignore */ }
+    return json({
+      base_host: (() => { try { return new URL(base).host } catch { return base } })(),
+      text_model: Deno.env.get('LLM_MODEL') ?? '(default)',
+      vision_model: Deno.env.get('LLM_VISION_MODEL') ?? '(default)',
+      vision_candidates: models.filter((m) => /vision|scout|maverick|llava|vl|4o|gemini|pixtral/i.test(m)),
+      all_models: models,
+    })
+  }
+
   // ── vision pipeline (NAS rasterizes, edge holds the secrets) ──
   // vision_targets: hand out customers still missing contact info + a signed URL
   // to one of their loads' rate cons. The NAS downloads + rasterizes, then posts
@@ -261,12 +280,16 @@ Deno.serve(async (req) => {
   if (body.mode === 'vision_apply') {
     const images = (body.images as string[]) || []
     if (!body.customer_id || !images.length) return json({ error: 'need customer_id + images' }, 400)
-    const visionModel = Deno.env.get('LLM_VISION_MODEL') ?? 'meta-llama/llama-4-scout-17b-16e-instruct'
+    // Vision can use its own provider (text stays on the main one, e.g. Groq,
+    // which has no vision model). Falls back to the main key/base if unset.
+    const visionKey = Deno.env.get('LLM_VISION_KEY') || apiKey
+    const visionBase = Deno.env.get('LLM_VISION_BASE_URL') || undefined
+    const visionModel = Deno.env.get('LLM_VISION_MODEL') ?? 'gpt-4o-mini'
     // deno-lint-ignore no-explicit-any
     const parts: any = [{ type: 'text', text: customerPrompt(carrier) + '\n\nThe rate confirmation pages follow as images.' }]
     for (const img of images.slice(0, 4)) parts.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${img}` } })
     let f: Record<string, unknown>
-    try { f = await extractFields(apiKey, visionModel, parts) } catch (e) { return json({ error: String(e).slice(0, 200) }, 502) }
+    try { f = await extractFields(visionKey, visionModel, parts, visionBase) } catch (e) { return json({ error: String(e).slice(0, 200) }, 502) }
     if (body.company_name && f.company_name) {
       const a = norm(String(body.company_name)), b = norm(String(f.company_name))
       let hit = false
