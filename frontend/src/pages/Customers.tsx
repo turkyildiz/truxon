@@ -4,7 +4,7 @@ import { useAuth } from '../auth'
 import PdfDrop from '../components/PdfDrop'
 import ResourcePage from '../components/ResourcePage'
 import { Badge } from '../components/ui'
-import { createCustomer, enrichCustomersBatch, extractCustomerPdf, listCustomers, updateCustomer } from '../data'
+import { createCustomer, deleteCustomer, enrichCustomersBatch, extractCustomerPdf, listCustomers, updateCustomer } from '../data'
 import { errorMessage } from '../supabase'
 import type { Customer } from '../types'
 
@@ -112,7 +112,15 @@ export default function Customers() {
           { header: 'Phone', render: (c) => c.phone || '—' },
           { header: 'Email', render: (c) => c.email || '—' },
           { header: 'Terms', render: (c) => c.payment_terms },
-          { header: 'Status', render: (c) => <Badge status={c.is_active ? 'active' : 'inactive'} /> },
+          {
+            header: 'Status',
+            render: (c) =>
+              c.do_not_use ? (
+                <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/40 dark:text-red-300">Do Not Use</span>
+              ) : (
+                <Badge status={c.is_active ? 'active' : 'inactive'} />
+              ),
+          },
         ]}
         fields={[
           { name: 'company_name', label: 'Company Name', required: true },
@@ -126,10 +134,11 @@ export default function Customers() {
           { name: 'secondary_email', label: 'Secondary Email' },
           { name: 'payment_terms', label: 'Payment Terms' },
           { name: 'is_active', label: 'Active', type: 'checkbox' },
+          { name: 'do_not_use', label: 'Do Not Use (blacklist)', type: 'checkbox' },
           { name: 'billing_address', label: 'Billing Address', type: 'textarea', full: true },
           { name: 'notes', label: 'Notes', type: 'textarea', full: true },
         ]}
-        defaults={{ company_name: '', contact_person: '', phone: '', email: '', fax: '', toll_free: '', secondary_contact: '', secondary_phone: '', secondary_email: '', payment_terms: 'Net 30', billing_address: '', notes: '', is_active: true }}
+        defaults={{ company_name: '', contact_person: '', phone: '', email: '', fax: '', toll_free: '', secondary_contact: '', secondary_phone: '', secondary_email: '', payment_terms: 'Net 30', billing_address: '', notes: '', is_active: true, do_not_use: false }}
         toForm={(c) => ({
           company_name: c.company_name,
           contact_person: c.contact_person,
@@ -144,7 +153,12 @@ export default function Customers() {
           billing_address: c.billing_address,
           notes: c.notes,
           is_active: c.is_active,
+          do_not_use: c.do_not_use,
         })}
+        remove={user?.role === 'admin' ? {
+          fn: deleteCustomer,
+          confirm: (c) => `Delete "${c.company_name}" permanently?\n\nOnly allowed if we've never hauled their cargo (no loads or invoices). Otherwise use the Inactive or Do Not Use toggles instead.`,
+        } : undefined}
       />
     </div>
   )

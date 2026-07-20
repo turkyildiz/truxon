@@ -24,6 +24,7 @@ export interface Customer {
   payment_terms: string
   notes: string
   is_active: boolean
+  do_not_use: boolean
 }
 
 export interface Driver {

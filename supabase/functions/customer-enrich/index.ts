@@ -174,25 +174,50 @@ Deno.serve(async (req) => {
 
   const { data: settings } = await svc.from('company_settings').select('company_name').eq('id', 1).maybeSingle()
   const carrier = settings?.company_name || 'the carrier'
-  const docsPerCustomer = Math.min(Math.max(Number(body.docs_per_customer) || 3, 1), 5)
+  // Keep per-invocation work small: edge functions hard-cap at ~150s wall clock,
+  // and each doc is a download + LLM call. 2 docs is enough (rate cons carry the
+  // full broker contact block).
+  const docsPerCustomer = Math.min(Math.max(Number(body.docs_per_customer) || 2, 1), 5)
 
-  // ── cron: monthly maintenance sweep (apply, loop under a time budget) ──
+  // ── probe: counts only, no LLM, no writes (scope + diagnosis) ──
+  if (body.probe === true) {
+    const c = svc.from('customers')
+    const total = (await c.select('id', { count: 'exact', head: true })).count ?? 0
+    const anyBlank = (await c.select('id', { count: 'exact', head: true }).or('contact_person.eq.,phone.eq.,email.eq.,billing_address.eq.')).count ?? 0
+    const noContact = (await c.select('id', { count: 'exact', head: true }).eq('contact_person', '')).count ?? 0
+    const noPhone = (await c.select('id', { count: 'exact', head: true }).eq('phone', '')).count ?? 0
+    const noEmail = (await c.select('id', { count: 'exact', head: true }).eq('email', '')).count ?? 0
+    const noBilling = (await c.select('id', { count: 'exact', head: true }).eq('billing_address', '')).count ?? 0
+    const enriched = (await c.select('id', { count: 'exact', head: true }).not('enriched_at', 'is', null)).count ?? 0
+    const custDocs = (await svc.from('documents').select('id', { count: 'exact', head: true }).eq('entity_type', 'customer')).count ?? 0
+    const loadDocs = (await svc.from('documents').select('id', { count: 'exact', head: true }).eq('entity_type', 'load')).count ?? 0
+    return json({ probe: true, total, anyBlank, noContact, noPhone, noEmail, noBilling, enriched, customerDocs: custDocs, loadDocs })
+  }
+
+  // ── cron / anon: maintenance sweep (apply, loop under a time budget) ──
+  // Honours optional limit / max_batches so a first run can be kept small and
+  // watched; returns the customers it actually filled for observability.
   if (isCron || body.cron === true) {
     const started = Date.now()
-    const BUDGET_MS = 120_000
-    const MAX_BATCHES = 40
-    let afterId = 0, scanned = 0, filledTotal = 0, touched = 0, batches = 0
-    for (let i = 0; i < MAX_BATCHES; i++) {
-      const r = await runBatch(svc, { afterId, limit: 25, docsPerCustomer, apply: true, oneCustomer: null, apiKey, model, carrier })
+    const BUDGET_MS = 90_000 // return well under the platform's 150s ceiling
+    const maxBatches = Math.min(Math.max(Number(body.max_batches) || 4, 1), 40)
+    const perBatch = Math.min(Math.max(Number(body.limit) || 6, 1), 50)
+    let afterId = Number(body.after_id) || 0
+    let scanned = 0, filledTotal = 0, touched = 0, batches = 0
+    const filledCustomers: Array<Record<string, unknown>> = []
+    for (let i = 0; i < maxBatches; i++) {
+      const r = await runBatch(svc, { afterId, limit: perBatch, docsPerCustomer, apply: true, oneCustomer: null, apiKey, model, carrier })
       batches++
       if (r.processed === 0 || r.lastId <= afterId) break
       scanned += r.processed
       filledTotal += r.filledTotal
-      touched += r.customers.filter((c: Record<string, unknown>) => Number(c.filled) > 0).length
+      for (const c of r.customers as Array<Record<string, unknown>>) {
+        if (Number(c.filled) > 0) { touched++; if (filledCustomers.length < 60) filledCustomers.push({ id: c.id, company_name: c.company_name, filled: c.filled, fields: c.proposed }) }
+      }
       afterId = r.lastId
       if (Date.now() - started > BUDGET_MS) break
     }
-    return json({ mode: 'cron', scanned, filledTotal, touched, batches })
+    return json({ mode: 'cron', scanned, filledTotal, touched, batches, lastId: afterId, filledCustomers })
   }
 
   // ── admin: one cursor-paged batch (the UI loops) ──

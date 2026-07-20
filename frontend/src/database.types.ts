@@ -215,6 +215,7 @@ export type Database = {
           company_name: string
           contact_person: string
           created_at: string
+          do_not_use: boolean
           email: string
           enriched_at: string | null
           fax: string
@@ -235,6 +236,7 @@ export type Database = {
           company_name: string
           contact_person?: string
           created_at?: string
+          do_not_use?: boolean
           email?: string
           enriched_at?: string | null
           fax?: string
@@ -255,6 +257,7 @@ export type Database = {
           company_name?: string
           contact_person?: string
           created_at?: string
+          do_not_use?: boolean
           email?: string
           enriched_at?: string | null
           fax?: string
@@ -2488,6 +2491,7 @@ export type Database = {
       create_work_order_draft: { Args: { p: Json }; Returns: number }
       current_odometer: { Args: { p_truck_id: number }; Returns: number }
       dashboard_summary: { Args: never; Returns: Json }
+      delete_customer: { Args: { p_id: number }; Returns: undefined }
       delete_invoice_payment: {
         Args: { p_payment_id: number }
         Returns: undefined

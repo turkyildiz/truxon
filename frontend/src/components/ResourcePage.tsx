@@ -52,6 +52,10 @@ interface Props<T extends { id: number | string }> {
   onPrefillConsumed?: () => void
   /** Load dynamic select options when opening create/edit. */
   fieldOptionsLoader?: (item: T | null) => Promise<Record<string, { value: string; label: string }[]>>
+  /** When set, the edit modal shows a Delete button. `fn` should reject with a
+   * human-readable message when the delete isn't allowed (the server enforces
+   * the real rule). `confirm` builds the confirmation prompt. */
+  remove?: { fn: (id: T['id']) => Promise<unknown>; confirm?: (item: T) => string }
 }
 
 export default function ResourcePage<T extends { id: number | string }>({
@@ -70,6 +74,7 @@ export default function ResourcePage<T extends { id: number | string }>({
   prefill,
   onPrefillConsumed,
   fieldOptionsLoader,
+  remove,
 }: Props<T>) {
   const qc = useQueryClient()
   const [params] = useSearchParams()
@@ -119,6 +124,21 @@ export default function ResourcePage<T extends { id: number | string }>({
     },
     onError: (err) => setError(errorMessage(err)),
   })
+
+  const del = useMutation({
+    mutationFn: (id: T['id']) => remove!.fn(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [queryKey] })
+      close()
+    },
+    onError: (err) => setError(errorMessage(err)),
+  })
+
+  function onDelete() {
+    if (!editing || !remove) return
+    const msg = remove.confirm?.(editing) ?? 'Delete this record permanently?'
+    if (window.confirm(msg)) del.mutate(editing.id)
+  }
 
   async function loadOptions(item: T | null) {
     if (!fieldOptionsLoader) {
@@ -244,13 +264,22 @@ export default function ResourcePage<T extends { id: number | string }>({
             ))}
           </div>
           {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-          <div className="mt-5 flex justify-end gap-3">
-            <Button type="button" variant="secondary" onClick={close}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={save.isPending}>
-              {save.isPending ? 'Saving…' : 'Save'}
-            </Button>
+          <div className="mt-5 flex items-center justify-between gap-3">
+            <div>
+              {editing && remove && (
+                <Button type="button" variant="danger" onClick={onDelete} disabled={del.isPending}>
+                  {del.isPending ? 'Deleting…' : 'Delete'}
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <Button type="button" variant="secondary" onClick={close}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={save.isPending}>
+                {save.isPending ? 'Saving…' : 'Save'}
+              </Button>
+            </div>
           </div>
         </form>
       </Modal>

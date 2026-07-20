@@ -82,6 +82,13 @@ export async function updateCustomer(id: number, payload: Row): Promise<Customer
   return unwrap(await supabase.from('customers').update(payload as TablesUpdate<'customers'>).eq('id', id).select().single())
 }
 
+/** Delete a customer — server-guarded: only succeeds if we've never hauled
+ *  their cargo (no loads and no invoices). Rejects with a message otherwise. */
+export async function deleteCustomer(id: number): Promise<void> {
+  const { error } = await supabase.rpc('delete_customer', { p_id: id })
+  if (error) throw error
+}
+
 export interface EnrichBatch {
   processed: number
   lastId: number
@@ -93,8 +100,10 @@ export interface EnrichBatch {
 /** One page of customer enrichment (admin only). The caller advances `afterId`
  *  with the returned `lastId` until `processed` is 0. */
 export async function enrichCustomersBatch(afterId: number, apply: boolean): Promise<EnrichBatch> {
+  // Small chunks: edge functions cap at ~150s and each doc is a download + LLM
+  // call, so the UI pages through in bites of a few customers.
   const { data, error } = await supabase.functions.invoke('customer-enrich', {
-    body: { after_id: afterId, apply, limit: 25 },
+    body: { after_id: afterId, apply, limit: 6, docs_per_customer: 2 },
   })
   if (error) throw error
   return data as EnrichBatch
