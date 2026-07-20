@@ -10,8 +10,15 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { driverTrail, fleetPositionsSnapshot, type FleetPin } from '../data'
+import { driverTrail, fleetLive, type FleetPin } from '../data'
 import { Card, PageHeader } from '../components/ui'
+
+function hosLabel(sec: number | null | undefined): string {
+  if (sec == null) return ''
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  return `${h}h ${m}m`
+}
 
 const FRESH = '#16a34a' // green — recent
 const STALE = '#d97706' // amber — going cold
@@ -35,10 +42,17 @@ function escapeHtml(s: string): string {
 
 function popupHtml(p: FleetPin, warned: boolean): string {
   const age = ageLabel(p.recorded_at)
+  const eld = p.source === 'eld'
+  const extra = eld
+    ? `${p.location ? `<br/>${escapeHtml(p.location)}` : ''}` +
+      `${p.odometer != null ? `<br/>Odometer ${Math.round(p.odometer).toLocaleString()} mi` : ''}` +
+      `${p.hos_drive_sec != null ? `<br/>Drive time left: ${hosLabel(p.hos_drive_sec)}` : ''}`
+    : ''
   return `<div style="font:13px system-ui;line-height:1.5">
-    <strong>${escapeHtml(p.driver_name ?? 'Driver')}</strong>${warned ? ' ⚠️' : ''}<br/>
+    <strong>${escapeHtml(p.driver_name ?? 'Driver')}</strong>${warned ? ' ⚠️' : ''}
+      <span style="font-size:11px;color:#64748b">· ${eld ? 'ELD' : 'phone'}</span><br/>
     Truck ${escapeHtml(p.truck_unit ?? '—')} · Load ${escapeHtml(p.load_number ?? '—')}<br/>
-    ${mph(p.speed_mps)} · <span style="color:${age.stale ? STALE : '#64748b'}">${escapeHtml(age.text)}</span>
+    ${mph(p.speed_mps)} · <span style="color:${age.stale ? STALE : '#64748b'}">${escapeHtml(age.text)}</span>${extra}
   </div>`
 }
 
@@ -224,7 +238,7 @@ export default function FleetMap() {
 
   const { data: pins = [], isLoading, error } = useQuery({
     queryKey: ['fleet-positions'],
-    queryFn: fleetPositionsSnapshot,
+    queryFn: fleetLive,
     refetchInterval: 20_000,
   })
   const { data: alerts = [] } = useQuery({

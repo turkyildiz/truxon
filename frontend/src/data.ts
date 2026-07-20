@@ -206,6 +206,13 @@ export interface FleetPin {
   speed_mps: number | null
   heading_deg: number | null
   recorded_at: string
+  // ELD-sourced extras (present when source === 'eld')
+  source?: 'eld' | 'mobile'
+  location?: string | null
+  odometer?: number | null
+  hos_drive_sec?: number | null
+  duty_status?: string | null
+  eld_status?: string | null
 }
 
 export async function fleetPositionsSnapshot(): Promise<FleetPin[]> {
@@ -1431,4 +1438,76 @@ export async function carrierSafety(): Promise<CarrierSafety> {
 /** Admin: pull a fresh FMCSA profile now (the weekly cron does this automatically). */
 export async function runFmcsaCheck(): Promise<Record<string, unknown>> {
   return invokeFunction('fmcsa-watch', { body: {} })
+}
+
+// ---------- ELD telematics (live fleet) ----------
+
+export interface EldFleetRow {
+  vehicle_id: string
+  unit: string | null
+  vin: string | null
+  truck_id: number | null
+  lat: number | null
+  lng: number | null
+  speed: number | null
+  odometer: number | null
+  fuel_level: number | null
+  status: string | null
+  location: string | null
+  ts: string | null
+  driver_name: string | null
+  hos_drive_sec: number | null
+  hos_shift_sec: number | null
+  hos_cycle_sec: number | null
+  duty_status: string | null
+}
+
+/** Latest ELD position + driver HOS for every active vehicle. */
+export async function eldFleetLive(): Promise<EldFleetRow[]> {
+  const data = unwrap(await supabase.rpc('eld_fleet_live'))
+  return (data as unknown as EldFleetRow[]) ?? []
+}
+
+/** Admin: pull a fresh ELD sync now (the 15-min cron does this automatically). */
+export async function eldSyncNow(): Promise<Record<string, unknown>> {
+  return invokeFunction('eld-sync', { body: {} })
+}
+
+/** Merged live fleet for the map: ELD is the source of truth (accurate, always
+ *  on); the phone-GPS snapshot fills in only trucks the ELD doesn't cover. */
+export async function fleetLive(): Promise<FleetPin[]> {
+  const [eld, mobile] = await Promise.all([
+    eldFleetLive().catch(() => [] as EldFleetRow[]),
+    fleetPositionsSnapshot().catch(() => [] as FleetPin[]),
+  ])
+  const pins: FleetPin[] = []
+  const covered = new Set<number>()
+  eld.forEach((e, i) => {
+    if (e.lat == null || e.lng == null) return
+    if (e.truck_id) covered.add(e.truck_id)
+    pins.push({
+      driver_id: -(e.truck_id ?? i + 1), // synthetic (negative) key; no collision with real driver ids
+      driver_name: e.driver_name ?? `Unit ${e.unit ?? '?'}`,
+      truck_id: e.truck_id ?? null,
+      truck_unit: e.unit ?? null,
+      load_id: null,
+      load_number: null,
+      lat: Number(e.lat),
+      lng: Number(e.lng),
+      speed_mps: e.speed != null ? Number(e.speed) * 0.44704 : null, // ELD reports mph → m/s for the shared formatter
+      heading_deg: null,
+      recorded_at: e.ts ?? new Date().toISOString(),
+      source: 'eld',
+      location: e.location,
+      odometer: e.odometer,
+      hos_drive_sec: e.hos_drive_sec,
+      duty_status: e.duty_status,
+      eld_status: e.status,
+    })
+  })
+  for (const m of mobile) {
+    if (m.truck_id && covered.has(m.truck_id)) continue // ELD already has this truck
+    pins.push({ ...m, source: 'mobile' })
+  }
+  return pins
 }

@@ -790,6 +790,242 @@ export type Database = {
           },
         ]
       }
+      eld_driver_status: {
+        Row: {
+          break_sec: number | null
+          current_status: string | null
+          cycle_sec: number | null
+          drive_sec: number | null
+          driver_id: string
+          shift_sec: number | null
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          break_sec?: number | null
+          current_status?: string | null
+          cycle_sec?: number | null
+          drive_sec?: number | null
+          driver_id: string
+          shift_sec?: number | null
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          break_sec?: number | null
+          current_status?: string | null
+          cycle_sec?: number | null
+          drive_sec?: number | null
+          driver_id?: string
+          shift_sec?: number | null
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eld_driver_status_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: true
+            referencedRelation: "eld_drivers"
+            referencedColumns: ["driver_id"]
+          },
+        ]
+      }
+      eld_drivers: {
+        Row: {
+          active: boolean
+          driver_id: string
+          first_name: string
+          last_name: string
+          last_seen: string
+          matched_driver_id: number | null
+          raw: Json | null
+          username: string
+        }
+        Insert: {
+          active?: boolean
+          driver_id: string
+          first_name?: string
+          last_name?: string
+          last_seen?: string
+          matched_driver_id?: number | null
+          raw?: Json | null
+          username?: string
+        }
+        Update: {
+          active?: boolean
+          driver_id?: string
+          first_name?: string
+          last_name?: string
+          last_seen?: string
+          matched_driver_id?: number | null
+          raw?: Json | null
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eld_drivers_matched_driver_id_fkey"
+            columns: ["matched_driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eld_location_history: {
+        Row: {
+          calc_location: string | null
+          direction: number | null
+          id: string
+          lat: number | null
+          lng: number | null
+          speed: number | null
+          status: string | null
+          truck_id: number | null
+          ts: string
+          vehicle_id: string | null
+          vehicle_number: string | null
+          vin: string | null
+        }
+        Insert: {
+          calc_location?: string | null
+          direction?: number | null
+          id: string
+          lat?: number | null
+          lng?: number | null
+          speed?: number | null
+          status?: string | null
+          truck_id?: number | null
+          ts: string
+          vehicle_id?: string | null
+          vehicle_number?: string | null
+          vin?: string | null
+        }
+        Update: {
+          calc_location?: string | null
+          direction?: number | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          speed?: number | null
+          status?: string | null
+          truck_id?: number | null
+          ts?: string
+          vehicle_id?: string | null
+          vehicle_number?: string | null
+          vin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eld_location_history_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eld_location_history_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "eld_vehicles"
+            referencedColumns: ["vehicle_id"]
+          },
+        ]
+      }
+      eld_vehicle_status: {
+        Row: {
+          calc_location: string | null
+          eld_driver_id: string | null
+          fuel_level: number | null
+          lat: number | null
+          lon: number | null
+          number: string | null
+          odometer: number | null
+          speed: number | null
+          status: string | null
+          ts: string | null
+          updated_at: string
+          vehicle_id: string
+          vin: string | null
+        }
+        Insert: {
+          calc_location?: string | null
+          eld_driver_id?: string | null
+          fuel_level?: number | null
+          lat?: number | null
+          lon?: number | null
+          number?: string | null
+          odometer?: number | null
+          speed?: number | null
+          status?: string | null
+          ts?: string | null
+          updated_at?: string
+          vehicle_id: string
+          vin?: string | null
+        }
+        Update: {
+          calc_location?: string | null
+          eld_driver_id?: string | null
+          fuel_level?: number | null
+          lat?: number | null
+          lon?: number | null
+          number?: string | null
+          odometer?: number | null
+          speed?: number | null
+          status?: string | null
+          ts?: string | null
+          updated_at?: string
+          vehicle_id?: string
+          vin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eld_vehicle_status_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: true
+            referencedRelation: "eld_vehicles"
+            referencedColumns: ["vehicle_id"]
+          },
+        ]
+      }
+      eld_vehicles: {
+        Row: {
+          active: boolean
+          last_seen: string
+          number: string
+          raw: Json | null
+          truck_id: number | null
+          vehicle_id: string
+          vin: string
+        }
+        Insert: {
+          active?: boolean
+          last_seen?: string
+          number?: string
+          raw?: Json | null
+          truck_id?: number | null
+          vehicle_id: string
+          vin?: string
+        }
+        Update: {
+          active?: boolean
+          last_seen?: string
+          number?: string
+          raw?: Json | null
+          truck_id?: number | null
+          vehicle_id?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eld_vehicles_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       equipment_enrichment_log: {
         Row: {
           action: string
@@ -3027,6 +3263,8 @@ export type Database = {
           norm_key: string
         }[]
       }
+      eld_fleet_live: { Args: never; Returns: Json }
+      eld_link_vehicles: { Args: never; Returns: number }
       enqueue_doc_search: {
         Args: { p_entity_type?: string; p_query: string }
         Returns: number
