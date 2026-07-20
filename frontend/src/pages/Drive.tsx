@@ -115,7 +115,19 @@ export default function Drive({ drive }: { drive: DriveName }) {
   const dragRef = useRef<number[] | null>(null)
 
   const [path, setPath] = useState('')
-  const [view, setView] = useState<'grid' | 'list'>('grid')
+  // Windows-style view options; remembered across visits.
+  type ViewMode = 'lg' | 'md' | 'sm' | 'list'
+  const [view, setViewState] = useState<ViewMode>(() => {
+    const v = localStorage.getItem('drive_view')
+    return v === 'lg' || v === 'md' || v === 'sm' || v === 'list' ? v : 'lg'
+  })
+  const setView = (v: ViewMode) => { localStorage.setItem('drive_view', v); setViewState(v) }
+  // grid geometry per icon size
+  const GRID: Record<Exclude<ViewMode, 'list'>, { cols: string; thumb: number; pad: string; caption: boolean }> = {
+    lg: { cols: 'grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5', thumb: 72, pad: 'p-3', caption: true },
+    md: { cols: 'grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8', thumb: 44, pad: 'p-2', caption: true },
+    sm: { cols: 'grid-cols-4 gap-1.5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10', thumb: 28, pad: 'p-1.5', caption: false },
+  }
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [sort, setSort] = useState<{ key: 'name' | 'modified' | 'size'; dir: 'asc' | 'desc' }>({ key: 'name', dir: 'asc' })
@@ -322,8 +334,10 @@ export default function Drive({ drive }: { drive: DriveName }) {
             }}
           />
           <div className="flex overflow-hidden rounded-lg border border-line">
-            <button onClick={() => setView('grid')} className={`px-2.5 py-1.5 text-sm ${view === 'grid' ? 'bg-surface-2 text-body' : 'text-muted'}`} title="Grid">▦</button>
-            <button onClick={() => setView('list')} className={`px-2.5 py-1.5 text-sm ${view === 'list' ? 'bg-surface-2 text-body' : 'text-muted'}`} title="List">☰</button>
+            <button onClick={() => setView('lg')} className={`px-2.5 py-1.5 text-sm ${view === 'lg' ? 'bg-surface-2 text-body' : 'text-muted'}`} title="Large icons">🔳</button>
+            <button onClick={() => setView('md')} className={`px-2.5 py-1.5 text-sm ${view === 'md' ? 'bg-surface-2 text-body' : 'text-muted'}`} title="Medium icons">▦</button>
+            <button onClick={() => setView('sm')} className={`px-2.5 py-1.5 text-sm ${view === 'sm' ? 'bg-surface-2 text-body' : 'text-muted'}`} title="Small icons">▩</button>
+            <button onClick={() => setView('list')} className={`px-2.5 py-1.5 text-sm ${view === 'list' ? 'bg-surface-2 text-body' : 'text-muted'}`} title="Details list">☰</button>
           </div>
         </div>
       </div>
@@ -405,11 +419,12 @@ export default function Drive({ drive }: { drive: DriveName }) {
           <p className="text-muted">{searching ? 'No matches.' : 'This folder is empty.'}</p>
           {!searching && <p className="mt-1 text-sm text-muted">Drag files or folders here, or use Upload.</p>}
         </div>
-      ) : view === 'grid' ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+      ) : view !== 'list' ? (
+        <div className={`grid ${GRID[view].cols}`}>
           {items.map((i) => {
             const sel = selected.has(i.id)
             const isTarget = i.is_folder && dropTarget === `f${i.id}`
+            const g = GRID[view]
             return (
               <div
                 key={i.id}
@@ -419,7 +434,7 @@ export default function Drive({ drive }: { drive: DriveName }) {
                 onClick={() => (i.is_folder ? open(i) : toggle(i.id))}
                 onDoubleClick={() => !i.is_folder && open(i)}
                 {...(i.is_folder ? targetProps(`f${i.id}`, fullPathOf(i), i.id) : {})}
-                className={`group relative cursor-pointer rounded-xl border p-3 transition-colors ${isTarget ? 'border-brand ring-2 ring-brand' : sel ? 'border-brand bg-brand/5' : 'border-line hover:bg-surface-2'}`}
+                className={`group relative cursor-pointer rounded-xl border ${g.pad} transition-colors ${isTarget ? 'border-brand ring-2 ring-brand' : sel ? 'border-brand bg-brand/5' : 'border-line hover:bg-surface-2'}`}
                 title={i.filename}
               >
                 <input
@@ -427,16 +442,18 @@ export default function Drive({ drive }: { drive: DriveName }) {
                   checked={sel}
                   onChange={() => toggle(i.id)}
                   onClick={(e) => e.stopPropagation()}
-                  className={`absolute left-2 top-2 h-4 w-4 ${sel ? '' : 'opacity-0 group-hover:opacity-100'}`}
+                  className={`absolute left-1.5 top-1.5 h-4 w-4 ${sel ? '' : 'opacity-0 group-hover:opacity-100'}`}
                 />
-                <div className="flex justify-center py-2">
-                  <Thumb item={i} size={72} />
+                <div className={`flex justify-center ${view === 'sm' ? 'py-0.5' : 'py-2'}`}>
+                  <Thumb item={i} size={g.thumb} />
                 </div>
-                <div className="truncate text-center text-sm font-medium text-body">{i.filename}</div>
-                <div className="truncate text-center text-xs text-muted">
-                  {i.is_folder ? 'Folder' : fileSize(i.size_bytes)}
-                  {searching && i.parent ? ` · in ${i.parent}` : ''}
-                </div>
+                <div className={`truncate text-center font-medium text-body ${view === 'sm' ? 'text-[11px]' : 'text-sm'}`}>{i.filename}</div>
+                {g.caption && (
+                  <div className="truncate text-center text-xs text-muted">
+                    {i.is_folder ? 'Folder' : fileSize(i.size_bytes)}
+                    {searching && i.parent ? ` · in ${i.parent}` : ''}
+                  </div>
+                )}
               </div>
             )
           })}
