@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useAuth } from '../auth'
-import { Badge, Button, Card, formatDate, formatDateTime, LoadError, money, StatCard } from '../components/ui'
+import { Badge, Button, Card, cityState, formatDate, formatDateTime, LoadError, money, StatCard } from '../components/ui'
 import { dashboardSummary } from '../data'
 import type { TrendPoint } from '../types'
 
@@ -290,7 +290,7 @@ export default function Dashboard() {
                     </td>
                     <td className="px-3 py-3">{l.customer_name}</td>
                     <td className="max-w-60 truncate px-3 py-3">
-                      {l.pickup_address?.split(',')[0]} → {l.delivery_address?.split(',')[0]}
+                      {cityState(l.pickup_address)} → {cityState(l.delivery_address)}
                     </td>
                     <td className="px-3 py-3">{l.driver_name ?? '—'}</td>
                     <td className="px-3 py-3 text-muted">{formatDateTime(l.pickup_time)}</td>

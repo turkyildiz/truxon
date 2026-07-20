@@ -246,3 +246,20 @@ export function formatDateTime(value: string | null | undefined): string {
   if (!value) return '—'
   return new Date(value).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
 }
+
+/** "City, ST" from a full address ("123 Main St, Chicago, IL 60601" → "Chicago, IL").
+ *  Handles missing zip, "City ST zip" without a comma, and bare "City, ST";
+ *  anything unparseable falls back to the first address segment. */
+export function cityState(address: string | null | undefined): string {
+  if (!address) return '—'
+  const parts = address.split(',').map((s) => s.trim()).filter(Boolean)
+  // walk from the end looking for a "ST" or "ST 60601" segment; city precedes it
+  for (let i = parts.length - 1; i > 0; i--) {
+    const m = parts[i].match(/^([A-Za-z]{2})(?:\s+\d{5}(?:-\d{4})?)?$/)
+    if (m) return `${parts[i - 1]}, ${m[1].toUpperCase()}`
+  }
+  // no comma before the state: "... , Chicago IL 60601"
+  const last = parts[parts.length - 1].match(/^(.+?)\s+([A-Za-z]{2})\s+\d{5}(?:-\d{4})?$/)
+  if (last) return `${last[1]}, ${last[2].toUpperCase()}`
+  return parts[0]
+}
