@@ -3,7 +3,7 @@
 -- that aren't at the stop.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(6);
+select plan(7);
 
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-000000000f45'::uuid, 'det@test.local');
 update public.profiles set role = 'admin' where id = '00000000-0000-4000-8000-000000000f45';
@@ -50,6 +50,13 @@ select is((select stop_type from public.detention_events() where load_number='DE
 
 -- DET-B: only 1h at the stop → below free time → not a detention event
 select is((select count(*)::int from public.detention_events() where load_number='DET-B'), 0, 'a dwell under the free time is not billable detention');
+
+-- Sentinel surfaces the detention as a cash finding
+select public.sentinel_scan();
+select is(
+  (select category from public.trux_insights
+    where dedup_key = 'detention:'||(select id from public.loads where load_number='DET-A')||':delivery'),
+  'cash', 'detention surfaces as a cash Sentinel finding');
 
 select * from finish();
 rollback;
