@@ -49,27 +49,25 @@ function loadEnv(p) {
 }
 const log = (m) => console.log(`[vision] ${new Date().toISOString()} ${m}`)
 
-const PROMPT = `You read a trucking RATE CONFIRMATION addressed to the carrier "${CARRIER}". Extract the BROKER/CUSTOMER (the company that issued this load — never "${CARRIER}"). Respond with ONLY a JSON object with these keys, using null when absent:
-- company_name: the broker/customer company name
-- contact_person: the broker rep / contact name
-- phone: the broker's phone number
-- email: the broker's email
-- billing_address: the broker's billing / remit-to / main address
-- mc_number: the broker's MC number
-- notes: short billing note (quick-pay, portal) or null`
+// Name-specific prompt: we already know which broker this rate con belongs to,
+// so we tell the model exactly whose details to pull — no carrier/broker guessing.
+const buildPrompt = (broker) => `You are reading a scanned trucking RATE CONFIRMATION. Find the contact details for the FREIGHT BROKER named "${broker}". Look across the whole page (letterhead, header, "Broker" block, footer) for THEIR phone, email, mailing/billing address, MC number, and a contact person (their rep/dispatcher).
+Respond with ONLY a JSON object, null for anything not shown:
+{"company_name": the broker name you found, "contact_person": ..., "phone": ..., "email": ..., "billing_address": ..., "mc_number": ..., "notes": short billing note or null}
+IMPORTANT: return the BROKER "${broker}"'s details, NOT "${CARRIER}" — that is the trucking carrier being hired, ignore its contact info.`
 
 async function edge(body) {
   const r = await fetch(URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${JWT}` }, body: JSON.stringify(body) })
   return r.json()
 }
 
-async function ollamaVision(images) {
+async function ollamaVision(images, prompt) {
   const r = await fetch(`${OLLAMA}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: MODEL,
-      messages: [{ role: 'user', content: PROMPT, images }],
+      messages: [{ role: 'user', content: prompt, images }],
       format: 'json',
       stream: false,
       options: { temperature: 0 },
@@ -97,12 +95,26 @@ async function main() {
         const pdf = Buffer.from(await (await fetch(t.url)).arrayBuffer())
         dir = mkdtempSync(join(tmpdir(), 'rc-'))
         writeFileSync(join(dir, 'in.pdf'), pdf)
-        execFileSync('pdftoppm', ['-jpeg', '-r', String(DPI), '-f', '1', '-l', String(PAGES), join(dir, 'in.pdf'), join(dir, 'p')], { stdio: 'ignore' })
+        // Many rate cons are owner-password encrypted — poppler refuses those.
+        // Strip encryption first with qpdf (harmless if not encrypted).
+        let src = join(dir, 'in.pdf')
+        try { execFileSync('qpdf', ['--decrypt', src, join(dir, 'dec.pdf')], { stdio: 'ignore' }); src = join(dir, 'dec.pdf') } catch { /* not encrypted / qpdf absent */ }
+        try {
+          execFileSync('pdftoppm', ['-jpeg', '-r', String(DPI), '-f', '1', '-l', String(PAGES), src, join(dir, 'p')], { stdio: 'ignore' })
+        } catch {
+          // last resort: pdftocairo handles some PDFs poppler's pdftoppm chokes on
+          execFileSync('pdftocairo', ['-jpeg', '-r', String(DPI), '-f', '1', '-l', String(PAGES), src, join(dir, 'p')], { stdio: 'ignore' })
+        }
         const imgs = readdirSync(dir).filter((f) => f.endsWith('.jpg')).sort().slice(0, PAGES).map((f) => readFileSync(join(dir, f)).toString('base64'))
         if (!imgs.length) { log(`0  ${t.company_name} (no pages)`); continue }
-        const f = await ollamaVision(imgs)
-        // name-match guard: only trust a rate con whose broker matches this customer
-        if (f.company_name) { const a = toks(t.company_name), b = toks(f.company_name); if (![...b].some((x) => a.has(x))) { log(`0  ${t.company_name} (name mismatch: "${String(f.company_name).slice(0, 30)}")`); continue } }
+        const f = await ollamaVision(imgs, buildPrompt(t.company_name))
+        // guard: reject only if the model clearly returned OUR carrier's block
+        // instead of the broker's (the observed failure mode)
+        if (f.company_name) {
+          const got = toks(f.company_name), want = toks(t.company_name), carrier = toks(CARRIER)
+          const looksCarrier = [...got].some((x) => carrier.has(x)) && ![...got].some((x) => want.has(x))
+          if (looksCarrier) { log(`0  ${t.company_name} (got carrier, not broker)`); continue }
+        }
         const res = await edge({ customer_id: t.customer_id, source_document_id: t.doc_id, fields: { contact_person: f.contact_person, phone: f.phone, email: f.email, billing_address: f.billing_address, mc_number: f.mc_number, notes: f.notes } })
         const n = Number(res.filled) || 0
         if (n > 0) { filled += n; touched++; log(`+${n} ${t.company_name}`) }
