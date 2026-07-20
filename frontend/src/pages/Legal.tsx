@@ -53,7 +53,7 @@ export function Privacy() {
       <h2>How we use information</h2>
       <ul>
         <li>To operate the TMS: dispatching, tracking, invoicing, settlements, maintenance, and reporting.</li>
-        <li><strong>AI processing</strong> — uploaded documents and intake emails may be processed by large-language-model services (Anthropic Claude) to extract fields (for example load numbers, amounts, dates) and to power the Trux assistant. These providers process data to provide the service and do not use it to train their models.</li>
+        <li><strong>AI processing</strong> — uploaded documents and intake emails may be processed by large-language-model services (Anthropic Claude) to extract fields (for example load numbers, amounts, dates) and to power the Forest assistant. These providers process data to provide the service and do not use it to train their models.</li>
         <li>To generate mapping and mileage via Google Maps services.</li>
         <li>To send operational notifications (for example load assignments and alerts).</li>
       </ul>

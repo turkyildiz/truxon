@@ -1,5 +1,5 @@
 /**
- * Trux Shadow — the observe-only ledger of what Trux WOULD do with the
+ * Forest Shadow — the observe-only ledger of what Forest WOULD do with the
  * dispatch@ inbox. Nothing here executes anything; it's the evaluation feed the
  * owner reviews for a couple of months before promoting any action to real.
  */
@@ -61,7 +61,7 @@ export default function TruxShadow() {
           <div>
             <h2 className="font-semibold text-body">👁️ Shadow mode — observing dispatch@aidalogistics.com</h2>
             <p className="mt-1 text-sm text-muted">
-              Trux reads the inbox every 20 minutes and records what it <em>would</em> do. It executes nothing and sends
+              Forest reads the inbox every 20 minutes and records what it <em>would</em> do. It executes nothing and sends
               nothing — this feed is how you judge it before any action is ever promoted to real.
             </p>
           </div>
@@ -123,7 +123,7 @@ export default function TruxShadow() {
                   </p>
                   <p className="mt-1 text-sm text-muted">{o.summary}</p>
                   <p className="mt-2 rounded-lg bg-surface-2 px-3 py-2 text-sm">
-                    <span className="font-semibold text-brand">Trux {ACTION_LABEL[o.would_action] ?? o.would_action}:</span>{' '}
+                    <span className="font-semibold text-brand">Forest {ACTION_LABEL[o.would_action] ?? o.would_action}:</span>{' '}
                     <span className="text-body">{o.would_detail || '—'}</span>
                   </p>
                   {(o.matched_customer_id || o.matched_load_id || o.extracted?.amount) && (

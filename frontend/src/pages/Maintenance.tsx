@@ -429,7 +429,7 @@ function RepairLog() {
     <div className="space-y-4">
       {review.length > 0 && (
         <Card title={`Awaiting Review (${review.length})`}>
-          <p className="mb-3 text-sm text-muted">Work orders Trux drafted from emailed shop sheets. Check the figures, edit if needed, then confirm — they don't count in your maintenance numbers until you do.</p>
+          <p className="mb-3 text-sm text-muted">Work orders Forest drafted from emailed shop sheets. Check the figures, edit if needed, then confirm — they don't count in your maintenance numbers until you do.</p>
           <Table headers={['Unit', 'Service', 'Shop', 'Cost', 'Description', '']}>
             {review.map((m) => (
               <tr key={m.id} className="hover:bg-surface-2">

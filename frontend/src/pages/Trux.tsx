@@ -491,10 +491,10 @@ export default function Trux() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-navy-600 to-navy-900 text-2xl shadow-md">
-          ✨
+          🌲
         </span>
         <div>
-          <h1 className="text-xl font-bold text-body">Trux</h1>
+          <h1 className="text-xl font-bold text-body">Forest</h1>
           <p className="text-sm text-muted">Your AI operations &amp; finance analyst</p>
         </div>
         <div className="ml-auto flex overflow-hidden rounded-xl border border-line">
@@ -507,7 +507,7 @@ export default function Trux() {
           <button
             onClick={() => setView('shadow')}
             className={`px-4 py-2 text-sm font-medium ${view === 'shadow' ? 'bg-surface-2 text-body' : 'text-muted hover:text-body'}`}
-            title="What Trux would do with the dispatch inbox (observe-only)"
+            title="What Forest would do with the dispatch inbox (observe-only)"
           >
             👁️ Shadow
           </button>
@@ -528,7 +528,7 @@ export default function Trux() {
               value={inputValue}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="Ask Trux anything…"
+              placeholder="Ask Forest anything…"
               disabled={busy}
               className="flex-1 bg-transparent py-1 text-base text-body placeholder:text-muted focus:outline-none disabled:opacity-50"
             />
@@ -560,7 +560,7 @@ export default function Trux() {
             <p className="text-xs text-muted">
               {empty
                 ? 'Ask about fuel, P&L, who owes us money, a driver, a load — or tap the mic and talk'
-                : 'Enter to ask · Any action Trux proposes needs your confirmation'}
+                : 'Enter to ask · Any action Forest proposes needs your confirmation'}
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -618,7 +618,7 @@ export default function Trux() {
                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.15s]" />
                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted" />
               </span>
-              Trux is thinking…
+              Forest is thinking…
             </div>
           )}
 
@@ -634,7 +634,7 @@ export default function Trux() {
                 <div key={j} className="w-full rounded-2xl border border-line bg-surface p-4 shadow-sm">
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
-                      <span>✨</span> Trux
+                      <span>🌲</span> Forest
                     </div>
                     {SYNTH_OK && m.content && (
                       <button

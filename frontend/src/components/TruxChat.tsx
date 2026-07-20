@@ -137,11 +137,11 @@ export default function TruxChat({ onClose }: { onClose?: () => void }) {
       <div className="flex items-center justify-between rounded-t-xl bg-navy-900 px-4 py-3 text-white">
         <div className="flex items-center gap-2">
           <span className="text-lg">🤖</span>
-          <span className="font-bold tracking-wide">Trux</span>
+          <span className="font-bold tracking-wide">Forest</span>
           <span className="text-xs text-navy-100">Truxon assistant</span>
         </div>
         {onClose && (
-          <button onClick={onClose} className="rounded-md px-2 py-0.5 text-navy-100 hover:bg-navy-700" aria-label="Close Trux">
+          <button onClick={onClose} className="rounded-md px-2 py-0.5 text-navy-100 hover:bg-navy-700" aria-label="Close Forest">
             ✕
           </button>
         )}
@@ -149,7 +149,7 @@ export default function TruxChat({ onClose }: { onClose?: () => void }) {
       <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto bg-surface-2 p-3 text-sm">
         {log.length === 0 && (
           <div className="space-y-2">
-            <p className="text-muted">Ask Trux about your work. Any action it proposes needs your confirmation.</p>
+            <p className="text-muted">Ask Forest about your work. Any action it proposes needs your confirmation.</p>
             {suggestions.map((s) => (
               <button
                 key={s}
@@ -191,14 +191,14 @@ export default function TruxChat({ onClose }: { onClose?: () => void }) {
             ))}
           </div>
         ))}
-        {send.isPending && <p className="text-muted">Trux is thinking…</p>}
+        {send.isPending && <p className="text-muted">Forest is thinking…</p>}
       </div>
       {error && <p className="px-3 pt-2 text-sm text-red-600">{error}</p>}
       <form onSubmit={onSubmit} className="flex gap-2 p-3">
         <Input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Message Trux…"
+          placeholder="Message Forest…"
           className="flex-1"
           disabled={send.isPending}
         />
@@ -224,11 +224,11 @@ export function TruxLauncher() {
       </div>
       <button
         onClick={() => setOpen((v) => !v)}
-        aria-label={open ? 'Close Trux' : 'Open Trux'}
+        aria-label={open ? 'Close Forest' : 'Open Forest'}
         className="fixed right-4 bottom-4 z-40 flex h-13 items-center gap-2 rounded-full bg-navy-900 px-4 text-white shadow-lg transition-transform hover:scale-105"
       >
         <span className="text-xl">🤖</span>
-        <span className="text-sm font-bold tracking-wide">{open ? 'Close' : 'Trux'}</span>
+        <span className="text-sm font-bold tracking-wide">{open ? 'Close' : 'Forest'}</span>
       </button>
     </>
   )

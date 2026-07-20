@@ -132,7 +132,7 @@ export default function Customers() {
             {enriching ? 'Filling…' : 'Fill blanks (QuickBooks + documents)'}
           </button>
           <span className="text-sm text-gray-500 dark:text-gray-400">
-            {enrichNote || 'Trux fills only the empty fields from QuickBooks and each customer’s paperwork — never overwrites what’s there.'}
+            {enrichNote || 'Forest fills only the empty fields from QuickBooks and each customer’s paperwork — never overwrites what’s there.'}
           </span>
         </div>
       )}

@@ -313,7 +313,7 @@ Deno.serve(async (req) => {
         const replyWO = async (text: string) => {
           await graph(tok, `/users/${encodeURIComponent(MAILBOX)}/messages/${m.id}/reply`, {
             method: 'POST',
-            body: JSON.stringify({ comment: `${text}\n\n— Trux, Truxon assistant (for ${profile.full_name})` }),
+            body: JSON.stringify({ comment: `${text}\n\n— Forest, Truxon assistant (for ${profile.full_name})` }),
           })
           await markRead()
         }
@@ -382,7 +382,7 @@ Deno.serve(async (req) => {
           : 'I read the attached document but could not prepare the request — please tell me exactly what you would like done (book the load, assign a driver/truck, etc.) and I will set it up for confirmation in the Truxon app.',
       })
 
-      const signature = `\n\n— Trux, Truxon assistant (acting for ${profile.full_name})`
+      const signature = `\n\n— Forest, Truxon assistant (acting for ${profile.full_name})`
       const replyRes = await graph(tok, `/users/${encodeURIComponent(MAILBOX)}/messages/${m.id}/reply`, {
         method: 'POST',
         body: JSON.stringify({ comment: run.reply + signature }),
@@ -398,7 +398,7 @@ Deno.serve(async (req) => {
       try {
         await graph(tok, `/users/${encodeURIComponent(MAILBOX)}/messages/${m.id}/reply`, {
           method: 'POST',
-          body: JSON.stringify({ comment: 'I hit a technical problem processing this email and could not complete it. Please resend in a few minutes, or use the Truxon app.\n\n— Trux' }),
+          body: JSON.stringify({ comment: 'I hit a technical problem processing this email and could not complete it. Please resend in a few minutes, or use the Truxon app.\n\n— Forest' }),
         })
         await markRead()
       } catch { /* ignore */ }

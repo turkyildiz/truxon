@@ -151,7 +151,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     return WithForegroundTask(
       child: Scaffold(
         appBar: AppBar(
-          title: Text(isDriver ? 'Trux Companion' : 'Trux'),
+          title: Text(isDriver ? 'Forest Companion' : 'Forest'),
           actions: [
             IconButton(
               tooltip: tr('signOut'),
@@ -220,7 +220,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           const SizedBox(height: 8),
           Text('${tr('role')}: $role'),
           const SizedBox(height: 16),
-          const Text('Trux Companion'),
+          const Text('Forest Companion'),
           Text(tr('aboutVoice')),
           Text(tr('aboutRadio')),
           if (role == 'driver') ...[

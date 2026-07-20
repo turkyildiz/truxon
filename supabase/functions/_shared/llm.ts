@@ -146,7 +146,7 @@ async function completeAnthropic(
   const body: Record<string, unknown> = {
     model,
     max_tokens: 4096,
-    system: system || 'You are Trux, a trucking TMS assistant.',
+    system: system || 'You are Forest, a trucking TMS assistant.',
     messages: rest,
   }
   if (tools?.length) {

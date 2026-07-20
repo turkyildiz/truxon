@@ -107,6 +107,7 @@ export const ROLE_MODULES: Record<string, string[]> = {
 export const ROUTE_MODULE: { prefix: string; module: string }[] = [
   { prefix: '/dashboard', module: 'dashboard' },
   { prefix: '/trux', module: 'trux' },
+  { prefix: '/forest', module: 'trux' },
   { prefix: '/track', module: 'track' },
   { prefix: '/loads', module: 'loads' },
   { prefix: '/dispatch', module: 'dispatch' },

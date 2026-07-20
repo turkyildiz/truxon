@@ -467,7 +467,7 @@ Deno.serve(async (req) => {
         }
       }
       if (playbook.length) { lines.push('', 'INBOX RETRIES:'); for (const p of playbook) lines.push(`  ⟳ ${p}`) }
-      lines.push('', `All checks: ${results.filter((r) => r.ok).length}/${results.length} ok`, `Time: ${now}`, '', '— Trux watchdog')
+      lines.push('', `All checks: ${results.filter((r) => r.ok).length}/${results.length} ok`, `Time: ${now}`, '', '— Forest watchdog')
       const subject = needAlert.length
         ? `⚠ Truxon watchdog: ${needAlert.length} check${needAlert.length > 1 ? 's' : ''} failing`
         : heal.some((h) => h.approval) ? '🔒 Truxon watchdog: action needs your approval'

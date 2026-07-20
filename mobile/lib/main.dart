@@ -47,7 +47,7 @@ class TruxCompanionApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Trux Companion',
+      title: 'Forest Companion',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0F2744), brightness: Brightness.light),
         useMaterial3: true,

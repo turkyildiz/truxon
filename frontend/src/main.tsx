@@ -80,7 +80,9 @@ createRoot(document.getElementById('root')!).render(
               }
             >
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/trux" element={<Trux />} />
+              <Route path="/forest" element={<Trux />} />
+              {/* legacy path — Trux was renamed Forest (2026-07-20) */}
+              <Route path="/trux" element={<Navigate to="/forest" replace />} />
               <Route path="/track" element={<FleetMap />} />
               <Route path="/loads" element={<Loads />} />
               <Route path="/loads/:id" element={<LoadDetail />} />

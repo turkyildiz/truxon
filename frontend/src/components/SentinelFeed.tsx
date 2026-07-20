@@ -26,7 +26,7 @@ export default function SentinelFeed() {
   return (
     <div className="rounded-2xl border border-line bg-surface p-4">
       <h2 className="mb-2 text-sm font-semibold text-body">
-        🛡️ Trux is watching
+        🛡️ Forest is watching
         {openCount > 0 && <span className="font-normal text-muted"> · {openCount} need{openCount === 1 ? 's' : ''} attention</span>}
       </h2>
       <ul className="space-y-2">

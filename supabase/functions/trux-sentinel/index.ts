@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     const openN = sum?.open ?? 0
     if (openN > 0) {
       const lines = (sum?.top ?? []).slice(0, 5).map((t) => `${t.severity === 'critical' ? '‼️' : '⚠️'} ${t.title}`).join('\n')
-      await pushAdmins(s, `Trux daily brief — ${openN} open (${sum?.critical ?? 0} critical)`, lines || 'See the Trux feed.', false)
+      await pushAdmins(s, `Forest daily brief — ${openN} open (${sum?.critical ?? 0} critical)`, lines || 'See the Forest feed.', false)
     }
     return json({ mode, summary: sum })
   }
