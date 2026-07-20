@@ -336,6 +336,54 @@ export interface InvoicePayment {
   received_at: string
 }
 
+// ── GL mirror (full P&L from the books) ─────────────────────────────────────
+
+export interface GlPnlMonth {
+  month: string
+  income: number
+  cogs: number
+  gross_profit: number
+  gross_margin_pct: number | null
+  opex: number
+  other_net: number
+  net_income: number
+  net_margin_pct: number | null
+  operating_ratio: number | null
+}
+
+export interface GlExpenseRow {
+  account: string
+  grp: string
+  total: number
+  monthly_avg: number
+  pct_of_revenue: number | null
+}
+
+export interface GlBreakevenMonth {
+  month: string
+  revenue: number
+  total_costs: number
+  miles: number
+  rpm_actual: number | null
+  rpm_breakeven: number | null
+  cushion_pct: number | null
+}
+
+export interface CfoSnapshot {
+  as_of: string | null
+  cash: number | null
+  ap: number | null
+  working_capital: number | null
+  working_capital_pct_revenue: number | null
+  current_ratio: number | null
+  dpo: number | null
+  days_of_cash: number | null
+  interest_coverage: number | null
+  overhead_per_tractor_month: number | null
+  total_cost_of_risk_12m: number | null
+  revenue_12m: number | null
+}
+
 /** QuickBooks connection + sync status card (admin only). */
 export interface QboStatus {
   connected: boolean

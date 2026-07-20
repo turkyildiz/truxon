@@ -47,6 +47,45 @@ export type Database = {
           },
         ]
       }
+      bs_snapshot: {
+        Row: {
+          ap: number | null
+          ar: number | null
+          as_of: string
+          cash: number | null
+          current_assets: number | null
+          current_liabilities: number | null
+          equity: number | null
+          total_assets: number | null
+          total_liabilities: number | null
+          updated_at: string
+        }
+        Insert: {
+          ap?: number | null
+          ar?: number | null
+          as_of: string
+          cash?: number | null
+          current_assets?: number | null
+          current_liabilities?: number | null
+          equity?: number | null
+          total_assets?: number | null
+          total_liabilities?: number | null
+          updated_at?: string
+        }
+        Update: {
+          ap?: number | null
+          ar?: number | null
+          as_of?: string
+          cash?: number | null
+          current_assets?: number | null
+          current_liabilities?: number | null
+          equity?: number | null
+          total_assets?: number | null
+          total_liabilities?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       budgets: {
         Row: {
           amount: number
@@ -547,6 +586,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      gl_monthly: {
+        Row: {
+          account: string
+          amount: number
+          grp: string
+          id: number
+          month: string
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          account: string
+          amount: number
+          grp: string
+          id?: never
+          month: string
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          account?: string
+          amount?: number
+          grp?: string
+          id?: never
+          month?: string
+          source?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       invoice_payments: {
         Row: {
@@ -1174,6 +1243,7 @@ export type Database = {
           id: number
           last_cdc: string | null
           last_error: string | null
+          last_pnl_at: string | null
           last_pull_at: string | null
           last_result: Json | null
         }
@@ -1182,6 +1252,7 @@ export type Database = {
           id?: number
           last_cdc?: string | null
           last_error?: string | null
+          last_pnl_at?: string | null
           last_pull_at?: string | null
           last_result?: Json | null
         }
@@ -1190,6 +1261,7 @@ export type Database = {
           id?: number
           last_cdc?: string | null
           last_error?: string | null
+          last_pnl_at?: string | null
           last_pull_at?: string | null
           last_result?: Json | null
         }
@@ -2230,6 +2302,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      bs_upsert: { Args: { p: Json }; Returns: undefined }
       budget_variance: {
         Args: { p_end: string; p_start: string }
         Returns: {
@@ -2458,6 +2531,45 @@ export type Database = {
           transactions: number
         }[]
       }
+      gl_breakeven_monthly: {
+        Args: { p_months?: number }
+        Returns: {
+          cushion_pct: number
+          miles: number
+          month: string
+          revenue: number
+          rpm_actual: number
+          rpm_breakeven: number
+          total_costs: number
+        }[]
+      }
+      gl_cfo_snapshot: { Args: never; Returns: Json }
+      gl_expense_breakdown: {
+        Args: { p_months?: number }
+        Returns: {
+          account: string
+          grp: string
+          monthly_avg: number
+          pct_of_revenue: number
+          total: number
+        }[]
+      }
+      gl_pnl_monthly: {
+        Args: { p_months?: number }
+        Returns: {
+          cogs: number
+          gross_margin_pct: number
+          gross_profit: number
+          income: number
+          month: string
+          net_income: number
+          net_margin_pct: number
+          operating_ratio: number
+          opex: number
+          other_net: number
+        }[]
+      }
+      gl_upsert_monthly: { Args: { p_rows: Json }; Returns: number }
       global_search: { Args: { q: string }; Returns: Json }
       import_fuel_transactions: { Args: { p_rows: Json }; Returns: Json }
       import_toll_transactions: { Args: { p_rows: Json }; Returns: Json }

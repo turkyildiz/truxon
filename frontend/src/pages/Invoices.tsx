@@ -10,7 +10,8 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Too
 import { Badge, Button, Card, Field, formatDate, LoadError, Modal, money, Select, Table } from '../components/ui'
 import {
   acctAging, acctMarginMonthly, acctRevenueByCustomer, acctRevenueMonthly, acctSummary, acctUnbilledLoads,
-  createInvoice, deleteInvoicePayment, emailInvoice, listCustomers, listInvoicePayments, listInvoices, listLoads,
+  createInvoice, deleteInvoicePayment, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
+  glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
   qboConnectUrl, qboStatus, recordInvoicePayment, setInvoiceStatus, triggerQboPull, voidInvoice,
 } from '../data'
 import { downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
@@ -486,6 +487,84 @@ function UnbilledTab({ onBill }: { onBill: (customerId: number) => void }) {
   )
 }
 
+// ── GL section: the full picture from the books ─────────────────────────────
+function GlSection() {
+  const pnlQ = useQuery({ queryKey: ['gl-pnl'], queryFn: () => glPnlMonthly(12), retry: false })
+  const cfoQ = useQuery({ queryKey: ['gl-cfo'], queryFn: glCfoSnapshot, retry: false })
+  const expQ = useQuery({ queryKey: ['gl-exp'], queryFn: () => glExpenseBreakdown(6), retry: false })
+  const beQ = useQuery({ queryKey: ['gl-be'], queryFn: () => glBreakevenMonthly(6), retry: false })
+  const pnl = (pnlQ.data ?? []).map((m) => ({ ...m, income: Number(m.income), net_income: Number(m.net_income) }))
+  if (pnl.length === 0) return null // GL mirror not synced yet
+  const cfo = cfoQ.data
+  const latest = pnl[pnl.length - 1]
+  const exp = (expQ.data ?? []).slice(0, 12)
+  const be = (beQ.data ?? []).filter((b) => b.rpm_breakeven != null)
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-semibold text-body">📚 From the books — full P&L (GL mirror, refreshed nightly)</h3>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <Kpi label="Operating ratio" value={latest?.operating_ratio != null ? `${latest.operating_ratio}%` : '—'}
+          sub={`${latest?.month} · target <95%`} tone={latest?.operating_ratio != null ? (Number(latest.operating_ratio) > 95 ? 'bad' : 'good') : undefined} />
+        <Kpi label="Net margin" value={latest?.net_margin_pct != null ? `${latest.net_margin_pct}%` : '—'} sub={latest?.month} />
+        {cfo?.cash != null && <Kpi label="Cash on hand" value={money(Number(cfo.cash))} sub={cfo.days_of_cash != null ? `${cfo.days_of_cash} days of cost` : undefined} />}
+        {cfo?.current_ratio != null && <Kpi label="Current ratio" value={String(cfo.current_ratio)} tone={Number(cfo.current_ratio) < 1 ? 'bad' : 'good'} />}
+        {cfo?.dpo != null && <Kpi label="DPO" value={`${cfo.dpo}d`} sub="days payable outstanding" />}
+        {cfo?.overhead_per_tractor_month != null && <Kpi label="Overhead / tractor" value={money(Number(cfo.overhead_per_tractor_month))} sub="per month" />}
+      </div>
+      <div className="rounded-2xl border border-line bg-surface p-4">
+        <h4 className="mb-2 text-sm font-semibold text-body">Revenue vs net income (all costs)</h4>
+        <ResponsiveContainer width="100%" height={220}>
+          <AreaChart data={pnl}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+            <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
+            <Tooltip formatter={(v) => money(Number(v))} />
+            <Area type="monotone" dataKey="income" name="Revenue" stroke="#2563eb" fill="#2563eb22" />
+            <Area type="monotone" dataKey="net_income" name="Net income" stroke="#16a34a" fill="#16a34a22" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div>
+          <h4 className="mb-2 text-sm font-semibold text-body">Where the money goes (6 months)</h4>
+          <Table headers={['Account', 'Total', '/mo', '% rev']}>
+            {exp.map((e) => (
+              <tr key={`${e.grp}:${e.account}`} className="hover:bg-surface-2">
+                <td className="px-3 py-2">{e.account} <span className="text-xs text-muted">{e.grp === 'cogs' ? 'COGS' : ''}</span></td>
+                <td className="px-3 py-2 font-semibold">{money(Number(e.total))}</td>
+                <td className="px-3 py-2 text-muted">{money(Number(e.monthly_avg))}</td>
+                <td className="px-3 py-2">{e.pct_of_revenue != null ? `${e.pct_of_revenue}%` : '—'}</td>
+              </tr>
+            ))}
+          </Table>
+        </div>
+        {be.length > 0 && (
+          <div>
+            <h4 className="mb-2 text-sm font-semibold text-body">Break-even rate per mile (all costs ÷ all miles)</h4>
+            <Table headers={['Month', 'Actual RPM', 'Break-even', 'Cushion']}>
+              {be.map((b) => (
+                <tr key={b.month} className="hover:bg-surface-2">
+                  <td className="px-3 py-2">{b.month}</td>
+                  <td className="px-3 py-2 font-semibold">${b.rpm_actual}</td>
+                  <td className="px-3 py-2">${b.rpm_breakeven}</td>
+                  <td className="px-3 py-2">
+                    {b.cushion_pct != null && (
+                      <span className={Number(b.cushion_pct) < 0 ? 'font-semibold text-red-600 dark:text-red-300' : Number(b.cushion_pct) < 10 ? 'text-amber-700 dark:text-amber-300' : 'text-green-600 dark:text-green-300'}>
+                        {b.cushion_pct}%
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </Table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Reports ──────────────────────────────────────────────────────────────────
 function ReportsTab() {
   const custQ = useQuery({ queryKey: ['acct-by-customer'], queryFn: () => acctRevenueByCustomer(365), retry: false })
@@ -494,6 +573,7 @@ function ReportsTab() {
   const custs = custQ.data ?? []
   return (
     <div className="space-y-6">
+      <GlSection />
       {margins.length > 0 && (
         <div className="rounded-2xl border border-line bg-surface p-4">
           <h3 className="mb-2 text-sm font-semibold text-body">Revenue vs direct-cost margin (fuel + tolls + maintenance)</h3>

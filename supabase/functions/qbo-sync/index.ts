@@ -97,6 +97,85 @@ function mapInvoice(inv: any): Record<string, unknown> {
   }
 }
 
+// ── GL mirror: monthly P&L + balance-sheet snapshot ─────────────────────────
+// Walks the QBO ProfitAndLoss report (summarized by month) into flat
+// {month, account, grp, amount} rows for gl_upsert_monthly.
+// deno-lint-ignore no-explicit-any
+function parsePnl(report: any): Record<string, unknown>[] {
+  const cols = (report?.Columns?.Column ?? []) as { ColTitle?: string; MetaData?: { Name: string; Value: string }[] }[]
+  // month columns carry a StartDate; the first col is the account name, last is Total
+  const monthCols: { idx: number; month: string }[] = []
+  cols.forEach((c, idx) => {
+    const start = c.MetaData?.find((m) => m.Name === 'StartDate')?.Value
+    if (start) monthCols.push({ idx, month: start.slice(0, 8) + '01' })
+  })
+  const GRP: Record<string, string> = {
+    Income: 'income', COGS: 'cogs', Expenses: 'expense',
+    OtherIncome: 'other_income', OtherExpenses: 'other_expense',
+  }
+  const out: Record<string, unknown>[] = []
+  // deno-lint-ignore no-explicit-any
+  function walk(rows: any[], grp: string | null) {
+    for (const r of rows ?? []) {
+      const g = GRP[r.group as string] ?? grp
+      if (r.type === 'Data' && g && r.ColData?.[0]?.value) {
+        for (const mc of monthCols) {
+          const v = Number(r.ColData[mc.idx]?.value ?? 0)
+          if (v !== 0) out.push({ month: mc.month, account: String(r.ColData[0].value), grp: g, amount: v })
+        }
+      }
+      if (r.Rows?.Row) walk(r.Rows.Row, g)
+    }
+  }
+  walk(report?.Rows?.Row ?? [], null)
+  return out
+}
+
+// Pick section totals out of the BalanceSheet report by their stable group names.
+// deno-lint-ignore no-explicit-any
+function parseBs(report: any): Record<string, number | null> {
+  const totals: Record<string, number> = {}
+  // deno-lint-ignore no-explicit-any
+  function walk(rows: any[]) {
+    for (const r of rows ?? []) {
+      if (r.group && r.Summary?.ColData?.length) {
+        const v = Number(r.Summary.ColData[r.Summary.ColData.length - 1]?.value ?? NaN)
+        if (!Number.isNaN(v)) totals[r.group as string] = v
+      }
+      if (r.Rows?.Row) walk(r.Rows.Row)
+    }
+  }
+  walk(report?.Rows?.Row ?? [])
+  return {
+    cash: totals.BankAccounts ?? null,
+    ar: totals.AR ?? null,
+    ap: totals.AP ?? null,
+    current_assets: totals.CurrentAssets ?? null,
+    current_liabilities: totals.CurrentLiabilities ?? null,
+    total_assets: totals.TotalAssets ?? null,
+    total_liabilities: totals.Liabilities ?? totals.TotalLiabilities ?? null,
+    equity: totals.Equity ?? null,
+  }
+}
+
+async function syncPnl(s: SupabaseClient, at: { token: string; realm: string }): Promise<Record<string, unknown>> {
+  const start = `${new Date().getFullYear() - 1}-01-01`
+  const end = new Date().toISOString().slice(0, 10)
+  const pnl = await qboGet(at.token,
+    `/v3/company/${at.realm}/reports/ProfitAndLoss?start_date=${start}&end_date=${end}&summarize_column_by=Month&accounting_method=Accrual&minorversion=75`)
+  const rows = parsePnl(pnl)
+  const { data: n, error } = await s.rpc('gl_upsert_monthly', { p_rows: rows })
+  if (error) throw new Error(`gl upsert: ${error.message}`)
+
+  const bs = await qboGet(at.token, `/v3/company/${at.realm}/reports/BalanceSheet?accounting_method=Accrual&minorversion=75`)
+  const snap = parseBs(bs)
+  const { error: bsErr } = await s.rpc('bs_upsert', { p: { as_of: end, ...snap } })
+  if (bsErr) throw new Error(`bs upsert: ${bsErr.message}`)
+
+  await s.from('qbo_sync_state').update({ last_pnl_at: new Date().toISOString() }).eq('id', 1)
+  return { gl_rows: n, bs: snap.cash != null || snap.ap != null }
+}
+
 async function pull(s: SupabaseClient): Promise<Response> {
   const at = await accessToken(s)
   if (!at) {
@@ -140,7 +219,19 @@ async function pull(s: SupabaseClient): Promise<Response> {
       const { data: vn } = await s.rpc('qbo_mark_voided', { p_qbo_ids: voided })
       voidedN = (vn as number) ?? 0
     }
-    const result = { ...(upserted as Record<string, unknown>), voided: voidedN, fetched: rows.length }
+    const result: Record<string, unknown> = { ...(upserted as Record<string, unknown>), voided: voidedN, fetched: rows.length }
+
+    // GL mirror: refresh the monthly P&L + balance sheet about once a day
+    // (best-effort — a report hiccup must not fail the invoice sync).
+    const lastPnl = st?.last_pnl_at ? new Date(st.last_pnl_at).getTime() : 0
+    if (Date.now() - lastPnl > 20 * 3600_000) {
+      try {
+        result.gl = await syncPnl(s, at)
+      } catch (e) {
+        result.gl_error = String(e).slice(0, 200)
+      }
+    }
+
     await s.from('qbo_sync_state').update({
       backfilled: true, last_cdc: cdcStart, last_pull_at: new Date().toISOString(),
       last_error: null, last_result: result,
@@ -241,6 +332,29 @@ Deno.serve(async (req) => {
       if (caller.role !== 'admin') return json({ error: 'Admin only' }, 403)
     }
     return await pull(s)
+  }
+
+  if (body.mode === 'pnl') {
+    // same gate as pull: cron anon bearer or an admin session
+    const auth = req.headers.get('Authorization') ?? ''
+    let ok = false
+    try {
+      const payload = JSON.parse(atob((auth.replace('Bearer ', '').split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/')))
+      const ref = new URL(Deno.env.get('SUPABASE_URL')!).hostname.split('.')[0]
+      ok = payload?.role === 'anon' && payload?.ref === ref
+    } catch { /* not a JWT */ }
+    if (!ok) {
+      const caller = await getCaller(req)
+      if (caller instanceof Response) return caller
+      if (caller.role !== 'admin') return json({ error: 'Admin only' }, 403)
+    }
+    const at = await accessToken(s)
+    if (!at) return json({ error: 'QBO not connected' }, 409)
+    try {
+      return json({ ok: true, ...(await syncPnl(s, at)) })
+    } catch (e) {
+      return json({ error: String(e).slice(0, 300) }, 502)
+    }
   }
 
   if (body.mode === 'push') {

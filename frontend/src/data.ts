@@ -27,6 +27,10 @@ import type {
   CustomerRevenue,
   MarginMonth,
   InvoicePayment,
+  GlPnlMonth,
+  GlExpenseRow,
+  GlBreakevenMonth,
+  CfoSnapshot,
   Load,
   LoadStatus,
   MaintenanceAlert,
@@ -471,6 +475,24 @@ export async function listInvoicePayments(invoiceId: number): Promise<InvoicePay
 
 export async function deleteInvoicePayment(paymentId: number): Promise<void> {
   unwrap(await supabase.rpc('delete_invoice_payment', { p_payment_id: paymentId }))
+}
+
+// ── GL mirror (full P&L from the books) ─────────────────────────────────────
+
+export async function glPnlMonthly(months = 12): Promise<GlPnlMonth[]> {
+  return unwrap(await supabase.rpc('gl_pnl_monthly', { p_months: months })) as unknown as GlPnlMonth[]
+}
+
+export async function glExpenseBreakdown(months = 6): Promise<GlExpenseRow[]> {
+  return unwrap(await supabase.rpc('gl_expense_breakdown', { p_months: months })) as unknown as GlExpenseRow[]
+}
+
+export async function glBreakevenMonthly(months = 12): Promise<GlBreakevenMonth[]> {
+  return unwrap(await supabase.rpc('gl_breakeven_monthly', { p_months: months })) as unknown as GlBreakevenMonth[]
+}
+
+export async function glCfoSnapshot(): Promise<CfoSnapshot> {
+  return unwrap(await supabase.rpc('gl_cfo_snapshot')) as unknown as CfoSnapshot
 }
 
 /** Email the invoice PDF to the customer's billing address (from trux@). */
