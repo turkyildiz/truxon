@@ -52,6 +52,13 @@ Ordered by risk. ✅ confirmed · ⬜ open (in our hands) · 🔶 needs Ilker / 
       board / CPM) and monthly budgets (budget-variance).
 - ⬜ **Company/invoice details** — logo, address, invoice numbering, payment terms
       correct before the first real invoice reaches a broker.
+- ✅ **Accounting module (2026-07-19)** — Truxon as the complete money system, QBO
+      now optional: payments ledger (partials, check/ACH/factoring, auto-paid at
+      zero balance), invoice emailing from trux@ (invoice-send fn), DSO/aging/
+      unbilled-leak/revenue/margin reports (acct_* RPCs, admin), Accounting page
+      with paid/unpaid/past-due toggles + charts. Follow-up: verify a real
+      invoice email lands (Graph Mail.Send is proven by watchdog, but eyeball
+      the first broker send).
 - ✅ **QuickBooks integration LIVE (2026-07-19)** — transition mode: QBO stays the
       books of record; Truxon mirrors it every 30 min (cron `truxon-qbo-pull`).
       First backfill: **812 invoices + 93 customers** from Aida Logistics' QBO.
