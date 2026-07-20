@@ -240,6 +240,21 @@ Deno.serve(async (req) => {
     return json({ probe: true, total, anyBlank, noContact, noPhone, noEmail, noBilling, enriched, customerDocs: custDocs, loadDocs })
   }
 
+  // ── pod_report: missing-POD detector output (cron/admin read) ──
+  if (body.mode === 'pod_report') {
+    const days = Number(body.days) || 45
+    const { data: rows, error: rErr } = await svc.rpc('loads_missing_pod', { p_days: days })
+    const list = (rows ?? []) as Array<Record<string, string>>
+    // annotate only the shown rows with an archive candidate (bounded lookups)
+    const shown = list.slice(0, 40)
+    for (const r of shown) {
+      const { data: cand } = await svc.rpc('pod_archive_candidate', { p_ref: r.reference_number ?? '', p_pickup: r.pickup_number ?? '', p_delivery: r.delivery_number ?? '' })
+      r.archive_file = (cand as string) ?? null as unknown as string
+    }
+    const inArchive = shown.filter((r) => r.archive_file).length
+    return json({ summary: { missing: list.length, shown: shown.length, in_archive_sampled: inArchive, days }, rows: shown, errors: [rErr?.message].filter(Boolean) })
+  }
+
   // ── migration_refs: name lists for the ITS import dry-run (cron/admin read) ──
   if (body.mode === 'migration_refs') {
     const custs = (await svc.from('customers').select('company_name, mc_number, usdot_number')).data ?? []
