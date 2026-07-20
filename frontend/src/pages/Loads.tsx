@@ -5,10 +5,22 @@ import { Badge, Button, Card, formatDateTime, Input, LoadError, money, Select } 
 import { listCustomers, listDrivers, listLoads } from '../data'
 import { LOAD_STATUSES } from '../types'
 
+const ALL_STATUSES = [...LOAD_STATUSES, 'cancelled' as const]
+
 export default function Loads() {
   const navigate = useNavigate()
   const [q, setQ] = useState('')
-  const [status, setStatus] = useState('')
+  // Status toggles (crew feedback): one switch per status, multi-select;
+  // the landing view opens with In Transit on. All off = show everything.
+  const [statuses, setStatuses] = useState<Set<string>>(() => new Set(['in_transit']))
+  const toggleStatus = (s: string) =>
+    setStatuses((prev) => {
+      const next = new Set(prev)
+      if (next.has(s)) next.delete(s)
+      else next.add(s)
+      return next
+    })
+  const statusList = [...statuses].sort()
   const [customerId, setCustomerId] = useState('')
   const [driverId, setDriverId] = useState('')
   const [dateFrom, setDateFrom] = useState('')
@@ -18,23 +30,38 @@ export default function Loads() {
   const { data: customers = [] } = useQuery({ queryKey: ['customers-all', ''], queryFn: () => listCustomers(undefined, { includeInactive: true }) })
   const { data: drivers = [] } = useQuery({ queryKey: ['drivers', ''], queryFn: () => listDrivers() })
   const loadsQ = useQuery({
-    queryKey: ['loads', q, status, customerId, driverId, dateFrom, dateTo],
-    queryFn: () => listLoads({ q, status, customer_id: customerId, driver_id: driverId, date_from: dateFrom, date_to: dateTo }),
+    queryKey: ['loads', q, statusList.join(','), customerId, driverId, dateFrom, dateTo],
+    queryFn: () => listLoads({ q, statuses: statusList, customer_id: customerId, driver_id: driverId, date_from: dateFrom, date_to: dateTo }),
   })
   const { data: loads = [], isLoading } = loadsQ
 
   return (
     <Card title="Loads" actions={<Button onClick={() => navigate('/dispatch')}>+ New Load</Button>}>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {ALL_STATUSES.map((s) => {
+          const on = statuses.has(s)
+          return (
+            <button
+              key={s}
+              onClick={() => toggleStatus(s)}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+                on ? 'border-brand bg-brand text-white' : 'border-line text-muted hover:bg-surface-2 hover:text-body'
+              }`}
+              title={on ? 'Hide these loads' : 'Show these loads'}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${on ? 'bg-white' : 'bg-current'}`} />
+              {s.replace('_', ' ')}
+            </button>
+          )
+        })}
+        {statuses.size > 0 && (
+          <button onClick={() => setStatuses(new Set())} className="px-2 py-1.5 text-sm text-muted hover:text-body" title="Show all statuses">
+            Show all
+          </button>
+        )}
+      </div>
       <div className="mb-4 flex flex-wrap gap-3">
         <Input placeholder="Search load #, broker #, address…" value={q} onChange={(e) => setQ(e.target.value)} className="w-full sm:w-64" />
-        <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full sm:w-44">
-          <option value="">All statuses</option>
-          {[...LOAD_STATUSES, 'cancelled' as const].map((s) => (
-            <option key={s} value={s}>
-              {s.replace('_', ' ')}
-            </option>
-          ))}
-        </Select>
         <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="w-full sm:w-56">
           <option value="">All customers</option>
           {customers.map((c) => (

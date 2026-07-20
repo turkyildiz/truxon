@@ -388,6 +388,7 @@ function mapLoad({ customer, driver, truck, trailer, ...load }: LoadRow): Load {
 export interface LoadFilters {
   q?: string
   status?: string
+  statuses?: string[]
   customer_id?: string | number
   driver_id?: string | number
   date_from?: string
@@ -397,6 +398,7 @@ export interface LoadFilters {
 export async function listLoads(filters: LoadFilters = {}): Promise<Load[]> {
   let query = supabase.from('loads').select(LOAD_SELECT).order('created_at', { ascending: false }).limit(200)
   if (filters.status) query = query.eq('status', filters.status as Tables<'loads'>['status'])
+  if (filters.statuses?.length) query = query.in('status', filters.statuses as Tables<'loads'>['status'][])
   if (filters.customer_id) query = query.eq('customer_id', Number(filters.customer_id))
   if (filters.driver_id) query = query.eq('driver_id', Number(filters.driver_id))
   if (filters.date_from) query = query.gte('pickup_time', filters.date_from)
