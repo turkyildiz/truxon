@@ -1,4 +1,4 @@
-// Trux email door — polls the trux@truxon.com M365 shared mailbox via
+// Forest email door — polls the forest@truxon.com M365 shared mailbox via
 // Microsoft Graph, verifies the sender is active Truxon staff, runs the
 // shared Trux agent core in PROPOSE mode AS THAT USER (a real session is
 // minted for them, so RLS + audit attribution hold), and replies by email.
@@ -20,7 +20,7 @@
 //   processing: exactly-once even with overlapping polls.
 //
 // Required secrets: MSGRAPH_TENANT_ID, MSGRAPH_CLIENT_ID,
-// MSGRAPH_CLIENT_SECRET. Optional: TRUX_MAILBOX (default trux@truxon.com).
+// MSGRAPH_CLIENT_SECRET. Optional: TRUX_MAILBOX (default forest@truxon.com).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { extractText, getDocumentProxy } from 'npm:unpdf@0.12.1'

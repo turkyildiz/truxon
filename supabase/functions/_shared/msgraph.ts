@@ -1,7 +1,7 @@
 // Microsoft Graph helpers shared by trux-inbox and watchdog.
 // Client-credentials flow against the tenant in MSGRAPH_* secrets.
 
-export const TRUX_MAILBOX = Deno.env.get('TRUX_MAILBOX') ?? 'trux@truxon.com'
+export const TRUX_MAILBOX = Deno.env.get('TRUX_MAILBOX') ?? 'forest@truxon.com'
 const GRAPH = 'https://graph.microsoft.com/v1.0'
 
 export function graphConfigured(): boolean {
