@@ -112,6 +112,26 @@ Deno.serve(async (req) => {
   const svc = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   const body = await req.json().catch(() => ({})) as Record<string, unknown>
 
+  // ---- debug: why are specific loads stuck? ----
+  if (body.mode === 'debug') {
+    const { data: stuck } = await svc.from('loads')
+      .select('id, status, pickup_address, delivery_address')
+      .is('geocoded_at', null)
+      .or('pickup_address.neq.,delivery_address.neq.')
+      .order('delivery_time', { ascending: false, nullsFirst: false })
+      .limit(Number(body.limit) || 5)
+    const out = []
+    for (const l of stuck ?? []) {
+      const pu = await geocodeOne(l.pickup_address ?? '', svc, key)
+      const de = await geocodeOne(l.delivery_address ?? '', svc, key)
+      const { error } = await stampLoad(svc, l.id, pu.geo, de.geo)
+      out.push({ id: l.id, status: l.status, pu_addr: l.pickup_address, de_addr: l.delivery_address,
+        pu_status: pu.status, de_status: de.status, pu_state: pu.geo?.state, de_state: de.geo?.state,
+        stamp_error: error?.message ?? null })
+    }
+    return json({ stuck: out })
+  }
+
   // ---- single address ----
   if (typeof body.address === 'string' && !body.mode) {
     const r = await geocodeOne(body.address, svc, key)
