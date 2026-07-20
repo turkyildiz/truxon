@@ -240,6 +240,21 @@ Deno.serve(async (req) => {
     return json({ probe: true, total, anyBlank, noContact, noPhone, noEmail, noBilling, enriched, customerDocs: custDocs, loadDocs })
   }
 
+  // ── migration_refs: name lists for the ITS import dry-run (cron/admin read) ──
+  if (body.mode === 'migration_refs') {
+    const custs = (await svc.from('customers').select('company_name, mc_number, usdot_number')).data ?? []
+    const drivers = (await svc.from('drivers').select('full_name')).data ?? []
+    const trucks = (await svc.from('trucks').select('unit_number')).data ?? []
+    const loadNotes = (await svc.from('loads').select('load_number, notes')).data ?? []
+    return json({
+      customers: custs.map((c) => c.company_name),
+      customer_ids: custs.map((c) => ({ name: c.company_name, mc: c.mc_number, dot: c.usdot_number })),
+      drivers: drivers.map((d) => d.full_name),
+      trucks: trucks.map((t) => t.unit_number),
+      existing_loads: loadNotes.map((l) => ({ n: l.load_number, its: /\[ITS #(\d+)\]/.exec(l.notes ?? '')?.[1] ?? null })),
+    })
+  }
+
   // ── apply pre-extracted fields (client-side vision of a rate con) ──
   // The browser renders a scanned rate-con to images and reads it with the
   // vision model (extract-pdf), then posts the fields here; we apply blanks-only.
