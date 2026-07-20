@@ -1511,3 +1511,40 @@ export async function fleetLive(): Promise<FleetPin[]> {
   }
   return pins
 }
+
+// ---------- Northstar: predictive cash ----------
+
+export interface CashflowWeek {
+  week_start: string
+  week_number: number
+  week_label: string
+  expected_in: number
+  expected_out: number
+  net: number
+  cumulative_net: number
+}
+export interface SlowPayRow {
+  invoice_id: number
+  invoice_number: string
+  customer: string
+  customer_id: number
+  total: number
+  invoice_date: string
+  due_date: string | null
+  avg_days: number
+  predicted_pay_date: string
+  predicted_days_late: number
+  risk: 'high' | 'medium' | 'low'
+}
+
+/** Weekly cash-flow forecast (expected in/out/net + running total). */
+export async function cashflowForecast(weeks = 8): Promise<CashflowWeek[]> {
+  const data = unwrap(await supabase.rpc('cashflow_forecast', { p_weeks: weeks }))
+  return (data as unknown as CashflowWeek[]) ?? []
+}
+
+/** Open invoices ranked by predicted lateness (learned from pay behavior). */
+export async function slowPayRisk(): Promise<SlowPayRow[]> {
+  const data = unwrap(await supabase.rpc('slow_pay_risk'))
+  return (data as unknown as SlowPayRow[]) ?? []
+}

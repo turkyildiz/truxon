@@ -3101,6 +3101,18 @@ export type Database = {
         }
       }
       carrier_safety_latest: { Args: never; Returns: Json }
+      cashflow_forecast: {
+        Args: { p_weeks?: number }
+        Returns: {
+          cumulative_net: number
+          expected_in: number
+          expected_out: number
+          net: number
+          week_label: string
+          week_number: number
+          week_start: string
+        }[]
+      }
       change_load_status: {
         Args: {
           p_load_id: number
@@ -3193,6 +3205,14 @@ export type Database = {
       }
       create_work_order_draft: { Args: { p: Json }; Returns: number }
       current_odometer: { Args: { p_truck_id: number }; Returns: number }
+      customer_pay_profile: {
+        Args: never
+        Returns: {
+          avg_days: number
+          customer_id: number
+          paid_count: number
+        }[]
+      }
       dashboard_summary: { Args: never; Returns: Json }
       delete_customer: { Args: { p_id: number }; Returns: undefined }
       delete_invoice_payment: {
@@ -3656,6 +3676,22 @@ export type Database = {
       set_load_paperwork: {
         Args: { p_awaiting: boolean; p_id: number }
         Returns: undefined
+      }
+      slow_pay_risk: {
+        Args: never
+        Returns: {
+          avg_days: number
+          customer: string
+          customer_id: number
+          due_date: string
+          invoice_date: string
+          invoice_id: number
+          invoice_number: string
+          predicted_days_late: number
+          predicted_pay_date: string
+          risk: string
+          total: number
+        }[]
       }
       toll_by_agency: {
         Args: { p_end: string; p_start: string }

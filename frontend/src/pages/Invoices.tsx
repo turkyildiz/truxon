@@ -10,15 +10,15 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Too
 import { Badge, Button, Card, Field, formatDate, LoadError, Modal, money, Select, Table } from '../components/ui'
 import {
   acctAging, acctMarginMonthly, acctRevenueByCustomer, acctRevenueMonthly, acctSummary, acctUnbilledLoads,
-  createInvoice, deleteInvoicePayment, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
+  cashflowForecast, createInvoice, deleteInvoicePayment, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
   glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
-  qboConnectUrl, qboStatus, recordInvoicePayment, setInvoiceStatus, triggerQboPull, voidInvoice,
+  qboConnectUrl, qboStatus, recordInvoicePayment, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
 } from '../data'
 import { downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
 import { errorMessage } from '../supabase'
 import type { Invoice } from '../types'
 
-type Tab = 'overview' | 'receivables' | 'aging' | 'unbilled' | 'reports'
+type Tab = 'overview' | 'receivables' | 'aging' | 'unbilled' | 'forecast' | 'reports'
 type Filter = 'all' | 'unpaid' | 'pastdue' | 'paid' | 'draft' | 'void'
 
 const TABS: { key: Tab; label: string }[] = [
@@ -26,6 +26,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'receivables', label: 'Receivables' },
   { key: 'aging', label: 'Aging' },
   { key: 'unbilled', label: 'Unbilled' },
+  { key: 'forecast', label: '🔮 Forecast' },
   { key: 'reports', label: 'Reports' },
 ]
 
@@ -346,6 +347,7 @@ export default function Invoices() {
 
       {tab === 'aging' && <AgingTab />}
       {tab === 'unbilled' && <UnbilledTab onBill={billCustomer} />}
+      {tab === 'forecast' && <ForecastTab />}
       {tab === 'reports' && <ReportsTab />}
 
       {/* ── Generate invoice ── */}
@@ -417,6 +419,76 @@ function OverviewCharts() {
 }
 
 // ── Aging ────────────────────────────────────────────────────────────────────
+// ---------- Forecast (Northstar predictive) ----------
+function ForecastTab() {
+  const cfQ = useQuery({ queryKey: ['cashflow-forecast'], queryFn: () => cashflowForecast(8), retry: false })
+  const spQ = useQuery({ queryKey: ['slow-pay-risk'], queryFn: slowPayRisk, retry: false })
+  const weeks = cfQ.data ?? []
+  const risky = (spQ.data ?? []).filter((r) => r.risk !== 'low')
+  const chart = weeks.map((w) => ({ label: `W${w.week_number}`, In: w.expected_in, Out: -w.expected_out, Net: w.net, Running: w.cumulative_net }))
+  const riskColor = (r: string) => (r === 'high' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400')
+
+  return (
+    <div className="space-y-4">
+      <Card title="Cash-flow forecast — next 8 weeks">
+        <p className="mb-3 text-xs text-muted">
+          Money <strong>in</strong> is projected from each broker's learned pay behavior + delivered-but-unbilled loads; money <strong>out</strong> is your trailing 8-week average (fuel + driver pay + truck fixed). A transparent estimate, not a guarantee.
+        </p>
+        {cfQ.isLoading ? (
+          <p className="py-8 text-center text-muted">Loading…</p>
+        ) : cfQ.isError ? (
+          <LoadError error={cfQ.error} onRetry={() => cfQ.refetch()} />
+        ) : (
+          <>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={chart}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--muted)' }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: 'var(--muted)' }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v) => money(Math.abs(Number(v)))} />
+                <Bar dataKey="In" fill="#16a34a" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                <Bar dataKey="Out" fill="#dc2626" radius={[0, 0, 4, 4]} maxBarSize={28} />
+              </BarChart>
+            </ResponsiveContainer>
+            <Table headers={['Week', 'Expected in', 'Expected out', 'Net', 'Running']}>
+              {weeks.map((w) => (
+                <tr key={w.week_start} className="border-b border-line">
+                  <td className="px-3 py-2 font-medium">{w.week_label}</td>
+                  <td className="px-3 py-2 text-green-600 dark:text-green-400">{money(w.expected_in)}</td>
+                  <td className="px-3 py-2 text-red-600 dark:text-red-400">{money(w.expected_out)}</td>
+                  <td className={`px-3 py-2 font-medium ${w.net >= 0 ? 'text-body' : 'text-red-600 dark:text-red-400'}`}>{money(w.net)}</td>
+                  <td className={`px-3 py-2 font-semibold ${w.cumulative_net >= 0 ? 'text-body' : 'text-red-600 dark:text-red-400'}`}>{money(w.cumulative_net)}</td>
+                </tr>
+              ))}
+            </Table>
+          </>
+        )}
+      </Card>
+
+      <Card title={`Collections risk — invoices predicted to pay late (${risky.length})`}>
+        {spQ.isLoading ? (
+          <p className="py-6 text-center text-muted">Loading…</p>
+        ) : risky.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted">No open invoices are trending late. 🎉</p>
+        ) : (
+          <Table headers={['Invoice', 'Customer', 'Amount', 'Pays ~', 'Days late', 'Risk']}>
+            {risky.map((r) => (
+              <tr key={r.invoice_id} className="border-b border-line">
+                <td className="px-3 py-2 font-medium text-brand">{r.invoice_number}</td>
+                <td className="px-3 py-2">{r.customer}</td>
+                <td className="px-3 py-2">{money(r.total)}</td>
+                <td className="px-3 py-2 text-muted">{formatDate(r.predicted_pay_date)}</td>
+                <td className={`px-3 py-2 font-medium ${riskColor(r.risk)}`}>{r.predicted_days_late > 0 ? `+${r.predicted_days_late}d` : 'on time'}</td>
+                <td className={`px-3 py-2 font-semibold capitalize ${riskColor(r.risk)}`}>{r.risk}</td>
+              </tr>
+            ))}
+          </Table>
+        )}
+      </Card>
+    </div>
+  )
+}
+
 function AgingTab() {
   const q = useQuery({ queryKey: ['acct-aging'], queryFn: acctAging, retry: false })
   if (q.isLoading) return <p className="py-8 text-center text-muted">Loading…</p>
