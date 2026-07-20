@@ -38,11 +38,36 @@ function renderMarkdown(md: string): string {
   return DOMPurify.sanitize(raw)
 }
 
+/** Rewrite numbers into forms the voice speaks naturally — currency, percent,
+ * thousands separators, unit codes, and long ID digit-strings (VIN/DOT/phone)
+ * that should be read digit-by-digit rather than as a giant number. */
+function numbersForSpeech(s: string): string {
+  return s
+    // IDs after a label read digit-by-digit (DOT 4187601, VIN …H6707, MC 1234567)
+    .replace(/\b(USDOT|DOT|VIN|MC|PO|invoice)\s*#?\s*([A-Z0-9-]{4,})/gi,
+      (m, label: string, id: string) => (/\d/.test(id) ? `${label} ${id.replace(/[^A-Z0-9]/gi, '').split('').join(' ')}` : m))
+    // currency: $1,234.56 → "1234 dollars and 56 cents"; $5,000 → "5000 dollars"
+    .replace(/\$\s?(\d{1,3}(?:,\d{3})*|\d+)(?:\.(\d{1,2}))?/g, (_m, dollars: string, cents?: string) => {
+      const d = Number(dollars.replace(/,/g, ''))
+      const c = cents ? Number(cents.padEnd(2, '0')) : 0
+      const parts: string[] = []
+      if (d > 0 || c === 0) parts.push(`${d} dollar${d === 1 ? '' : 's'}`)
+      if (c > 0) parts.push(`${c} cent${c === 1 ? '' : 's'}`)
+      return parts.join(' and ')
+    })
+    // percentages: "25%" / "7.4%" → "25 percent"
+    .replace(/(\d+(?:\.\d+)?)\s?%/g, (_m, n: string) => `${n} percent`)
+    // remaining thousands separators in bare numbers: "42,212" → "42212"
+    .replace(/\b\d{1,3}(?:,\d{3})+\b/g, (m) => m.replace(/,/g, ''))
+    // zero-padded unit codes read oddly: "03" → "zero three"
+    .replace(/\b0(\d)\b/g, (_m, d: string) => `zero ${d}`)
+}
+
 /** Reduce Markdown to plain prose the synthesizer can read: drop tables, code
  * blocks and formatting marks, keep the narrative, and cap to a few sentences
  * (~800 chars) so answers stay listenable, not a wall of speech. */
 function toSpeech(md: string): string {
-  const prose = md
+  const prose = numbersForSpeech(md
     .split('\n')
     .filter((line) => !line.trim().startsWith('|')) // drop Markdown table rows
     .join('\n')
@@ -52,7 +77,7 @@ function toSpeech(md: string): string {
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // links → their text
     .replace(/[#*_>`|~]/g, ' ') // stray formatting marks
     .replace(/\s+/g, ' ')
-    .trim()
+    .trim())
   if (prose.length <= 800) return prose
   const head = prose.slice(0, 800)
   const stop = Math.max(head.lastIndexOf('. '), head.lastIndexOf('! '), head.lastIndexOf('? '))
