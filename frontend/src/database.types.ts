@@ -3282,6 +3282,7 @@ export type Database = {
           unit_number: string
         }[]
       }
+      fleet_cost_basis: { Args: never; Returns: Json }
       fleet_odometers: {
         Args: never
         Returns: {

@@ -1569,3 +1569,46 @@ export async function revenueForecast(weeks = 6): Promise<RevenueForecastWeek[]>
   const data = unwrap(await supabase.rpc('revenue_forecast', { p_weeks: weeks }))
   return (data as unknown as RevenueForecastWeek[]) ?? []
 }
+
+// ---------- Northstar: load margin at booking ----------
+
+export interface FleetCostBasis {
+  mpg: number
+  fuel_price: number
+  pay_per_mile: number
+  fixed_per_mile: number
+  toll_per_mile: number
+  breakeven_rpm: number
+  avg_rpm: number
+}
+export interface LoadMargin {
+  total_miles: number
+  fuel: number
+  driver: number
+  tolls: number
+  fixed: number
+  cost: number
+  net: number
+  margin_pct: number
+  all_in_rpm: number
+  verdict: 'good' | 'thin' | 'loss'
+}
+
+/** The fleet's real cost basis (MPG, fuel price, pay, fixed, breakeven RPM). */
+export async function fleetCostBasis(): Promise<FleetCostBasis> {
+  return unwrap(await supabase.rpc('fleet_cost_basis')) as unknown as FleetCostBasis
+}
+
+/** Predict a load's net from its rate/miles using the fleet cost basis. Pure. */
+export function estimateLoadMargin(rate: number, miles: number, emptyMiles: number, b: FleetCostBasis): LoadMargin {
+  const total = Math.max(miles + emptyMiles, 0)
+  const fuel = b.mpg > 0 ? (total / b.mpg) * b.fuel_price : 0
+  const driver = total * b.pay_per_mile
+  const tolls = total * b.toll_per_mile
+  const fixed = total * b.fixed_per_mile
+  const cost = fuel + driver + tolls + fixed
+  const net = rate - cost
+  const all_in_rpm = total > 0 ? rate / total : 0
+  const verdict: LoadMargin['verdict'] = net < 0 ? 'loss' : all_in_rpm < b.breakeven_rpm * 1.15 ? 'thin' : 'good'
+  return { total_miles: total, fuel, driver, tolls, fixed, cost, net, margin_pct: rate > 0 ? (net / rate) * 100 : 0, all_in_rpm, verdict }
+}

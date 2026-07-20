@@ -1,9 +1,9 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
-import { Button, Card, Field, Input, Select, Textarea } from '../components/ui'
-import { calculateDistance, createCustomer, createLoad, extractPdf, type ExtractedStop } from '../data'
+import { Button, Card, Field, Input, money, Select, Textarea } from '../components/ui'
+import { calculateDistance, createCustomer, createLoad, estimateLoadMargin, extractPdf, fleetCostBasis, type ExtractedStop } from '../data'
 import { errorMessage } from '../supabase'
 import { ReferenceDataBanner, useReferenceData } from '../useReferenceData'
 import FleetMap from './FleetMap'
@@ -189,6 +189,14 @@ export default function Dispatch() {
 
   const rpm = form.rate && form.miles && parseFloat(form.miles) > 0 ? (parseFloat(form.rate) / parseFloat(form.miles)).toFixed(2) : null
 
+  // Northstar: predicted margin, live as the rate/miles are entered.
+  const { data: costBasis } = useQuery({ queryKey: ['fleet-cost-basis'], queryFn: fleetCostBasis, staleTime: 30 * 60 * 1000, retry: false })
+  const rate = parseFloat(form.rate)
+  const miles = parseFloat(form.miles)
+  const margin = costBasis && rate > 0 && miles > 0
+    ? estimateLoadMargin(rate, miles, parseFloat(form.empty_miles) || 0, costBasis)
+    : null
+
   return (
     <div className="space-y-4">
       <FleetMap />
@@ -268,6 +276,33 @@ export default function Dispatch() {
               </Field>
               {rpm && <div className="pb-3 text-sm font-semibold text-brand">${rpm}/mi</div>}
             </div>
+
+            {margin && (
+              <div className={`rounded-lg border px-3 py-2 text-sm ${
+                margin.verdict === 'loss' ? 'border-red-500/40 bg-red-500/10'
+                : margin.verdict === 'thin' ? 'border-amber-500/40 bg-amber-500/10'
+                : 'border-green-500/40 bg-green-500/10'
+              }`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className={`font-semibold ${
+                    margin.verdict === 'loss' ? 'text-red-700 dark:text-red-300'
+                    : margin.verdict === 'thin' ? 'text-amber-700 dark:text-amber-300'
+                    : 'text-green-700 dark:text-green-300'
+                  }`}>
+                    {margin.verdict === 'loss' ? '⚠️ Predicted LOSS' : margin.verdict === 'thin' ? '➖ Thin margin' : '✅ Good margin'}
+                    {' · '}est. net {money(margin.net)} ({margin.margin_pct.toFixed(0)}%)
+                  </span>
+                  <span className="text-xs text-muted">
+                    ${margin.all_in_rpm.toFixed(2)}/mi all-in vs ${costBasis?.breakeven_rpm.toFixed(2)} breakeven
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-muted">
+                  On {Math.round(margin.total_miles)} mi: fuel {money(margin.fuel)} · driver {money(margin.driver)} · fixed {money(margin.fixed)}
+                  {margin.tolls >= 1 ? ` · tolls ${money(margin.tolls)}` : ''} — a predicted estimate from your recent cost basis
+                </div>
+              </div>
+            )}
+
             <div className="flex items-end gap-3 pb-1">
               <Button
                 type="button"
