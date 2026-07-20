@@ -86,5 +86,39 @@ Deno.serve(async (req) => {
     return json({ matches: data })
   }
 
+  // ── search_targets: claim the oldest pending search request (NAS) ──
+  if (body.mode === 'search_targets') {
+    if (!cron) return json({ error: 'cron only' }, 403)
+    const { data, error } = await svc.rpc('claim_doc_search')
+    if (error) return json({ error: error.message }, 500)
+    const req = Array.isArray(data) ? data[0] : null
+    return json({ request: req ?? null })
+  }
+
+  // ── search_complete: embed → match → store results (NAS returns the vector) ──
+  if (body.mode === 'search_complete') {
+    if (!cron) return json({ error: 'cron only' }, 403)
+    const id = Number(body.request_id)
+    if (!id) return json({ error: 'request_id required' }, 400)
+    const emb = body.query_embedding
+    if (!Array.isArray(emb) || emb.length === 0) {
+      await svc.rpc('complete_doc_search', { p_id: id, p_results: null, p_error: String(body.worker_error ?? 'no embedding') })
+      return json({ ok: true, stored: 'error' })
+    }
+    // entity_type filter comes from the request row, not the worker payload
+    const { data: reqRow } = await svc.from('doc_search_requests').select('entity_type').eq('id', id).single()
+    const { data: matches, error } = await svc.rpc('match_document_embeddings', {
+      p_embedding: JSON.stringify(emb),
+      p_count: Number(body.count) || 12,
+      p_entity_type: reqRow?.entity_type ?? null,
+    })
+    if (error) {
+      await svc.rpc('complete_doc_search', { p_id: id, p_results: null, p_error: error.message })
+      return json({ error: error.message }, 500)
+    }
+    await svc.rpc('complete_doc_search', { p_id: id, p_results: matches ?? [], p_error: null })
+    return json({ ok: true, stored: (matches ?? []).length })
+  }
+
   return json({ error: 'unknown mode' }, 400)
 })

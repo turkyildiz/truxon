@@ -33,6 +33,7 @@ const Tolls = lazy(() => import('./pages/Tolls'))
 const Users = lazy(() => import('./pages/Users'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Drive = lazy(() => import('./pages/Drive'))
+const DocSearch = lazy(() => import('./pages/DocSearch'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 15_000 } },
@@ -95,6 +96,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/tolls" element={<Tolls />} />
               <Route path="/personal-drive" element={<Drive drive="personal" />} />
               <Route path="/team-drive" element={<Drive drive="team" />} />
+              <Route path="/doc-search" element={<DocSearch />} />
               <Route path="/users" element={<Users />} />
               <Route path="/settings" element={<Settings />} />
             </Route>

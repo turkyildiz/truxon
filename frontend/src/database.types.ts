@@ -275,6 +275,86 @@ export type Database = {
         }
         Relationships: []
       }
+      doc_search_requests: {
+        Row: {
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          entity_type: string | null
+          error: string | null
+          id: number
+          query: string
+          requester: string | null
+          results: Json | null
+          status: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          entity_type?: string | null
+          error?: string | null
+          id?: never
+          query: string
+          requester?: string | null
+          results?: Json | null
+          status?: string
+        }
+        Update: {
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          entity_type?: string | null
+          error?: string | null
+          id?: never
+          query?: string
+          requester?: string | null
+          results?: Json | null
+          status?: string
+        }
+        Relationships: []
+      }
+      document_embeddings: {
+        Row: {
+          chunk_index: number
+          content: string
+          created_at: string
+          document_id: number
+          embedding: string
+          entity_id: number
+          entity_type: string
+          id: number
+        }
+        Insert: {
+          chunk_index?: number
+          content: string
+          created_at?: string
+          document_id: number
+          embedding: string
+          entity_id: number
+          entity_type: string
+          id?: never
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          created_at?: string
+          document_id?: number
+          embedding?: string
+          entity_id?: number
+          entity_type?: string
+          id?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_embeddings_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           content_type: string
@@ -283,6 +363,7 @@ export type Database = {
           entity_type: string
           filename: string
           id: number
+          indexed_at: string | null
           size_bytes: number
           storage_path: string
           uploaded_at: string
@@ -295,6 +376,7 @@ export type Database = {
           entity_type: string
           filename: string
           id?: never
+          indexed_at?: string | null
           size_bytes?: number
           storage_path: string
           uploaded_at?: string
@@ -307,6 +389,7 @@ export type Database = {
           entity_type?: string
           filename?: string
           id?: never
+          indexed_at?: string | null
           size_bytes?: number
           storage_path?: string
           uploaded_at?: string
@@ -2453,9 +2536,21 @@ export type Database = {
         Args: { p_action: string; p_max: number; p_window?: string }
         Returns: boolean
       }
+      claim_doc_search: {
+        Args: never
+        Returns: {
+          entity_type: string
+          id: number
+          query: string
+        }[]
+      }
       company_scorecard: {
         Args: { p_end: string; p_start: string }
         Returns: Json
+      }
+      complete_doc_search: {
+        Args: { p_error?: string; p_id: number; p_results?: Json }
+        Returns: undefined
       }
       create_invoice: {
         Args: {
@@ -2552,6 +2647,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      enqueue_doc_search: {
+        Args: { p_entity_type?: string; p_query: string }
+        Returns: number
       }
       fleet_odometers: {
         Args: never
@@ -2730,6 +2829,18 @@ export type Database = {
       maintenance_summary: {
         Args: { p_end: string; p_start: string }
         Returns: Json
+      }
+      match_document_embeddings: {
+        Args: { p_count?: number; p_embedding: string; p_entity_type?: string }
+        Returns: {
+          content: string
+          doc_type: string
+          document_id: number
+          entity_id: number
+          entity_type: string
+          filename: string
+          similarity: number
+        }[]
       }
       my_driver_id: { Args: never; Returns: number }
       my_role: {
@@ -2936,6 +3047,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      upsert_doc_embeddings: {
+        Args: {
+          p_chunks: Json
+          p_document_id: number
+          p_entity_id: number
+          p_entity_type: string
+        }
+        Returns: number
       }
       void_invoice: { Args: { p_invoice_id: number }; Returns: undefined }
       watchdog_action_count: {

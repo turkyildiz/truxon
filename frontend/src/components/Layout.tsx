@@ -97,6 +97,7 @@ const NAV_GROUPS: { title: string | null; items: NavItem[] }[] = [
   { title: 'Files', items: [
     { key: 'personal_drive', to: '/personal-drive', label: 'Personal Drive', icon: '📁' },
     { key: 'team_drive', to: '/team-drive', label: 'Team Drive', icon: '🗂️' },
+    { key: 'doc_search', to: '/doc-search', label: 'Document Search', icon: '🔎' },
   ] },
   { title: 'Admin', items: [
     { key: 'users', to: '/users', label: 'Users', icon: '👤' },

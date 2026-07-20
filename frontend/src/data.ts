@@ -704,6 +704,66 @@ export async function downloadDocument(doc: DocumentMeta): Promise<void> {
   URL.revokeObjectURL(url)
 }
 
+// ---------- Document semantic search (RAG) ----------
+
+export interface DocSearchMatch {
+  document_id: number
+  entity_type: string
+  entity_id: number
+  filename: string
+  doc_type: string | null
+  content: string
+  similarity: number
+}
+
+/** Enqueue a semantic search; the NAS worker embeds the query + runs the match.
+ *  Polls the request row until it's done/error (or times out). */
+export async function searchDocuments(
+  query: string,
+  entityType?: string,
+  opts: { timeoutMs?: number; intervalMs?: number } = {},
+): Promise<DocSearchMatch[]> {
+  const timeoutMs = opts.timeoutMs ?? 25_000
+  const intervalMs = opts.intervalMs ?? 1_200
+  const { data: id, error } = await supabase.rpc('enqueue_doc_search', {
+    p_query: query,
+    p_entity_type: entityType ?? undefined,
+  })
+  if (error) throw new Error(error.message)
+
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    await new Promise((r) => setTimeout(r, intervalMs))
+    const { data, error: pErr } = await supabase
+      .from('doc_search_requests')
+      .select('status, results, error')
+      .eq('id', id as number)
+      .single()
+    if (pErr) throw new Error(pErr.message)
+    if (data?.status === 'done') return (data.results as DocSearchMatch[] | null) ?? []
+    if (data?.status === 'error') throw new Error(String(data.error ?? 'search failed'))
+    if (Date.now() > deadline) throw new Error('Search timed out — the indexer may be busy. Try again in a moment.')
+  }
+}
+
+/** Download a document by its id (search results carry the id, not the path). */
+export async function downloadDocumentById(documentId: number): Promise<void> {
+  const { data: doc, error } = await supabase
+    .from('documents')
+    .select('storage_path, filename')
+    .eq('id', documentId)
+    .single()
+  if (error || !doc) throw new Error(error?.message ?? 'Document not found')
+  const { data, error: dErr } = await supabase.storage.from('documents').download(doc.storage_path)
+  if (dErr) throw new Error(dErr.message)
+  const url = URL.createObjectURL(data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = doc.filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ---------- Activity / Notes ----------
 
 export async function listActivity(entityType: string, entityId: number | string): Promise<Activity[]> {
