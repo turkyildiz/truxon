@@ -43,7 +43,36 @@ function fileSize(bytes: number): string {
 const fullPathOf = (i: DriveItem) => (i.parent === '' ? i.filename : `${i.parent}/${i.filename}`)
 const isImage = (i: DriveItem) => i.content_type.startsWith('image/')
 const isPdf = (i: DriveItem) => i.content_type === 'application/pdf'
-const isFileDrag = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files')
+// A drop coming from OUTSIDE the app: real OS files, OR an image/link dragged out
+// of another browser window/tab (which arrives as a URL, not a file).
+const hasExternalDrag = (e: React.DragEvent) => {
+  const t = Array.from(e.dataTransfer.types)
+  return t.includes('Files') || t.includes('DownloadURL') || t.includes('text/uri-list')
+}
+function fileNameFromUrl(url: string): string {
+  try {
+    const p = new URL(url).pathname.split('/').filter(Boolean).pop() ?? ''
+    return decodeURIComponent(p) || 'file'
+  } catch {
+    return 'file'
+  }
+}
+// Pull a downloadable URL out of a cross-browser drag. Chrome ships a
+// "mime:filename:url" DownloadURL; everything else exposes text/uri-list.
+function urlFromDrop(dt: DataTransfer): { url: string; name: string } | null {
+  const dl = dt.getData('DownloadURL')
+  if (dl) {
+    const parts = dl.split(':')
+    parts.shift() // mime
+    const name = parts.shift() ?? ''
+    const url = parts.join(':') // url itself contains ':' — rejoin the rest
+    if (/^https?:\/\//i.test(url)) return { url, name: name || fileNameFromUrl(url) }
+  }
+  const uri = dt.getData('text/uri-list') || dt.getData('text/plain')
+  const line = uri.split('\n').map((s) => s.trim()).find((s) => /^https?:\/\//i.test(s))
+  if (line) return { url: line, name: fileNameFromUrl(line) }
+  return null
+}
 
 function icon(i: DriveItem): { emoji: string; bg: string } {
   if (i.is_folder) return { emoji: '📁', bg: 'bg-amber-400/15' }
@@ -237,9 +266,28 @@ export default function Drive({ drive }: { drive: DriveName }) {
     invalidate()
   }
   function handleExternalDrop(e: React.DragEvent, base: string) {
+    // Read everything we need off dataTransfer synchronously — it's cleared
+    // once the drop handler returns and any await would lose it.
     const entries = entriesFromDrop(e.dataTransfer)
-    if (entries) readAllThenUpload(entries, base)
-    else if (e.dataTransfer.files?.length) doUpload(e.dataTransfer.files, base)
+    if (entries) return readAllThenUpload(entries, base)
+    if (e.dataTransfer.files?.length) return doUpload(e.dataTransfer.files, base)
+    const u = urlFromDrop(e.dataTransfer)
+    if (u) uploadFromUrl(u.url, u.name, base)
+  }
+  async function uploadFromUrl(url: string, name: string, base: string) {
+    setError('')
+    setUploading({ done: 0, total: 1 })
+    try {
+      const res = await fetch(url, { mode: 'cors' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      const file = new File([blob], name || 'file', { type: blob.type || 'application/octet-stream' })
+      setUploading(null)
+      await doUpload([file], base)
+    } catch {
+      setUploading(null)
+      setError("That item was dragged from another site that doesn't allow copying it directly. Save it to your computer first, then drag it in — or use the Upload button.")
+    }
   }
   async function readAllThenUpload(entries: unknown[], base: string) {
     const out: UploadEntry[] = []
@@ -259,7 +307,7 @@ export default function Drive({ drive }: { drive: DriveName }) {
     e.stopPropagation()
     setDropTarget(null)
     setDragOver(false)
-    if (isFileDrag(e)) {
+    if (hasExternalDrag(e)) {
       handleExternalDrop(e, dest)
       return
     }
@@ -270,10 +318,11 @@ export default function Drive({ drive }: { drive: DriveName }) {
   function targetProps(key: string, dest: string, excludeId?: number) {
     return {
       onDragOver: (e: React.DragEvent) => {
-        if (isFileDrag(e) || dragRef.current) {
+        const external = hasExternalDrag(e)
+        if (external || dragRef.current) {
           e.preventDefault()
           e.stopPropagation()
-          e.dataTransfer.dropEffect = isFileDrag(e) ? 'copy' : 'move'
+          e.dataTransfer.dropEffect = external ? 'copy' : 'move'
           if (dropTarget !== key) setDropTarget(key)
         }
       },
@@ -290,7 +339,7 @@ export default function Drive({ drive }: { drive: DriveName }) {
     <div
       className="space-y-3"
       onDragOver={(e) => {
-        if (isFileDrag(e)) {
+        if (hasExternalDrag(e)) {
           e.preventDefault()
           if (!dragOver) setDragOver(true)
         }
@@ -301,7 +350,7 @@ export default function Drive({ drive }: { drive: DriveName }) {
       onDrop={(e) => {
         e.preventDefault()
         setDragOver(false)
-        if (isFileDrag(e)) handleExternalDrop(e, path)
+        if (hasExternalDrag(e)) handleExternalDrop(e, path)
       }}
     >
       {/* header */}
