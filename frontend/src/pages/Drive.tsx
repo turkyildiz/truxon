@@ -57,21 +57,31 @@ function fileNameFromUrl(url: string): string {
     return 'file'
   }
 }
-// Pull a downloadable URL out of a cross-browser drag. Chrome ships a
-// "mime:filename:url" DownloadURL; everything else exposes text/uri-list.
-function urlFromDrop(dt: DataTransfer): { url: string; name: string } | null {
+// Pull downloadable URLs out of a cross-browser drag. Chrome ships a single
+// "mime:filename:url" DownloadURL; text/uri-list can carry several (one per
+// line, '#' comment lines ignored) when multiple items are dragged at once.
+function urlsFromDrop(dt: DataTransfer): { url: string; name: string }[] {
+  const out: { url: string; name: string }[] = []
+  const seen = new Set<string>()
+  const add = (url: string, name?: string) => {
+    if (/^https?:\/\//i.test(url) && !seen.has(url)) {
+      seen.add(url)
+      out.push({ url, name: name || fileNameFromUrl(url) })
+    }
+  }
   const dl = dt.getData('DownloadURL')
   if (dl) {
     const parts = dl.split(':')
     parts.shift() // mime
     const name = parts.shift() ?? ''
-    const url = parts.join(':') // url itself contains ':' — rejoin the rest
-    if (/^https?:\/\//i.test(url)) return { url, name: name || fileNameFromUrl(url) }
+    add(parts.join(':'), name) // url itself contains ':' — rejoin the rest
   }
   const uri = dt.getData('text/uri-list') || dt.getData('text/plain')
-  const line = uri.split('\n').map((s) => s.trim()).find((s) => /^https?:\/\//i.test(s))
-  if (line) return { url: line, name: fileNameFromUrl(line) }
-  return null
+  for (const line of uri.split('\n')) {
+    const s = line.trim()
+    if (s && !s.startsWith('#')) add(s)
+  }
+  return out
 }
 
 function icon(i: DriveItem): { emoji: string; bg: string } {
@@ -271,22 +281,32 @@ export default function Drive({ drive }: { drive: DriveName }) {
     const entries = entriesFromDrop(e.dataTransfer)
     if (entries) return readAllThenUpload(entries, base)
     if (e.dataTransfer.files?.length) return doUpload(e.dataTransfer.files, base)
-    const u = urlFromDrop(e.dataTransfer)
-    if (u) uploadFromUrl(u.url, u.name, base)
+    const urls = urlsFromDrop(e.dataTransfer)
+    if (urls.length) uploadFromUrls(urls, base)
   }
-  async function uploadFromUrl(url: string, name: string, base: string) {
+  async function uploadFromUrls(urls: { url: string; name: string }[], base: string) {
     setError('')
-    setUploading({ done: 0, total: 1 })
-    try {
-      const res = await fetch(url, { mode: 'cors' })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const blob = await res.blob()
-      const file = new File([blob], name || 'file', { type: blob.type || 'application/octet-stream' })
-      setUploading(null)
-      await doUpload([file], base)
-    } catch {
-      setUploading(null)
-      setError("That item was dragged from another site that doesn't allow copying it directly. Save it to your computer first, then drag it in — or use the Upload button.")
+    setUploading({ done: 0, total: urls.length })
+    const files: File[] = []
+    let blocked = 0
+    for (let i = 0; i < urls.length; i++) {
+      try {
+        const res = await fetch(urls[i].url, { mode: 'cors' })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const blob = await res.blob()
+        files.push(new File([blob], urls[i].name || 'file', { type: blob.type || 'application/octet-stream' }))
+      } catch {
+        blocked++
+      }
+      setUploading({ done: i + 1, total: urls.length })
+    }
+    setUploading(null)
+    if (files.length) await doUpload(files, base)
+    if (blocked) {
+      setError(
+        `${blocked} item${blocked === 1 ? '' : 's'} came from a site that doesn't allow copying directly. ` +
+          'Save those to your computer first, then drag them in — or use the Upload button.',
+      )
     }
   }
   async function readAllThenUpload(entries: unknown[], base: string) {
