@@ -28,7 +28,7 @@ import { json } from '../_shared/auth.ts'
 import { graph, graphConfigured, graphToken, TRUX_MAILBOX as MAILBOX } from '../_shared/msgraph.ts'
 import { runTrux, type Sb } from '../_shared/truxcore.ts'
 import { extractWorkOrder } from '../_shared/extract_llm.ts'
-import { classifyDocument, fileDocument, matchEntity } from '../_shared/doc_filing.ts'
+import { classifyDocument, extractEquipmentFields, fileDocument, matchEntity } from '../_shared/doc_filing.ts'
 
 const EMAIL_ROLES = ['admin', 'dispatcher', 'accountant']
 
@@ -404,23 +404,42 @@ Deno.serve(async (req) => {
 
         const context = `Subject: ${m.subject ?? ''}\n${bodyText.slice(0, 500)}`
         const filed: string[] = []; const unmatched: string[] = []; const unreadable: string[] = []
+        const enriched: string[] = []; const conflicts: string[] = []
         for (const att of docAttachments) {
           const c = await classifyDocument(att, apiKey, textModel, visionModel, context)
           if (!c || c.confidence === 'low' && c.entity_kind === 'unknown') { unreadable.push(att.name); continue }
           const ent = await matchEntity(svc, c.entity_kind, c.entity_ref)
           if (!ent) { unmatched.push(`${c.summary || att.name} (${c.entity_kind} "${c.entity_ref ?? '?'}")`); continue }
           const res = await fileDocument(svc, ent, att, c.doc_type, acting.userId)
-          if (res.ok) filed.push(`${c.doc_type.replace(/_/g, ' ')} → ${ent.label}`)
-          else unreadable.push(`${att.name} (${res.error})`)
+          if (!res.ok) { unreadable.push(`${att.name} (${res.error})`); continue }
+          filed.push(`${c.doc_type.replace(/_/g, ' ')} → ${ent.label}`)
+          // A registration/title on a truck/trailer? Harvest its fields and fill
+          // any blanks on the record (blanks-only; disagreements are flagged).
+          if ((c.doc_type === 'registration' || c.doc_type === 'title') && (ent.entity_type === 'truck' || ent.entity_type === 'trailer')) {
+            const fields = await extractEquipmentFields(att, apiKey, textModel, visionModel, context)
+            if (fields) {
+              const { data: enr } = (await svc.rpc('apply_equipment_enrichment', {
+                p_equipment_type: ent.entity_type, p_equipment_id: ent.entity_id,
+                p_fields: fields, p_source_document_id: res.documentId ?? null, p_model: textModel,
+              })) as unknown as { data: { filled?: number; conflicts?: number } | null }
+              if (enr?.filled) enriched.push(`${ent.label}: filled ${enr.filled} blank field${enr.filled === 1 ? '' : 's'} (${Object.keys(fields).join(', ')})`)
+              if (enr?.conflicts) conflicts.push(`${ent.label}: ${enr.conflicts} value${enr.conflicts === 1 ? '' : 's'} on the document disagree with what's on file — left unchanged for you to check`)
+            }
+          }
         }
         const parts: string[] = []
         if (filed.length) parts.push(`Filed:\n${filed.map((f) => `  • ${f}`).join('\n')}`)
+        if (enriched.length) parts.push(`Updated the record from it:\n${enriched.map((e) => `  • ${e}`).join('\n')}`)
+        if (conflicts.length) parts.push(`Heads up:\n${conflicts.map((c) => `  • ${c}`).join('\n')}`)
         if (unmatched.length) parts.push(`I read these but couldn't tell which record they belong to — reply with the unit/name and I'll file them:\n${unmatched.map((u) => `  • ${u}`).join('\n')}`)
         if (unreadable.length) parts.push(`I couldn't read: ${unreadable.join(', ')}.`)
-        if (filed.length) await notifyOwners(svc, 'Forest filed a document', filed.join('; '))
-        await finish('processed', `filing: filed ${filed.length}, unmatched ${unmatched.length}, unreadable ${unreadable.length}; ${attDiag}`, sessionId ?? undefined)
+        if (filed.length || conflicts.length) {
+          await notifyOwners(svc, 'Forest filed a document',
+            [...filed, ...enriched.map((e) => `✎ ${e}`), ...conflicts.map((c) => `⚠ ${c}`)].join('; '))
+        }
+        await finish('processed', `filing: filed ${filed.length}, enriched ${enriched.length}, conflicts ${conflicts.length}, unmatched ${unmatched.length}, unreadable ${unreadable.length}; ${attDiag}`, sessionId ?? undefined)
         await reply(parts.join('\n\n') || "I got your attachment but couldn't tell what it was — could you say what it is and which truck/customer/load it's for?")
-        results.push({ id: m.id, filing: { filed: filed.length, unmatched: unmatched.length, unreadable: unreadable.length } })
+        results.push({ id: m.id, filing: { filed: filed.length, enriched: enriched.length, conflicts: conflicts.length, unmatched: unmatched.length, unreadable: unreadable.length } })
         continue
       }
 
