@@ -1,23 +1,24 @@
 #!/usr/bin/env node
-// NAS vision enrichment — fills blank customer contact fields by reading each
-// customer's SCANNED rate confirmations with cloud vision AI. The NAS only
-// rasterizes (poppler/pdftoppm); the customer-enrich edge function holds every
-// secret (storage access, the LLM key, the DB write). So this box carries NO
-// sensitive credentials — just the PUBLIC anon token + poppler.
+// NAS vision enrichment (LOCAL) — fills blank customer contact fields by reading
+// each customer's SCANNED rate confirmations with a LOCAL vision model (Ollama)
+// on the NAS CPU. No external LLM key, no cloud, fully private.
 //
 // Flow per customer:
 //   edge vision_targets  → { customer_id, company_name, doc_id, signed url }
 //   fetch the PDF (signed url) → pdftoppm → JPEG pages
-//   edge vision_apply    → runs the vision model + fills blanks-only
+//   LOCAL Ollama (vision) → JSON contact fields
+//   NAS name-match guard → edge apply_fields → blanks-only write
 //
-// No extract-pdf 30/hr cap (the vision_* path is cron-gated, not per-user).
+// The edge holds the DB secrets; this box runs the model locally. Slow on CPU —
+// meant as an overnight backfill.
 //
 // Env (deploy/vision-enrich/vision.env, chmod 600):
 //   CUSTOMER_ENRICH_URL   https://<ref>.supabase.co/functions/v1/customer-enrich
-//   SUPABASE_ANON_JWT     the public JWT-format anon token (cron identity)
-//   MAX_CUSTOMERS         safety cap per run (default 1000)
-//   RASTER_DPI            pdftoppm resolution (default 130)
-//   MAX_PAGES             pages per rate con to read (default 2)
+//   SUPABASE_ANON_JWT     public JWT-format anon token
+//   OLLAMA_URL            default http://127.0.0.1:11434
+//   OLLAMA_MODEL          default minicpm-v
+//   CARRIER               our carrier name (default "Aida Logistics LLC")
+//   MAX_CUSTOMERS / RASTER_DPI / MAX_PAGES
 
 import { readFileSync, writeFileSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -29,9 +30,15 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const env = loadEnv(join(HERE, 'vision.env'))
 const URL = env.CUSTOMER_ENRICH_URL
 const JWT = env.SUPABASE_ANON_JWT
+const OLLAMA = (env.OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/$/, '')
+const MODEL = env.OLLAMA_MODEL || 'minicpm-v'
+const CARRIER = env.CARRIER || 'Aida Logistics LLC'
 const MAX_CUSTOMERS = Number(env.MAX_CUSTOMERS || 1000)
 const DPI = Number(env.RASTER_DPI || 130)
 const PAGES = Number(env.MAX_PAGES || 2)
+
+const STOP = new Set(['inc', 'llc', 'ltd', 'co', 'corp', 'company', 'group', 'the', 'and', 'of', 'logistics', 'transport', 'transportation', 'freight', 'trucking', 'carriers', 'carrier', 'services', 'service', 'brokerage', 'solutions', 'usa', 'dba'])
+const toks = (s) => new Set(String(s ?? '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((t) => t.length > 2 && !STOP.has(t)))
 
 function loadEnv(p) {
   try {
@@ -42,20 +49,45 @@ function loadEnv(p) {
 }
 const log = (m) => console.log(`[vision] ${new Date().toISOString()} ${m}`)
 
-async function post(body) {
-  const r = await fetch(URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${JWT}` },
-    body: JSON.stringify(body),
-  })
+const PROMPT = `You read a trucking RATE CONFIRMATION addressed to the carrier "${CARRIER}". Extract the BROKER/CUSTOMER (the company that issued this load — never "${CARRIER}"). Respond with ONLY a JSON object with these keys, using null when absent:
+- company_name: the broker/customer company name
+- contact_person: the broker rep / contact name
+- phone: the broker's phone number
+- email: the broker's email
+- billing_address: the broker's billing / remit-to / main address
+- mc_number: the broker's MC number
+- notes: short billing note (quick-pay, portal) or null`
+
+async function edge(body) {
+  const r = await fetch(URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${JWT}` }, body: JSON.stringify(body) })
   return r.json()
+}
+
+async function ollamaVision(images) {
+  const r = await fetch(`${OLLAMA}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [{ role: 'user', content: PROMPT, images }],
+      format: 'json',
+      stream: false,
+      options: { temperature: 0 },
+    }),
+    signal: AbortSignal.timeout(600_000), // CPU inference is slow
+  })
+  if (!r.ok) throw new Error(`ollama ${r.status}: ${(await r.text()).slice(0, 120)}`)
+  const j = await r.json()
+  const content = j?.message?.content ?? ''
+  try { return JSON.parse(content) } catch { return JSON.parse((content.match(/\{[\s\S]*\}/) || ['{}'])[0]) }
 }
 
 async function main() {
   if (!URL || !JWT) throw new Error('CUSTOMER_ENRICH_URL and SUPABASE_ANON_JWT required in vision.env')
+  log(`model=${MODEL} ollama=${OLLAMA}`)
   let after = 0, done = 0, filled = 0, touched = 0
   while (done < MAX_CUSTOMERS) {
-    const { targets, lastId, queried } = await post({ mode: 'vision_targets', after_id: after, limit: 8 })
+    const { targets, lastId, queried } = await edge({ mode: 'vision_targets', after_id: after, limit: 8 })
     if (!queried) { log('no more candidates'); break }
     for (const t of targets ?? []) {
       if (done >= MAX_CUSTOMERS) break
@@ -64,18 +96,19 @@ async function main() {
       try {
         const pdf = Buffer.from(await (await fetch(t.url)).arrayBuffer())
         dir = mkdtempSync(join(tmpdir(), 'rc-'))
-        const pdfPath = join(dir, 'in.pdf')
-        writeFileSync(pdfPath, pdf)
-        execFileSync('pdftoppm', ['-jpeg', '-r', String(DPI), '-f', '1', '-l', String(PAGES), pdfPath, join(dir, 'p')], { stdio: 'ignore' })
-        const imgs = readdirSync(dir).filter((f) => f.endsWith('.jpg')).sort().slice(0, PAGES)
-          .map((f) => readFileSync(join(dir, f)).toString('base64'))
+        writeFileSync(join(dir, 'in.pdf'), pdf)
+        execFileSync('pdftoppm', ['-jpeg', '-r', String(DPI), '-f', '1', '-l', String(PAGES), join(dir, 'in.pdf'), join(dir, 'p')], { stdio: 'ignore' })
+        const imgs = readdirSync(dir).filter((f) => f.endsWith('.jpg')).sort().slice(0, PAGES).map((f) => readFileSync(join(dir, f)).toString('base64'))
         if (!imgs.length) { log(`0  ${t.company_name} (no pages)`); continue }
-        const res = await post({ mode: 'vision_apply', customer_id: t.customer_id, company_name: t.company_name, doc_id: t.doc_id, images: imgs })
-        const f = Number(res.filled) || 0
-        if (f > 0) { filled += f; touched++; log(`+${f} ${t.company_name}`) }
-        else log(`0  ${t.company_name}${res.skipped ? ` (${res.skipped})` : ''}${res.error ? ` [${res.error}]` : ''}`)
+        const f = await ollamaVision(imgs)
+        // name-match guard: only trust a rate con whose broker matches this customer
+        if (f.company_name) { const a = toks(t.company_name), b = toks(f.company_name); if (![...b].some((x) => a.has(x))) { log(`0  ${t.company_name} (name mismatch: "${String(f.company_name).slice(0, 30)}")`); continue } }
+        const res = await edge({ customer_id: t.customer_id, source_document_id: t.doc_id, fields: { contact_person: f.contact_person, phone: f.phone, email: f.email, billing_address: f.billing_address, mc_number: f.mc_number, notes: f.notes } })
+        const n = Number(res.filled) || 0
+        if (n > 0) { filled += n; touched++; log(`+${n} ${t.company_name}`) }
+        else log(`0  ${t.company_name}${res.error ? ` [${res.error}]` : ''}`)
       } catch (e) {
-        log(`${t.company_name}: ${String(e).slice(0, 90)}`)
+        log(`${t.company_name}: ${String(e).slice(0, 100)}`)
       } finally {
         if (dir) rmSync(dir, { recursive: true, force: true })
       }
