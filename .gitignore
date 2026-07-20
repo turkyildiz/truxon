@@ -29,3 +29,8 @@ deploy/vision-enrich/logs/
 # NAS doc-rag indexer: env (public token) + logs
 deploy/doc-rag/rag.env
 deploy/doc-rag/logs/
+
+# Dropbox → Team Drive bulk import: env, staged bytes, manifest (never commit)
+deploy/drive-import/drive.env
+deploy/drive-import/.stage/
+deploy/drive-import/manifest.json

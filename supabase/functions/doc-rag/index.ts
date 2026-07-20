@@ -123,6 +123,68 @@ Deno.serve(async (req) => {
     return json({ chunks: Number(n) || 0 })
   }
 
+  // ── drive_owner: the admin uid — the storage-path prefix for bulk imports ──
+  // (a uid grants no access by itself; every gate keys on verified JWTs)
+  if (body.mode === 'drive_owner') {
+    if (!cron) return json({ error: 'cron only' }, 403)
+    const { data: admin } = await svc.from('profiles').select('id').eq('role', 'admin').limit(1).single()
+    return json({ owner_uid: admin?.id ?? null })
+  }
+
+  // ── drive_register: create metadata rows for bulk-uploaded team files ──
+  // Used by the Dropbox import (deploy/drive-import). Only registers objects
+  // that actually exist in the private team bucket — the public-token gate
+  // can't invent rows for bytes that aren't there. Idempotent by storage_path.
+  if (body.mode === 'drive_register') {
+    if (!cron) return json({ error: 'cron only' }, 403)
+    const files = Array.isArray(body.files) ? body.files as Array<Record<string, unknown>> : []
+    if (files.length === 0 || files.length > 50) return json({ error: 'files: 1-50 per call' }, 400)
+    // registered rows belong to the (sole) admin
+    const { data: admin } = await svc.from('profiles').select('id').eq('role', 'admin').limit(1).single()
+    if (!admin) return json({ error: 'no admin profile' }, 500)
+    let inserted = 0, foldersMade = 0, skipped = 0
+    const folderCache = new Set<string>(
+      ((await svc.from('drive_files').select('parent, filename').eq('drive', 'team').eq('is_folder', true)).data ?? [])
+        .map((f) => (f.parent ? `${f.parent}/${f.filename}` : f.filename as string)),
+    )
+    for (const f of files) {
+      const storagePath = String(f.storage_path ?? '')
+      const filename = String(f.filename ?? '')
+      const parent = String(f.parent ?? '')
+      if (!storagePath || !filename) { skipped++; continue }
+      // the object must really exist in the team bucket
+      const dir = storagePath.split('/').slice(0, -1).join('/')
+      const base = storagePath.split('/').pop()!
+      const { data: found } = await svc.storage.from('team').list(dir, { search: base, limit: 1 })
+      if (!found?.length) { skipped++; continue }
+      // already registered?
+      const { data: dupe } = await svc.from('drive_files').select('id').eq('storage_path', storagePath).limit(1)
+      if (dupe?.length) { skipped++; continue }
+      // ensure ancestor folder rows exist (parent 'A/B/C' → rows A, A/B, A/B/C)
+      const segs = parent ? parent.split('/') : []
+      for (let i = 0; i < segs.length; i++) {
+        const full = segs.slice(0, i + 1).join('/')
+        if (folderCache.has(full)) continue
+        await svc.from('drive_files').insert({
+          drive: 'team', owner_id: admin.id, filename: segs[i], storage_path: null,
+          content_type: '', size_bytes: 0, parent: segs.slice(0, i).join('/'), is_folder: true,
+        })
+        folderCache.add(full)
+        foldersMade++
+      }
+      const { error } = await svc.from('drive_files').insert({
+        drive: 'team', owner_id: admin.id, filename,
+        storage_path: storagePath,
+        content_type: String(f.content_type ?? 'application/octet-stream'),
+        size_bytes: Number(f.size_bytes) || 0,
+        parent, is_folder: false,
+      })
+      if (error) skipped++
+      else inserted++
+    }
+    return json({ inserted, folders: foldersMade, skipped })
+  }
+
   // ── search_targets: claim the oldest pending search request (NAS) ──
   if (body.mode === 'search_targets') {
     if (!cron) return json({ error: 'cron only' }, 403)
