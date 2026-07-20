@@ -1,0 +1,2 @@
+{ "name": "truxon-doc-rag-indexer", "version": "1.0.0", "private": true, "type": "module",
+  "description": "NAS local-embedding document indexer for Truxon RAG" }

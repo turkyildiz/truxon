@@ -25,3 +25,7 @@ deploy/migration-its/files/
 # NAS vision enrichment: env (public token, but keep NAS-only) + logs
 deploy/vision-enrich/vision.env
 deploy/vision-enrich/logs/
+
+# NAS doc-rag indexer: env (public token) + logs
+deploy/doc-rag/rag.env
+deploy/doc-rag/logs/
