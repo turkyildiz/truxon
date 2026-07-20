@@ -129,7 +129,7 @@ function ForecastGlance() {
                   <li key={r.invoice_id} className="flex items-center justify-between gap-2">
                     <span className="truncate">{r.customer}</span>
                     <span className="shrink-0 text-amber-600">
-                      {money(Number(r.total))} · ~{r.predicted_days_late}d late
+                      {money(Number(r.outstanding))} · ~{r.predicted_days_late}d late
                     </span>
                   </li>
                 ))}

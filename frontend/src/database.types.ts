@@ -3407,6 +3407,10 @@ export type Database = {
           unit_number: string
         }[]
       }
+      fleet_ops_extras: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
+      }
       fleet_positions_snapshot: { Args: never; Returns: Json }
       fmcsa_rating_label: { Args: { p_rating: string }; Returns: string }
       fmcsa_record: {
@@ -3670,6 +3674,10 @@ export type Database = {
           storage_path: string
         }[]
       }
+      pod_capture_rate: {
+        Args: { p_end: string; p_hours?: number; p_start: string }
+        Returns: Json
+      }
       qbo_mark_voided: { Args: { p_qbo_ids: Json }; Returns: number }
       qbo_status: { Args: never; Returns: Json }
       qbo_upsert_invoices: { Args: { p_rows: Json }; Returns: Json }
@@ -3722,6 +3730,10 @@ export type Database = {
         }[]
       }
       safety_summary: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
+      }
+      sales_pipeline: {
         Args: { p_end: string; p_start: string }
         Returns: Json
       }
@@ -3797,11 +3809,16 @@ export type Database = {
           invoice_date: string
           invoice_id: number
           invoice_number: string
+          outstanding: number
           predicted_days_late: number
           predicted_pay_date: string
           risk: string
           total: number
         }[]
+      }
+      stop_dwell_summary: {
+        Args: { p_days?: number; p_radius_mi?: number }
+        Returns: Json
       }
       toll_by_agency: {
         Args: { p_end: string; p_start: string }

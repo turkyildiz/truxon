@@ -435,6 +435,54 @@ Deno.serve(async (req) => {
     }
   }
 
+  if (body.mode === 'debug_dupes') {
+    // Diagnostic: QBO-mirror rows that look like duplicates of native invoices,
+    // matched by the digits of the doc number. Same gate as pull/pnl.
+    const auth = req.headers.get('Authorization') ?? ''
+    let ok = false
+    try {
+      const payload = JSON.parse(atob((auth.replace('Bearer ', '').split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/')))
+      const ref = new URL(Deno.env.get('SUPABASE_URL')!).hostname.split('.')[0]
+      ok = payload?.role === 'anon' && payload?.ref === ref
+    } catch { /* not a JWT */ }
+    if (!ok) {
+      const caller = await getCaller(req)
+      if (caller instanceof Response) return caller
+      if (caller.role !== 'admin') return json({ error: 'Admin only' }, 403)
+    }
+    const { data: mirror } = await s.from('invoices')
+      .select('id, invoice_number, qbo_doc_number, status, total, qbo_balance')
+      .like('invoice_number', 'QBO-%')
+    const { data: native } = await s.from('invoices')
+      .select('id, invoice_number, status, total')
+      .not('invoice_number', 'like', 'QBO-%')
+    const digits = (x: string | null) => (x ?? '').replace(/\D/g, '').replace(/^0+/, '')
+    const byDigits = new Map<string, { id: number; invoice_number: string; status: string; total: number }[]>()
+    for (const n of native ?? []) {
+      const k = digits(n.invoice_number)
+      if (!k) continue
+      if (!byDigits.has(k)) byDigits.set(k, [])
+      byDigits.get(k)!.push(n)
+    }
+    const rows = (mirror ?? []).map((m) => {
+      const twins = byDigits.get(digits(m.qbo_doc_number || m.invoice_number)) ?? []
+      return {
+        id: m.id, num: m.invoice_number, status: m.status, total: m.total, qbo_balance: m.qbo_balance,
+        twin: twins[0] ? { id: twins[0].id, num: twins[0].invoice_number, status: twins[0].status, total: twins[0].total } : null,
+        twin_count: twins.length,
+      }
+    })
+    const sent = rows.filter((r) => r.status === 'sent')
+    return json({
+      mirror_total: rows.length,
+      mirror_by_status: rows.reduce((a: Record<string, number>, r) => { a[r.status] = (a[r.status] ?? 0) + 1; return a }, {}),
+      sent_with_twin: sent.filter((r) => r.twin).length,
+      sent_twin_paid: sent.filter((r) => r.twin?.status === 'paid').length,
+      sent_twin_total_match: sent.filter((r) => r.twin && Number(r.twin.total) === Number(r.total)).length,
+      sample_sent: sent.slice(0, 12),
+    })
+  }
+
   if (body.mode === 'push') {
     if (Deno.env.get('QBO_PUSH_ENABLED') !== 'true') {
       return json({ error: 'Push mode is not enabled yet (transition period: QBO remains the invoice source)' }, 403)

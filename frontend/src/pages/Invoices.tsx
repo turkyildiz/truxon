@@ -503,12 +503,12 @@ function ForecastTab() {
         ) : risky.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted">No open invoices are trending late. 🎉</p>
         ) : (
-          <Table headers={['Invoice', 'Customer', 'Amount', 'Pays ~', 'Days late', 'Risk']}>
+          <Table headers={['Invoice', 'Customer', 'Open', 'Pays ~', 'Days late', 'Risk']}>
             {risky.map((r) => (
               <tr key={r.invoice_id} className="border-b border-line">
                 <td className="px-3 py-2 font-medium text-brand">{r.invoice_number}</td>
                 <td className="px-3 py-2">{r.customer}</td>
-                <td className="px-3 py-2">{money(r.total)}</td>
+                <td className="px-3 py-2">{money(Number(r.outstanding))}</td>
                 <td className="px-3 py-2 text-muted">{formatDate(r.predicted_pay_date)}</td>
                 <td className={`px-3 py-2 font-medium ${riskColor(r.risk)}`}>{r.predicted_days_late > 0 ? `+${r.predicted_days_late}d` : 'on time'}</td>
                 <td className={`px-3 py-2 font-semibold capitalize ${riskColor(r.risk)}`}>{r.risk}</td>

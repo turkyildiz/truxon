@@ -3,7 +3,7 @@
 -- invoice is left alone; paying the invoice auto-resolves the warning.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(6);
+select plan(7);
 
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-000000000f41'::uuid, 'slowpay@test.local');
 update public.profiles set role = 'admin' where id = '00000000-0000-4000-8000-000000000f41';
@@ -56,6 +56,17 @@ select is(
   (select count(*)::int from public.trux_insights
     where dedup_key = 'slow_pay:'||(select id from public.invoices where invoice_number='FP-OPEN')),
   0, 'a reliable payer''s invoice is not flagged');
+
+-- A fee-residual mirror invoice from the same slow payer must NOT fire, even
+-- though its predicted date is past due.
+insert into public.invoices (invoice_number, customer_id, invoice_date, due_date, total, status, source, qbo_doc_number, qbo_balance)
+  select 'QBO-771', id, now(), now() + interval '30 days', 2600, 'sent', 'qbo', '771', 132.95
+  from public.customers where company_name = 'Slow Broker';
+select public.sentinel_scan();
+select is(
+  (select count(*)::int from public.trux_insights
+    where dedup_key = 'slow_pay:'||(select id from public.invoices where invoice_number='QBO-771')),
+  0, 'a factoring-fee residual does not fire a slow-pay warning');
 
 -- ---------- auto-resolve on payment ----------
 update public.invoices set status = 'paid', paid_at = now()

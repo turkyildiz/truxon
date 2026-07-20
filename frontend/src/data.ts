@@ -1534,6 +1534,7 @@ export interface SlowPayRow {
   customer: string
   customer_id: number
   total: number
+  outstanding: number
   invoice_date: string
   due_date: string | null
   avg_days: number
