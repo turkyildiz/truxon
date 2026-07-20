@@ -63,3 +63,7 @@ verify_jwt = false
 # OAuth browser navigations (connect/callback) can't carry a JWT header;
 # every mode gates itself in-function (admin JWT / anon-cron / oauth state)
 verify_jwt = false
+
+[functions.customer-enrich]
+# admin JWT verified in-function via getCaller; monthly cron uses the anon bearer
+verify_jwt = false
