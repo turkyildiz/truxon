@@ -64,8 +64,13 @@ export default function Reports() {
             ← Prev
           </Button>
           {data && (
-            <span className="px-2 text-sm font-medium">
-              {new Date(data.week_start + 'T00:00:00').toLocaleDateString()} – {new Date(data.week_end + 'T00:00:00').toLocaleDateString()}
+            <span className="flex flex-col items-center px-2 text-sm font-medium leading-tight">
+              <span className="text-xs font-semibold text-brand" title="Standard week: Monday–Sunday. Week 0 is a partial start-of-year week.">
+                Week {data.week_number}
+              </span>
+              <span>
+                {new Date(data.week_start + 'T00:00:00').toLocaleDateString()} – {new Date(data.week_end + 'T00:00:00').toLocaleDateString()}
+              </span>
             </span>
           )}
           <Button variant="secondary" onClick={() => setWeekOf(shiftWeek(weekOf, 1))}>

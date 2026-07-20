@@ -436,6 +436,9 @@ export interface WeeklyRow {
 export interface WeeklyReport {
   week_start: string
   week_end: string
+  week_number: number
+  week_year: number
+  week_label: string
   by_truck: WeeklyRow[]
   by_driver: WeeklyRow[]
   totals: {
@@ -464,6 +467,7 @@ export interface DashboardActiveLoad {
 
 export interface TrendPoint {
   label: string
+  week?: string
   revenue: number
   miles: number
   empty_miles: number
@@ -471,12 +475,15 @@ export interface TrendPoint {
 }
 
 export interface DashboardSummary {
+  week_number: number
+  week_label: string
+  week_start: string
   week_revenue: number
   week_miles: number
   week_loads: number
   week_avg_rate_per_mile: number | null
   prev_week: { revenue: number; miles: number; loads: number; avg_rate_per_mile: number | null }
-  prev_year_week: { revenue: number; miles: number; loads: number; avg_rate_per_mile: number | null }
+  prev_year_week: { label: string; revenue: number; miles: number; loads: number; avg_rate_per_mile: number | null }
   available_trucks: number
   active_drivers: number
   status_counts: Record<string, number>

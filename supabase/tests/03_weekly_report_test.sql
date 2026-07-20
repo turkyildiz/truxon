@@ -3,7 +3,7 @@
 -- are global to the DB, so assertions stay scoped to the seeded drivers.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(6);
+select plan(8);
 
 -- ---------- seed ----------
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-000000000f03'::uuid, 'wk-admin@test.local');
@@ -90,6 +90,10 @@ select is(
   300::numeric,
   'truck miles exclude cancelled loads'
 );
+
+-- standard week is threaded through the report payload
+select is(public.weekly_report('2026-07-20')->>'week_label', '2026-W29', 'weekly_report carries the standard week label');
+select is((public.weekly_report('2026-07-20')->>'week_start')::date, '2026-07-20'::date, 'weekly_report week_start is the Monday');
 
 select * from finish();
 rollback;

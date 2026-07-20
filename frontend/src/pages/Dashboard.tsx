@@ -5,6 +5,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Too
 import { useAuth } from '../auth'
 import { Badge, Button, Card, cityState, formatDate, formatDateTime, LoadError, money, StatCard } from '../components/ui'
 import { dashboardSummary } from '../data'
+import { weekTitle } from '../lib/week'
 import type { TrendPoint } from '../types'
 
 /** Roles allowed the company-wide dashboard (mirrors the dashboard_summary
@@ -102,7 +103,12 @@ export default function Dashboard() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-body">Dashboard</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold text-body">Dashboard</h1>
+          <span className="rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-muted" title="Standard week: Monday–Sunday. Week 0 is a partial start-of-year week.">
+            📅 {weekTitle(new Date(data.week_start + 'T00:00:00'))}
+          </span>
+        </div>
         <div className="flex gap-2">
           <Button onClick={() => navigate('/dispatch')}>+ New Load</Button>
           <Button variant="secondary" onClick={() => navigate('/reports')}>
