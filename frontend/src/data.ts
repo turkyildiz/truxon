@@ -396,6 +396,26 @@ export interface LoadFilters {
   date_to?: string
 }
 
+// ---------- Missing-POD detection ----------
+
+export interface MissingPodRow {
+  load_id: number
+  load_number: string
+  customer: string | null
+  status: string
+  delivered_at: string | null
+  reference_number: string
+  pickup_number: string
+  delivery_number: string
+}
+
+/** Delivered/billed loads with no proof-of-delivery on file (admin/dispatcher/accountant). */
+export async function listMissingPods(days = 45): Promise<MissingPodRow[]> {
+  const { data, error } = await supabase.rpc('loads_missing_pod', { p_days: days })
+  if (error) throw error
+  return (data ?? []) as unknown as MissingPodRow[]
+}
+
 // ---------- Trux dispatch shadow (observe-only ledger) ----------
 
 export interface TruxObservation {

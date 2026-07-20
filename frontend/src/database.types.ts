@@ -2975,6 +2975,20 @@ export type Database = {
         Args: { p_cents: number; p_provider: string }
         Returns: boolean
       }
+      loads_missing_pod: {
+        Args: { p_days?: number }
+        Returns: {
+          customer: string
+          delivered_at: string
+          delivery_number: string
+          load_id: number
+          load_number: string
+          pickup_number: string
+          reference_number: string
+          status: string
+        }[]
+      }
+      loads_missing_pod_summary: { Args: { p_days?: number }; Returns: Json }
       log_observation: { Args: { p: Json }; Returns: number }
       maintenance_alerts: {
         Args: never
@@ -3098,6 +3112,10 @@ export type Database = {
         }
       }
       pnl_summary: { Args: { p_end: string; p_start: string }; Returns: Json }
+      pod_archive_candidate: {
+        Args: { p_delivery?: string; p_pickup?: string; p_ref: string }
+        Returns: string
+      }
       qbo_mark_voided: { Args: { p_qbo_ids: Json }; Returns: number }
       qbo_status: { Args: never; Returns: Json }
       qbo_upsert_invoices: { Args: { p_rows: Json }; Returns: Json }

@@ -2,10 +2,39 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Badge, Button, Card, formatDateTime, Input, LoadError, money, Select } from '../components/ui'
-import { listCustomers, listDrivers, listLoads } from '../data'
+import { listCustomers, listDrivers, listLoads, listMissingPods } from '../data'
 import { LOAD_STATUSES } from '../types'
 
 const ALL_STATUSES = [...LOAD_STATUSES, 'cancelled' as const]
+
+/** Delivered/billed loads with no POD on file — money that can stall. */
+function MissingPodsBanner() {
+  const [open, setOpen] = useState(false)
+  const q = useQuery({ queryKey: ['missing-pods', 45], queryFn: () => listMissingPods(45), staleTime: 60_000 })
+  const rows = q.data ?? []
+  if (rows.length === 0) return null
+  return (
+    <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between text-left">
+        <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+          📄 {rows.length} delivered load{rows.length === 1 ? '' : 's'} missing a POD (last 45 days) — brokers won't pay without it
+        </span>
+        <span className="text-xs text-amber-700 dark:text-amber-300">{open ? 'hide' : 'show'}</span>
+      </button>
+      {open && (
+        <div className="mt-2 max-h-56 space-y-1 overflow-y-auto">
+          {rows.slice(0, 60).map((r) => (
+            <Link key={r.load_id} to={`/loads/${r.load_id}`} className="flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-amber-500/10">
+              <span className="font-medium text-brand">#{r.load_number}</span>
+              <span className="truncate px-2 text-muted">{r.customer ?? '—'}</span>
+              <span className="text-xs capitalize text-muted">{r.status}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function Loads() {
   const navigate = useNavigate()
@@ -37,6 +66,8 @@ export default function Loads() {
   const { data: loads = [], isLoading } = loadsQ
 
   return (
+    <div className="space-y-4">
+    <MissingPodsBanner />
     <Card title="Loads" actions={<Button onClick={() => navigate('/dispatch')}>+ New Load</Button>}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {ALL_STATUSES.map((s) => {
@@ -152,5 +183,6 @@ export default function Loads() {
         </div>
       )}
     </Card>
+    </div>
   )
 }
