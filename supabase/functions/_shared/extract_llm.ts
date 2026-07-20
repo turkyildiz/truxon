@@ -143,6 +143,7 @@ Respond with ONLY a JSON object (no markdown fences) with these keys:
 - billing_address: the remit-to / bill-to mailing address for invoices if given, otherwise the company's main address. null if none.
 - payment_terms: payment terms as stated (e.g. "Net 30", "28 days", "30 days after POD"). null if none.
 - mc_number: the BROKER's MC number if shown (not the carrier's). null if none.
+- usdot_number: the BROKER's USDOT number if shown (not the carrier's). null if none.
 - notes: short string (max 300 chars) with billing quirks worth remembering — invoicing portals, required paperwork, quick-pay options. null if nothing notable.
 Use null for anything genuinely absent.`
 }

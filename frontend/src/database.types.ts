@@ -257,6 +257,7 @@ export type Database = {
           secondary_phone: string
           toll_free: string
           updated_at: string
+          usdot_number: string
         }
         Insert: {
           billing_address?: string
@@ -279,6 +280,7 @@ export type Database = {
           secondary_phone?: string
           toll_free?: string
           updated_at?: string
+          usdot_number?: string
         }
         Update: {
           billing_address?: string
@@ -301,6 +303,7 @@ export type Database = {
           secondary_phone?: string
           toll_free?: string
           updated_at?: string
+          usdot_number?: string
         }
         Relationships: []
       }

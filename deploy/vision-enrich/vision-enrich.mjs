@@ -51,9 +51,9 @@ const log = (m) => console.log(`[vision] ${new Date().toISOString()} ${m}`)
 
 // Name-specific prompt: we already know which broker this rate con belongs to,
 // so we tell the model exactly whose details to pull — no carrier/broker guessing.
-const buildPrompt = (broker) => `You are reading a scanned trucking RATE CONFIRMATION. Find the contact details for the FREIGHT BROKER named "${broker}". Look across the whole page (letterhead, header, "Broker" block, footer) for THEIR phone, email, mailing/billing address, MC number, and a contact person (their rep/dispatcher).
+const buildPrompt = (broker) => `You are reading a scanned trucking RATE CONFIRMATION. Find the contact details for the FREIGHT BROKER named "${broker}". Look across the whole page (letterhead, header, "Broker" block, footer) for THEIR phone, email, mailing/billing address, MC number, USDOT number, and a contact person (their rep/dispatcher).
 Respond with ONLY a JSON object, null for anything not shown:
-{"company_name": the broker name you found, "contact_person": ..., "phone": ..., "email": ..., "billing_address": ..., "mc_number": ..., "notes": short billing note or null}
+{"company_name": the broker name you found, "contact_person": ..., "phone": ..., "email": ..., "billing_address": ..., "mc_number": ..., "usdot_number": ..., "notes": short billing note or null}
 IMPORTANT: return the BROKER "${broker}"'s details, NOT "${CARRIER}" — that is the trucking carrier being hired, ignore its contact info.`
 
 async function edge(body) {
@@ -115,7 +115,7 @@ async function main() {
           const looksCarrier = [...got].some((x) => carrier.has(x)) && ![...got].some((x) => want.has(x))
           if (looksCarrier) { log(`0  ${t.company_name} (got carrier, not broker)`); continue }
         }
-        const res = await edge({ customer_id: t.customer_id, source_document_id: t.doc_id, fields: { contact_person: f.contact_person, phone: f.phone, email: f.email, billing_address: f.billing_address, mc_number: f.mc_number, notes: f.notes } })
+        const res = await edge({ customer_id: t.customer_id, source_document_id: t.doc_id, fields: { contact_person: f.contact_person, phone: f.phone, email: f.email, billing_address: f.billing_address, mc_number: f.mc_number, usdot_number: f.usdot_number, notes: f.notes } })
         const n = Number(res.filled) || 0
         if (n > 0) { filled += n; touched++; log(`+${n} ${t.company_name}`) }
         else log(`0  ${t.company_name}${res.error ? ` [${res.error}]` : ''}`)

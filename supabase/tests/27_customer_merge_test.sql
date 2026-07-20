@@ -3,7 +3,7 @@
 -- stops the QBO invoice pull from resurrecting a merged duplicate.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(17);
+select plan(18);
 
 -- ── normalization ──
 select is(public.normalize_company_name('AM Trans Expedite, L.L.C.'),
@@ -89,6 +89,11 @@ select is((select customer_id from public.loads where load_number = 'MRG-BILLED'
           'merge repoints a billed load');
 select throws_like($$ update public.loads set rate = 1 where load_number = 'MRG-BILLED' $$,
   '%Billed loads are locked%', 'billed load stays locked outside merge');
+
+-- ── usdot joins the enrichment allow-list ──
+select is(public.apply_customer_enrichment(
+  (select id from public.customers where company_name = 'Coyote Logistics LLC'),
+  '{"usdot_number": "1234567"}'::jsonb, null, 'test'), 1, 'usdot_number fills via enrichment');
 
 -- ── gate: a driver cannot merge ──
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-000000000e27'::uuid, 'merge@test.local');

@@ -218,7 +218,7 @@ Deno.serve(async (req) => {
     const f = body.fields as Record<string, unknown>
     const fields: Record<string, unknown> = {
       contact_person: f.contact_person, phone: f.phone, email: f.email,
-      billing_address: f.billing_address, mc_number: f.mc_number, notes: f.notes || null,
+      billing_address: f.billing_address, mc_number: f.mc_number, usdot_number: f.usdot_number, notes: f.notes || null,
     }
     const { data: n, error: rpcErr } = await svc.rpc('apply_customer_enrichment', {
       p_customer_id: Number(body.customer_id), p_fields: fields, p_source_document_id: body.source_document_id ?? null, p_model: 'vision:ratecon',
@@ -243,17 +243,25 @@ Deno.serve(async (req) => {
     const dry = !!body.dry_run
     const { data: groups, error } = await svc.rpc('duplicate_customer_groups')
     if (error) return json({ error: error.message }, 500)
-    type Member = { id: number; company_name: string; mc_number: string; qbo_id: string | null; loads: number; invoices: number }
+    type Member = { id: number; company_name: string; mc_number: string; usdot_number: string; qbo_id: string | null; loads: number; invoices: number }
     const results: Array<Record<string, unknown>> = []
     let merged = 0, skipped = 0
+    const digits = (s: string | null | undefined) => (s ?? '').replace(/\D/g, '')
     for (const g of (groups ?? []) as Array<{ norm_key: string; members: Member[] }>) {
       const keeper = g.members[0]
       for (const dupe of g.members.slice(1)) {
-        const mcA = (keeper.mc_number ?? '').replace(/\D/g, '')
-        const mcB = (dupe.mc_number ?? '').replace(/\D/g, '')
+        // MC / USDOT are each unique per company — when both sides carry the
+        // same kind of number and it differs, these are different companies.
+        const mcA = digits(keeper.mc_number), mcB = digits(dupe.mc_number)
+        const dotA = digits(keeper.usdot_number), dotB = digits(dupe.usdot_number)
         if (mcA && mcB && mcA !== mcB) {
           skipped++
           results.push({ group: g.norm_key, skipped: dupe.company_name, reason: `MC mismatch (${mcA} vs ${mcB})` })
+          continue
+        }
+        if (dotA && dotB && dotA !== dotB) {
+          skipped++
+          results.push({ group: g.norm_key, skipped: dupe.company_name, reason: `USDOT mismatch (${dotA} vs ${dotB})` })
           continue
         }
         if (dry) {
