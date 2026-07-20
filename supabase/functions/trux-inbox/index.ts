@@ -28,6 +28,7 @@ import { json } from '../_shared/auth.ts'
 import { graph, graphConfigured, graphToken, TRUX_MAILBOX as MAILBOX } from '../_shared/msgraph.ts'
 import { runTrux, type Sb } from '../_shared/truxcore.ts'
 import { extractWorkOrder } from '../_shared/extract_llm.ts'
+import { classifyDocument, fileDocument, matchEntity } from '../_shared/doc_filing.ts'
 
 const EMAIL_ROLES = ['admin', 'dispatcher', 'accountant']
 
@@ -242,6 +243,8 @@ Deno.serve(async (req) => {
       // Captured separately for the work-order path (raw text + page photos).
       let woText = ''
       const woImages: { bytes: Uint8Array; mime: string }[] = []
+      // Every readable file (PDF or image) kept whole, for document filing.
+      const docAttachments: { name: string; contentType: string; bytes: Uint8Array }[] = []
       const decodeB64 = (b64: string): Uint8Array => {
         const bin = atob(b64)
         const bytes = new Uint8Array(bin.length)
@@ -282,8 +285,10 @@ Deno.serve(async (req) => {
           for (const a of atts) {
             if (isPdf(a)) {
               await readPdf(a)
+              docAttachments.push({ name: a.name ?? 'document.pdf', contentType: a.contentType || 'application/pdf', bytes: decodeB64(a.contentBytes) })
             } else if (isImage(a)) {
               readImage(a)
+              docAttachments.push({ name: a.name ?? 'image.jpg', contentType: a.contentType || 'image/jpeg', bytes: decodeB64(a.contentBytes) })
             } else if ((a['@odata.type'] ?? '').includes('referenceAttachment')) {
               attachmentBlock += `\n\n[Attachment "${a.name}" arrived as a cloud-storage LINK (e.g. Google Drive), not a real file — ask the sender to attach the actual PDF file instead of a link.]`
             } else if ((a['@odata.type'] ?? '').includes('itemAttachment')) {
@@ -365,6 +370,46 @@ Deno.serve(async (req) => {
       }
 
       const bodyText = stripQuotedReply(stripHtml(String(m.body?.content ?? ''))).slice(0, 4000)
+
+      // --- document filing: classify each attachment and file it under the
+      // right record (truck/trailer/driver/customer/load). Additive + reversible;
+      // owner is notified. Skipped if the sender clearly wants an action (asks a
+      // question / gives an instruction in the body) — then the agent handles it. --
+      const wantsAction = /\b(book|assign|create|dispatch|status|update|cancel|invoice|how much|what|when|where|who|why|\?)\b/i.test(bodyText)
+      if (docAttachments.length > 0 && !wantsAction) {
+        const apiKey = Deno.env.get('LLM_API_KEY')
+        const textModel = Deno.env.get('LLM_MODEL') ?? 'meta-llama/llama-3.1-8b-instruct'
+        const visionModel = Deno.env.get('LLM_VISION_MODEL') ?? 'meta-llama/llama-4-scout-17b-16e-instruct'
+        const reply = async (text: string) => {
+          await graph(tok, `/users/${encodeURIComponent(MAILBOX)}/messages/${m.id}/reply`, {
+            method: 'POST', body: JSON.stringify({ comment: `${text}\n\n— Forest, Truxon assistant (for ${profile.full_name})` }),
+          })
+          await markRead()
+        }
+        if (!apiKey) { await finish('failed', 'filing: no LLM key'); await reply('I received your document but document reading is not configured yet.'); results.push({ id: m.id, filing: 'no_llm' }); continue }
+
+        const context = `Subject: ${m.subject ?? ''}\n${bodyText.slice(0, 500)}`
+        const filed: string[] = []; const unmatched: string[] = []; const unreadable: string[] = []
+        for (const att of docAttachments) {
+          const c = await classifyDocument(att, apiKey, textModel, visionModel, context)
+          if (!c || c.confidence === 'low' && c.entity_kind === 'unknown') { unreadable.push(att.name); continue }
+          const ent = await matchEntity(svc, c.entity_kind, c.entity_ref)
+          if (!ent) { unmatched.push(`${c.summary || att.name} (${c.entity_kind} "${c.entity_ref ?? '?'}")`); continue }
+          const res = await fileDocument(svc, ent, att, c.doc_type, acting.userId)
+          if (res.ok) filed.push(`${c.doc_type.replace(/_/g, ' ')} → ${ent.label}`)
+          else unreadable.push(`${att.name} (${res.error})`)
+        }
+        const parts: string[] = []
+        if (filed.length) parts.push(`Filed:\n${filed.map((f) => `  • ${f}`).join('\n')}`)
+        if (unmatched.length) parts.push(`I read these but couldn't tell which record they belong to — reply with the unit/name and I'll file them:\n${unmatched.map((u) => `  • ${u}`).join('\n')}`)
+        if (unreadable.length) parts.push(`I couldn't read: ${unreadable.join(', ')}.`)
+        if (filed.length) await notifyOwners(svc, 'Forest filed a document', filed.join('; '))
+        await finish('processed', `filing: filed ${filed.length}, unmatched ${unmatched.length}, unreadable ${unreadable.length}; ${attDiag}`, sessionId ?? undefined)
+        await reply(parts.join('\n\n') || "I got your attachment but couldn't tell what it was — could you say what it is and which truck/customer/load it's for?")
+        results.push({ id: m.id, filing: { filed: filed.length, unmatched: unmatched.length, unreadable: unreadable.length } })
+        continue
+      }
+
       const agentMessage = `EMAIL from ${profile.full_name} <${fromEmail}>\nSubject: ${m.subject ?? ''}\n\n${bodyText}${attachmentBlock}`
 
       const run = await runTrux({
