@@ -13,7 +13,7 @@ class AppConfig {
   static const gpsInterval = Duration(seconds: 60);
 
   // ---- Trux voice (Feature 2) ----
-  /// Preferred TTS locale — a British voice, Jarvis-style. Overridable at build
+  /// Preferred TTS locale — a warm American voice for Forest. Overridable at build
   /// time with --dart-define=TRUX_VOICE_LOCALE=en-US.
   static const truxVoiceLocale = String.fromEnvironment(
     'TRUX_VOICE_LOCALE',

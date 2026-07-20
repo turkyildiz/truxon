@@ -1,7 +1,7 @@
 /**
- * Trux — a search-bar-centric executive analyst over the SAME `trux-agent`
- * edge function the floating TruxChat uses. The big "Ask Trux anything…" bar is
- * the primary interface; answers stream below it newest-first. Trux replies are
+ * Forest — a search-bar-centric executive analyst over the SAME `trux-agent`
+ * edge function the floating TruxChat uses.  The big "Ask Forest anything…" bar is
+ * the primary interface; answers stream below it newest-first. Forest replies are
  * Markdown (exec summaries + tables) parsed with `marked` and sanitized with
  * `DOMPurify` — never raw HTML into the DOM. Write actions the agent proposes
  * surface as confirm/reject cards, exactly as in TruxChat.
@@ -124,7 +124,7 @@ function chooseVoice(): SpeechSynthesisVoice | null {
     null
   )
 }
-function jarvisVoice(): SpeechSynthesisVoice | null {
+function forestVoice(): SpeechSynthesisVoice | null {
   if (!cachedVoice) cachedVoice = chooseVoice()
   return cachedVoice
 }
@@ -336,8 +336,8 @@ export default function Trux() {
       return
     }
     const u = new SpeechSynthesisUtterance(spoken)
-    // JARVIS-ish delivery: a British male voice, measured pace, lower pitch.
-    const v = jarvisVoice()
+    // Forest delivery: a warm American male voice, measured pace, natural pitch.
+    const v = forestVoice()
     if (v) {
       u.voice = v
       u.lang = v.lang
@@ -572,14 +572,14 @@ export default function Trux() {
             <div className="flex items-center gap-2">
               <button
                 onClick={togglePremium}
-                title={premium ? 'Premium British-male (JARVIS) voice is on — tap for the free browser voice' : 'Use the premium British-male (JARVIS) voice'}
+                title={premium ? "Forest's premium voice is on — tap for the free browser voice" : "Use Forest's premium voice"}
                 aria-pressed={premium}
                 className={
                   'rounded-full border px-3 py-1 text-xs font-semibold ' +
                   (premium ? 'border-navy-600 bg-navy-500/15 text-navy-700 dark:text-navy-200' : 'border-line bg-surface text-muted hover:bg-surface-2')
                 }
               >
-                🎩 JARVIS voice{premium ? ' · on' : ''}
+                🌲 Forest voice{premium ? ' · on' : ''}
               </button>
               {handsFree && (
                 <span className={'rounded-full px-2.5 py-1 text-xs font-semibold ' + PILL[phase].cls}>{PILL[phase].label}</span>

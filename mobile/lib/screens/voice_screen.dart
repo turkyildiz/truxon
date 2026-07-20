@@ -4,7 +4,7 @@ import '../i18n.dart';
 import '../services/api.dart';
 import '../services/trux_voice.dart';
 
-/// Feature 2 — Jarvis-style voice console. Big mic, live transcript, spoken
+/// Feature 2 — Forest voice console. Big mic, live transcript, spoken
 /// British replies, and confirm cards for any action Trux proposes.
 class VoiceScreen extends StatefulWidget {
   const VoiceScreen({super.key, required this.api});
