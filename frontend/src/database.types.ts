@@ -146,6 +146,99 @@ export type Database = {
         }
         Relationships: []
       }
+      carrier_safety_snapshot: {
+        Row: {
+          allowed_to_operate: string
+          captured_at: string
+          crash_total: number | null
+          dot_number: string
+          driver_insp: number | null
+          driver_oos_insp: number | null
+          driver_oos_natl: number | null
+          driver_oos_rate: number | null
+          fatal_crash: number | null
+          id: number
+          inj_crash: number | null
+          iss_score: number | null
+          legal_name: string
+          mcs150_outdated: boolean | null
+          oos_date: string | null
+          raw: Json | null
+          review_date: string | null
+          safety_rating: string
+          safety_rating_date: string | null
+          snapshot_date: string
+          status_code: string
+          total_drivers: number | null
+          total_power_units: number | null
+          towaway_crash: number | null
+          vehicle_insp: number | null
+          vehicle_oos_insp: number | null
+          vehicle_oos_natl: number | null
+          vehicle_oos_rate: number | null
+        }
+        Insert: {
+          allowed_to_operate?: string
+          captured_at?: string
+          crash_total?: number | null
+          dot_number?: string
+          driver_insp?: number | null
+          driver_oos_insp?: number | null
+          driver_oos_natl?: number | null
+          driver_oos_rate?: number | null
+          fatal_crash?: number | null
+          id?: never
+          inj_crash?: number | null
+          iss_score?: number | null
+          legal_name?: string
+          mcs150_outdated?: boolean | null
+          oos_date?: string | null
+          raw?: Json | null
+          review_date?: string | null
+          safety_rating?: string
+          safety_rating_date?: string | null
+          snapshot_date: string
+          status_code?: string
+          total_drivers?: number | null
+          total_power_units?: number | null
+          towaway_crash?: number | null
+          vehicle_insp?: number | null
+          vehicle_oos_insp?: number | null
+          vehicle_oos_natl?: number | null
+          vehicle_oos_rate?: number | null
+        }
+        Update: {
+          allowed_to_operate?: string
+          captured_at?: string
+          crash_total?: number | null
+          dot_number?: string
+          driver_insp?: number | null
+          driver_oos_insp?: number | null
+          driver_oos_natl?: number | null
+          driver_oos_rate?: number | null
+          fatal_crash?: number | null
+          id?: never
+          inj_crash?: number | null
+          iss_score?: number | null
+          legal_name?: string
+          mcs150_outdated?: boolean | null
+          oos_date?: string | null
+          raw?: Json | null
+          review_date?: string | null
+          safety_rating?: string
+          safety_rating_date?: string | null
+          snapshot_date?: string
+          status_code?: string
+          total_drivers?: number | null
+          total_power_units?: number | null
+          towaway_crash?: number | null
+          vehicle_insp?: number | null
+          vehicle_oos_insp?: number | null
+          vehicle_oos_natl?: number | null
+          vehicle_oos_rate?: number | null
+        }
+        Relationships: []
+      }
       companion_config: {
         Row: {
           flags: Json
@@ -174,6 +267,7 @@ export type Database = {
           mc_number: string
           phone: string
           updated_at: string
+          usdot_number: string
         }
         Insert: {
           address?: string
@@ -184,6 +278,7 @@ export type Database = {
           mc_number?: string
           phone?: string
           updated_at?: string
+          usdot_number?: string
         }
         Update: {
           address?: string
@@ -194,6 +289,7 @@ export type Database = {
           mc_number?: string
           phone?: string
           updated_at?: string
+          usdot_number?: string
         }
         Relationships: []
       }
@@ -2768,6 +2864,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      carrier_safety_latest: { Args: never; Returns: Json }
       change_load_status: {
         Args: {
           p_load_id: number
@@ -2960,6 +3057,11 @@ export type Database = {
         }[]
       }
       fleet_positions_snapshot: { Args: never; Returns: Json }
+      fmcsa_rating_label: { Args: { p_rating: string }; Returns: string }
+      fmcsa_record: {
+        Args: { p_basics?: Json; p_snapshot: Json }
+        Returns: Json
+      }
       fuel_by_truck: {
         Args: { p_end: string; p_start: string }
         Returns: {

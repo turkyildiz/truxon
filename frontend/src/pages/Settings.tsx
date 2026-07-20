@@ -8,7 +8,7 @@ export default function Settings() {
   const qc = useQueryClient()
   const settingsQ = useQuery({ queryKey: ['company-settings'], queryFn: getCompanySettings })
   const { data } = settingsQ
-  const [form, setForm] = useState({ company_name: '', address: '', phone: '', email: '', mc_number: '' })
+  const [form, setForm] = useState({ company_name: '', address: '', phone: '', email: '', mc_number: '', usdot_number: '' })
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
 
@@ -20,6 +20,7 @@ export default function Settings() {
         phone: data.phone,
         email: data.email,
         mc_number: data.mc_number,
+        usdot_number: data.usdot_number ?? '',
       })
     }
   }, [data])
@@ -82,9 +83,18 @@ export default function Settings() {
               <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </Field>
           </div>
-          <Field label="MC Number">
-            <Input value={form.mc_number} onChange={(e) => setForm({ ...form, mc_number: e.target.value })} />
-          </Field>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="MC Number">
+              <Input value={form.mc_number} onChange={(e) => setForm({ ...form, mc_number: e.target.value })} />
+            </Field>
+            <Field label="USDOT Number">
+              <Input
+                value={form.usdot_number}
+                onChange={(e) => setForm({ ...form, usdot_number: e.target.value })}
+                placeholder="e.g. 1234567"
+              />
+            </Field>
+          </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex items-center justify-end gap-3">
             {saved && <span className="text-sm font-medium text-green-600">✓ Saved</span>}

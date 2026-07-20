@@ -1223,6 +1223,7 @@ export interface CompanySettings {
   phone: string
   email: string
   mc_number: string
+  usdot_number: string
   logo_path: string
 }
 
@@ -1393,4 +1394,41 @@ export async function attachPodFromArchive(loadId: number): Promise<string> {
   const type = cand.content_type || blob.type || 'application/octet-stream'
   await uploadDocument('load', loadId, new File([blob], cand.filename, { type }), 'POD')
   return cand.filename
+}
+
+// ---------- FMCSA safety watch ----------
+
+export interface CarrierSafetySnapshot {
+  snapshot_date: string
+  dot_number: string
+  legal_name: string
+  safety_rating: string
+  safety_rating_date: string | null
+  allowed_to_operate: string
+  driver_oos_rate: number | null
+  driver_oos_natl: number | null
+  vehicle_oos_rate: number | null
+  vehicle_oos_natl: number | null
+  crash_total: number | null
+  fatal_crash: number | null
+  total_power_units: number | null
+  iss_score: number | null
+}
+export interface SafetyBasic { basic: string; percentile: number | null; measure: number | null; alert: boolean }
+export interface CarrierSafety {
+  snapshot: CarrierSafetySnapshot | null
+  rating_label: string | null
+  basics: SafetyBasic[]
+  usdot: string
+}
+
+/** Latest FMCSA snapshot + BASICs for the Safety card. */
+export async function carrierSafety(): Promise<CarrierSafety> {
+  const d = unwrap(await supabase.rpc('carrier_safety_latest')) as unknown as CarrierSafety & { error?: string }
+  return { snapshot: d?.snapshot ?? null, rating_label: d?.rating_label ?? null, basics: d?.basics ?? [], usdot: d?.usdot ?? '' }
+}
+
+/** Admin: pull a fresh FMCSA profile now (the weekly cron does this automatically). */
+export async function runFmcsaCheck(): Promise<Record<string, unknown>> {
+  return invokeFunction('fmcsa-watch', { body: {} })
 }

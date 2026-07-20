@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
+import CarrierSafetyCard from '../components/CarrierSafetyCard'
 import ResourcePage from '../components/ResourcePage'
 import { Button, Card, formatDate, LoadError, money, StatCard, Table } from '../components/ui'
 import {
@@ -50,10 +51,11 @@ function Pill({ value, label }: { value: string; label?: string }) {
   )
 }
 
-type Tab = 'overview' | 'pm' | 'costs' | 'log' | 'vendors'
+type Tab = 'overview' | 'pm' | 'safety' | 'costs' | 'log' | 'vendors'
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
   { key: 'pm', label: 'PM & Compliance' },
+  { key: 'safety', label: 'Safety' },
   { key: 'costs', label: 'Costs' },
   { key: 'log', label: 'Repair Log' },
   { key: 'vendors', label: 'Shops' },
@@ -82,6 +84,7 @@ export default function Maintenance() {
 
       {tab === 'overview' && <OverviewTab />}
       {tab === 'pm' && <PmTab />}
+      {tab === 'safety' && <CarrierSafetyCard />}
       {tab === 'costs' && <CostsTab />}
       {tab === 'log' && <RepairLog />}
       {tab === 'vendors' && <VendorsTab />}
