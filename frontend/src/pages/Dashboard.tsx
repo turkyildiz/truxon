@@ -46,6 +46,12 @@ function KpiTrend({ change, changeYoY }: { change: number | null; changeYoY: num
   )
 }
 
+// Chart tooltip title: for weekly points show "W29 · Jul 20" (week number + range).
+function weekTooltipLabel(label: unknown, payload?: readonly { payload?: TrendPoint }[]): string {
+  const range = payload?.[0]?.payload?.range
+  return range ? `${label} · ${range}` : String(label ?? '')
+}
+
 function PeriodSelect({ value, onChange }: { value: 'weekly' | 'monthly'; onChange: (v: 'weekly' | 'monthly') => void }) {
   return (
     <select
@@ -97,7 +103,14 @@ export default function Dashboard() {
   if (summaryQ.isError) return <LoadError error={summaryQ.error} onRetry={() => summaryQ.refetch()} />
   if (isLoading || !data) return <p className="py-8 text-center text-muted">Loading dashboard…</p>
 
-  const trend: TrendPoint[] = (period === 'weekly' ? data.trend_weekly : data.trend_monthly) ?? []
+  // Weekly view labels the X-axis by standard week number (e.g. "W29"); the full
+  // date range stays in each point's `range` for the chart tooltip.
+  const rawTrend: TrendPoint[] = (period === 'weekly' ? data.trend_weekly : data.trend_monthly) ?? []
+  const trend = rawTrend.map((p) =>
+    period === 'weekly' && p.week
+      ? { ...p, range: p.label, label: `W${p.week.split('-W')[1]}` }
+      : p,
+  )
   const statusPills = Object.entries(data.status_counts).filter(([, v]) => v > 0)
 
   return (
@@ -182,7 +195,7 @@ export default function Dashboard() {
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} />
             <YAxis tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-            <Tooltip formatter={(v) => money(Number(v))} />
+            <Tooltip formatter={(v) => money(Number(v))} labelFormatter={weekTooltipLabel} />
             <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#2563eb" strokeWidth={2.5} fill="url(#gradRevenue)" />
           </AreaChart>
         </ResponsiveContainer>
@@ -214,7 +227,7 @@ export default function Dashboard() {
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} />
             <YAxis tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} tickFormatter={(v) => Number(v).toLocaleString()} />
-            <Tooltip formatter={(v) => Number(v).toLocaleString()} />
+            <Tooltip formatter={(v) => Number(v).toLocaleString()} labelFormatter={weekTooltipLabel} />
             <Area type="monotone" dataKey="miles" name="Total miles" stroke="#059669" strokeWidth={2.5} fill="url(#gradMiles)" />
             <Area type="monotone" dataKey="empty_miles" name="Empty miles" stroke="#d97706" strokeWidth={2.5} fill="url(#gradEmpty)" />
           </AreaChart>

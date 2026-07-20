@@ -468,6 +468,7 @@ export interface DashboardActiveLoad {
 export interface TrendPoint {
   label: string
   week?: string
+  range?: string
   revenue: number
   miles: number
   empty_miles: number
