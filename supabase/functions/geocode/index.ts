@@ -54,7 +54,7 @@ function parseGoogle(result: any): Geo {
 //               and the caller must NOT stamp the load done, so it retries later.
 //   cached    → whether a (billable) Google call was avoided.
 //   geo=null  → empty address (nothing to do).
-async function geocodeOne(addr: string, svc: SupabaseClient, key: string): Promise<{ geo: Geo | null; cached: boolean; ok: boolean }> {
+async function geocodeOne(addr: string, svc: SupabaseClient, key: string): Promise<{ geo: Geo | null; cached: boolean; ok: boolean; status?: string; errmsg?: string }> {
   const clean = (addr ?? '').trim()
   if (!clean) return { geo: null, cached: true, ok: true }
   const nk = norm(clean)
@@ -65,25 +65,25 @@ async function geocodeOne(addr: string, svc: SupabaseClient, key: string): Promi
   const url = new URL('https://maps.googleapis.com/maps/api/geocode/json')
   url.searchParams.set('address', clean)
   url.searchParams.set('key', key)
-  let body: { status?: string; results?: unknown[] } = {}
+  let body: { status?: string; results?: unknown[]; error_message?: string } = {}
   try {
     const resp = await fetch(url)
     body = await resp.json().catch(() => ({}))
   } catch {
-    return { geo: null, cached: false, ok: false } // network error — transient
+    return { geo: null, cached: false, ok: false, status: 'FETCH_ERROR' } // network error — transient
   }
   // A genuine "no such place" is cacheable; a config/quota/transient error is not.
   if (body.status === 'ZERO_RESULTS') {
     const empty: Geo = { formatted: '', lat: null, lon: null, city: '', state: '', postal: '', country: '', location_type: 'ZERO_RESULTS', partial: false }
     await svc.from('geocode_cache').upsert({ norm_address: nk, ...empty }, { onConflict: 'norm_address' })
-    return { geo: empty, cached: false, ok: true }
+    return { geo: empty, cached: false, ok: true, status: 'ZERO_RESULTS' }
   }
   if (body.status !== 'OK' || !Array.isArray(body.results) || body.results.length === 0) {
-    return { geo: null, cached: false, ok: false } // REQUEST_DENIED / OVER_QUERY_LIMIT / UNKNOWN — retry later
+    return { geo: null, cached: false, ok: false, status: body.status, errmsg: body.error_message } // REQUEST_DENIED / OVER_QUERY_LIMIT / UNKNOWN — retry later
   }
   const geo = parseGoogle(body.results[0])
   await svc.from('geocode_cache').upsert({ norm_address: nk, ...geo }, { onConflict: 'norm_address' })
-  return { geo, cached: false, ok: true }
+  return { geo, cached: false, ok: true, status: 'OK' }
 }
 
 Deno.serve(async (req) => {
@@ -105,8 +105,8 @@ Deno.serve(async (req) => {
 
   // ---- single address ----
   if (typeof body.address === 'string' && !body.mode) {
-    const { geo } = await geocodeOne(body.address, svc, key)
-    return json({ geo })
+    const r = await geocodeOne(body.address, svc, key)
+    return json({ geo: r.geo, status: r.status, error_message: r.errmsg, cached: r.cached })
   }
 
   // ---- one load's two stops ----
