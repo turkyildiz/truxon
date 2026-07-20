@@ -166,14 +166,43 @@ async function ensureLoggedIn(page) {
     throw new Error('ITS credentials missing in its.env (need ITS_PASSWORD and ITS_USERNAME or ITS_EMAIL)')
   }
   await page.goto('https://app.itsdispatch.com/login.php', { waitUntil: 'domcontentloaded' })
-  if (env.ITS_ACCOUNT) await page.fill('#account_numberlgn', env.ITS_ACCOUNT).catch(() => {})
-  if (env.ITS_USERNAME) await page.fill('#usernamelgn', env.ITS_USERNAME).catch(() => {})
-  if (env.ITS_EMAIL) await page.fill('#email', env.ITS_EMAIL).catch(() => {})
+  await page.waitForTimeout(1500)
+  if (process.argv.includes('--debug')) {
+    const dbg = await page.evaluate(() => ({
+      url: location.href, title: document.title, bodyLen: document.body.innerHTML.length,
+      inputs: [...document.querySelectorAll('input')].map((e) => ({ id: e.id, name: e.name, type: e.type, vis: e.offsetParent !== null })),
+      bodyHead: document.body.innerText.slice(0, 300),
+    }))
+    log(`login page: ${page.url()}`)
+    log(`login dbg: ${JSON.stringify(dbg)}`)
+  }
+  const cred = env.ITS_USERNAME || env.ITS_EMAIL || ''
+  const useEmail = cred.includes('@')
+  // ITS presents two login TABS: "Email Login" (email — the DEFAULT active tab)
+  // and "Classic Login" (account# + username). The #password field is shared and
+  // sits below the tabs. Wait for the JS to render the fields (don't race it), and
+  // only click a tab if the field we need isn't already visible (clicking the
+  // already-active tab would toggle it away).
+  const ensureField = async (sel, tabBtn) => {
+    if (await page.locator(sel).isVisible().catch(() => false)) return
+    await page.click(tabBtn).catch(() => {})
+    await page.waitForSelector(sel, { state: 'visible', timeout: 15000 })
+  }
+  if (useEmail) {
+    await page.waitForSelector('#email', { state: 'visible', timeout: 15000 }).catch(() => {})
+    await ensureField('#email', '#btn-email-login')
+    await page.fill('#email', cred)
+  } else {
+    await ensureField('#account_numberlgn', '#btn-classic-login')
+    if (env.ITS_ACCOUNT) await page.fill('#account_numberlgn', env.ITS_ACCOUNT).catch(() => {})
+    await page.fill('#usernamelgn', cred)
+  }
+  await page.waitForSelector('#password', { state: 'visible', timeout: 15000 })
   await page.fill('#password', env.ITS_PASSWORD)
-  await page.check('#remember_login').catch(() => {})
+  await page.locator('input[name=remember_login]').first().check().catch(() => {})
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {}),
-    page.click('#frmAppLogin button[type=submit], #frmAppLogin input[type=submit]').catch(() => page.press('#password', 'Enter')),
+    page.getByRole('button', { name: /^GO$/i }).first().click().catch(() => page.press('#password', 'Enter')),
   ])
   await page.waitForTimeout(2500)
   if (/login\.php/.test(page.url())) {
@@ -223,10 +252,21 @@ async function main() {
 
   try {
     if (MODE_LOGIN) {
-      log('login mode — a window is open; sign in to ITS, then press Enter here.')
+      log('login window open — sign in to ITS (clear the Cloudflare check + enter your password).')
       await page.goto('https://app.itsdispatch.com/login.php')
-      await new Promise((r) => process.stdin.once('data', r))
-      log('session saved to the persistent profile.')
+      // Auto-detect success: poll until the dispatch board is reachable (no keypress needed).
+      const deadline = Date.now() + 300000 // 5 min to sign in
+      let ok = false
+      while (Date.now() < deadline) {
+        await page.waitForTimeout(3000)
+        const u = page.url()
+        if (/dispatch\.php/.test(u) && !/login/.test(u)) {
+          if (await page.locator('text=DISPATCH BOARD').count().catch(() => 0)) { ok = true; break }
+        }
+      }
+      if (!ok) { log('did not detect a successful login within 5 min — nothing saved.'); return }
+      await page.waitForTimeout(1500) // let cookies settle
+      log('login detected — session captured to the persistent profile.')
       return
     }
 

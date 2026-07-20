@@ -1,92 +1,72 @@
-# ITS Dispatch nightly delta capture
+# ITS Dispatch delta capture (assisted)
 
-Logs into ITS Dispatch every night, reads the dispatch board, pulls every
-load's full record, and **accumulates** them into a local staging file. It
-**never writes to Truxon prod** — the cutover import is a single, reviewed step.
+Captures loads booked in ITS after the bulk import, into a local staging file,
+so the cutover import misses nothing. It **never writes to Truxon prod** — the
+cutover is a single, reviewed `import.mjs` run.
+
+## ⚠ Why "assisted", not a nightly cron
+
+ITS's login page is behind **Cloudflare Turnstile** bot-detection. A headless
+(or even headed) automated browser cannot clear it — and defeating bot-detection
+is not something we do. So an **unattended nightly login is impossible**. The
+NAS cron that would have done this is **disabled** (see the scheduler
+`entrypoint.sh` note); the deployed `fetch-its.mjs` + `its.env` on the NAS are
+left only as reference.
+
+The data endpoints themselves are *not* gated — once a **real, logged-in
+browser** holds the session, the fetches work perfectly (proven: full board,
+12 loads, 0 parse warnings). So capture runs **through the live browser**:
 
 ```
-NAS cron (01:00 CST)
-  → fetch-its.mjs  (Playwright, credential login to ITS)
-      POST dispatchboard_list.php (open + closed) → editIds
-      GET  edit_data.php?id=<editId>            → full load HTML
-      parse (in-page DOMParser)                 → structured load
-  → merge into its_loads_full.json  +  its_delta/YYYY-MM-DD.json snapshot
+You have ITS open + logged in (real browser, past Cloudflare)
+  → run the harvester (ITS_EXTRACTION.md §3) in the tab  → array of load objects
+  → node merge-its.mjs captured.json                     → its_loads_full.json (+ dated snapshot)
   ── nothing leaves for prod ──
 At cutover (~Aug 1):
-  → node import.mjs <admin> <pw>   (idempotent; skips load_numbers already in prod)
+  → alias truck 003→03, then  node import.mjs <admin> <pw>   (idempotent)
 ```
 
-**Why nightly, not one-shot at cutover:** once a load is invoiced in ITS it
-disappears from the dispatch board. Capturing every night grabs each load while
-it is still visible, so nothing created-then-archived between the bulk import
-and go-live is missed. See `ITS_EXTRACTION.md` for the reverse-engineered
-endpoints and field map.
+Low volume (a few new loads/day) means capturing every few days — plus one full
+sweep at cutover — covers the whole delta. The only thing to beat is a load that
+gets created *and* invoiced-then-archived (leaving the board) between captures;
+periodic capture keeps that window small.
 
-## One-time setup on the NAS
+## The capture procedure
 
-1. Node 20+ and Playwright's Chromium (image already pulled for the fuel job):
+1. Open ITS in a real browser and sign in (clears Cloudflare as a human).
+2. Run the harvester JS from `ITS_EXTRACTION.md` §3 in that tab. It enumerates
+   the open + closed boards and parses each load → a JSON array. Save it to
+   `captured.json`.
+3. Fold it into staging:
    ```bash
-   cd deploy/migration-its && npm install && npx playwright install chromium
+   node merge-its.mjs captured.json      # dedups by ITS editId, writes a dated snapshot
    ```
-2. Create `deploy/migration-its/its.env` (chmod 600):
-   ```
-   ITS_ACCOUNT=IL76053
-   ITS_USERNAME=<the ITS username>       # or ITS_EMAIL=<login email>
-   ITS_PASSWORD=<the ITS password>
-   ITS_LOOKBACK_DAYS=120
-   # optional failure alerts through the watchdog:
-   ALERT_WEBHOOK=https://okoeeyxxvzypjiumraxq.supabase.co/functions/v1/watchdog
-   WATCHDOG_REPORT_KEY=<same as the watchdog report key>
-   SUPABASE_ANON_KEY=<anon key, for the watchdog verify_jwt gate>
-   ```
-   Credentials are read from this file only; they are never logged.
-3. Prove it end-to-end before scheduling:
-   ```bash
-   node fetch-its.mjs --selfcheck    # login + parse a few loads + assert invariants
-   node fetch-its.mjs --once         # one real capture, snapshot only (no merge)
-   ```
-   `--selfcheck` exits non-zero (and alerts) if ITS changed its HTML.
+   `its_loads_full.json` accumulates; re-running any time is safe.
 
-## Cron — 01:00 America/Regina (Saskatchewan, UTC−6, no DST)
+(When working with the Claude Code agent, steps 1–3 are what it does for you when
+you say the ITS tab is open — it harvests through the live tab and merges.)
 
-Matches the existing NAS backup/fuel schedule convention (memory: NAS TZ is
-America/Regina). 01:00 CST → 07:00 UTC, fixed year-round.
+## Cutover import
 
-```cron
-CRON_TZ=America/Regina
-0 1 * * *  cd /volume1/docker/truxon-its && /usr/bin/node fetch-its.mjs >> its.log 2>&1
-# UTC-equivalent if the scheduler ignores CRON_TZ:
-0 7 * * *  cd /volume1/docker/truxon-its && /usr/bin/node fetch-its.mjs >> its.log 2>&1
+```bash
+# prereq: alias truck 003 → 03 (AtoB name) or it punchlists
+node import.mjs <admin_email> <admin_password>        # idempotent; skips load_numbers already in prod
+# review punchlist.json
 ```
 
-On the DXP8800 the crons run inside the busybox `crond` scheduler container
-(host cron needs root, which isn't available) — add the line to that container's
-crontab exactly like the backup/fuel jobs, using the Playwright-capable image.
+## Files
 
-## What lands where
-
-- `its_loads_full.json` — the **accumulated** delta (deduped by editId, updated
-  when a load's status/rate/stops change). This is what `import.mjs` reads.
-- `its_delta/YYYY-MM-DD.json` — an immutable raw snapshot per run (audit trail;
-  includes board counts + parse warnings).
-- `its.log` — run log.
-
-## Modes
-
-| Command | Effect |
-|---|---|
-| `node fetch-its.mjs` | scheduled run: login → capture → snapshot → merge |
-| `node fetch-its.mjs --once` | capture + snapshot, **no** merge (inspect first) |
-| `node fetch-its.mjs --selfcheck` | login + parse + assert invariants, prints a sample |
-| `node fetch-its.mjs --login` | manual persistent-profile login fallback (headed) |
-| `node fetch-its.mjs --headed` | run with a visible browser (debugging) |
+- `ITS_EXTRACTION.md` — reverse-engineered endpoints, field map, the §3 harvester.
+- `fetch-its.mjs` — headless Playwright harvester. **Login blocked by Cloudflare**
+  (kept for the parser/enumeration reference + possible CDP-attach future).
+- `merge-its.mjs` — folds an assisted capture into `its_loads_full.json`.
+- `import.mjs` — the idempotent cutover importer (unchanged from the bulk import).
+- `its_loads_full.json` / `its_delta/` — accumulated staging + dated snapshots
+  (git-ignored; contain real load data).
 
 ## Status
 
-- **Extraction + parser:** reverse-engineered and **validated live** against real
-  loads (1136 single-stop, 1162 multi-stop). Endpoints/field map in
-  `ITS_EXTRACTION.md`.
-- **This fetcher:** written; deploy on the NAS with `its.env`, run `--selfcheck`
-  once, then schedule. Selectors/endpoints mirror the current ITS; `--selfcheck`
-  is the tripwire if they change.
-- **Cutover import (`import.mjs`):** already built and idempotent — unchanged.
+- **Extraction + parser:** cracked & validated live (loads 1136, 1162; full board
+  harvest 12 loads / 0 warnings).
+- **Unattended cron:** not viable — Cloudflare Turnstile. Disabled on the NAS.
+- **Assisted capture + cutover import:** the working path.

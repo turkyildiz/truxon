@@ -69,11 +69,21 @@ Iterate N=1..; a stop exists when `sh_id_N` OR `sh_location_N` OR the display id
 has a value. **Validated live** against load 1136 (1 pu → 1 del) and load 1162
 (1 pu → 2 dels: correct sequence, correct final destination Channahon).
 
-## 4. Login (for headless/Playwright)
-`POST /login.php` (form `#frmAppLogin`). Fields: `account_numberlgn`
-(Aida = **IL76053**), `usernamelgn` **or** `email`, `password`, `remember_login`.
-Plain username/password — no Auth0/MFA — so `fetch-its.mjs` logs in from stored
-creds every run (more robust than the AtoB manual-login model).
+## 4. Login — ⚠ behind Cloudflare Turnstile (blocks automation)
+`POST /login.php` (form `#frmAppLogin`, two tabs: **Email Login** = default,
+`#email`+`#password`; **Classic Login** = `#account_numberlgn` (Aida=**IL76053**)
++`#usernamelgn`). No Auth0/MFA — BUT the login page is wrapped in **Cloudflare
+Turnstile** ("Just a moment… performing security verification"). A headless /
+Playwright browser (even headed) gets stuck in the check forever — it detects
+`navigator.webdriver` + CDP. **We do NOT bypass bot-detection.** Consequence:
+**unattended login is impossible**; only a real, human-driven browser
+authenticates. The data endpoints (§1–§2) are NOT Turnstile-gated — once a real
+browser holds the session, the fetches work fine. So capture is **assisted**:
+harvest through the live logged-in tab (the §3 parser as one `page.evaluate`),
+then `merge-its.mjs` folds the result into `its_loads_full.json`.
+`fetch-its.mjs` (headless Playwright) is kept for its parser/enumeration
+reference and a possible future CDP-attach-to-real-Chrome, but its headless
+login cannot clear Turnstile.
 
 ## 5. Target shape (what import.mjs consumes: `its_loads_full.json`)
 Array of `{ meta:{loadNum, editId, invoiceNum, invoiceDate, listCustomer,
