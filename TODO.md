@@ -7,10 +7,16 @@ _Last updated: 2026-07-19_
 Ordered by risk. ✅ confirmed · ⬜ open (in our hands) · 🔶 needs Ilker / external.
 
 - ✅ **Watchdog monitoring** — runs every 5 min in prod (cron `truxon-watchdog`).
-- 🔶 **Real data migration from ITS Dispatch** — toolchain exists
-      (`deploy/migration-its/import.mjs` + backfill_*.mjs + upload_docs.mjs). Prod
-      still holds TEST data — needs the ITS export and a run against prod, then a
-      row-count sanity check. Biggest silent risk.
+- ✅ **ITS data migration** — ran from the OTHER dev computer ~2026-07-15/17;
+      audited + hardened 2026-07-19: 983/984 loads carry the [ITS #] marker,
+      2,457 docs on 945 loads (96%), 28 drivers / 12 trucks / 20 trailers /
+      296 customers. Fixes applied: truck 003→03 (AtoB name) + 19 orphan fuel
+      rows linked (0 unmatched now); 971 ITS-invoiced loads → billed, leaving
+      the REAL leak visible: 2 completed loads / $9,000 never invoiced.
+      **Remaining: one final delta scrape+import at cutover** (loads booked in
+      ITS after Jul 17). Toolchain is idempotent; scraper lives on the other
+      dev box (or rebuild here, ~1h). NOTE for delta: ITS says truck '003' —
+      alias it to '03' or the importer will punchlist it.
 - 🔶 **Staff accounts + roles** — create each user with the correct role; drivers
       also need the mobile app installed (blocked on the keystore below).
 - ✅ **Verified backups** — deployed on the NAS (2026-07-19). A `truxon-scheduler`
