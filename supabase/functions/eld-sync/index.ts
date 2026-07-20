@@ -19,6 +19,13 @@ function isCron(req: Request): boolean {
 
 // deno-lint-ignore no-explicit-any
 const n = (v: any): number | null => { if (v == null || v === '') return null; const x = Number(v); return Number.isFinite(x) ? x : null }
+// keep the LAST row per key — the status feeds can repeat a vehicle/driver, and an
+// upsert batch with a duplicate conflict key errors ("cannot affect row twice").
+function dedupeBy<T>(rows: T[], key: (r: T) => string): T[] {
+  const m = new Map<string, T>()
+  for (const r of rows) { const k = key(r); if (k) m.set(k, r) }
+  return [...m.values()]
+}
 // deno-lint-ignore no-explicit-any
 const mmddyyyy = (d: Date): string => `${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}-${d.getUTCFullYear()}`
 
@@ -112,23 +119,42 @@ Deno.serve(async (req) => {
     }
 
     // ── live status (default) ──
-    const vstatus = await pageAll('latest-vehicle-status')
-    const dstatus = await pageAll('latest-driver-status')
-    if (vstatus.length) {
-      await svc.from('eld_vehicle_status').upsert(vstatus.map((s) => ({
-        vehicle_id: s.vehicle_id, eld_driver_id: s.driver_id ?? null, number: s.number ?? '', vin: s.vin ?? '',
-        odometer: n(s.odometer), fuel_level: n(s.fuel_level), speed: n(s.speed),
-        lat: n(s.lat), lon: n(s.lon), status: s.status ?? null, ts: s.timestamp ?? null,
-        calc_location: s.calc_location ?? null, updated_at: now,
-      })), { onConflict: 'vehicle_id' })
+    const vstatus = dedupeBy(await pageAll('latest-vehicle-status'), (s) => s.vehicle_id)
+    const dstatus = dedupeBy(await pageAll('latest-driver-status'), (s) => s.driver_id)
+    const errs: string[] = []
+
+    // The status feeds can reference vehicles/drivers not in the roster page
+    // (e.g. inactive units still reporting). Backfill roster stubs so the fleet
+    // feed's joins see them — without overwriting real roster rows.
+    const stubV = dedupeBy(vstatus.filter((s) => s.vehicle_id), (s) => s.vehicle_id).map((s) => ({
+      vehicle_id: s.vehicle_id, number: s.number ?? '', vin: s.vin ?? '', active: true, last_seen: now,
+    }))
+    if (stubV.length) await svc.from('eld_vehicles').upsert(stubV, { onConflict: 'vehicle_id', ignoreDuplicates: true })
+    const stubD = dedupeBy(dstatus.filter((s) => s.driver_id), (s) => s.driver_id).map((s) => ({
+      driver_id: s.driver_id, username: s.username ?? '', active: true, last_seen: now,
+    }))
+    if (stubD.length) await svc.from('eld_drivers').upsert(stubD, { onConflict: 'driver_id', ignoreDuplicates: true })
+    await svc.rpc('eld_link_vehicles')
+
+    const vsRows = vstatus.filter((s) => s.vehicle_id).map((s) => ({
+      vehicle_id: s.vehicle_id, eld_driver_id: s.driver_id || null, number: s.number ?? '', vin: s.vin ?? '',
+      odometer: n(s.odometer), fuel_level: n(s.fuel_level), speed: n(s.speed),
+      lat: n(s.lat), lon: n(s.lon), status: s.status ?? null, ts: s.timestamp || null,
+      calc_location: s.calc_location ?? null, updated_at: now,
+    }))
+    if (vsRows.length) {
+      const { error } = await svc.from('eld_vehicle_status').upsert(vsRows, { onConflict: 'vehicle_id' })
+      if (error) errs.push(`vehicle_status: ${error.message}`)
     }
-    if (dstatus.length) {
-      await svc.from('eld_driver_status').upsert(dstatus.map((s) => ({
-        driver_id: s.driver_id, username: s.username ?? '', break_sec: n(s.break), drive_sec: n(s.drive),
-        shift_sec: n(s.shift), cycle_sec: n(s.cycle), current_status: s.current_status ?? null, updated_at: now,
-      })), { onConflict: 'driver_id' })
+    const dsRows = dstatus.filter((s) => s.driver_id).map((s) => ({
+      driver_id: s.driver_id, username: s.username ?? '', break_sec: n(s.break), drive_sec: n(s.drive),
+      shift_sec: n(s.shift), cycle_sec: n(s.cycle), current_status: s.current_status ?? null, updated_at: now,
+    }))
+    if (dsRows.length) {
+      const { error } = await svc.from('eld_driver_status').upsert(dsRows, { onConflict: 'driver_id' })
+      if (error) errs.push(`driver_status: ${error.message}`)
     }
-    return json({ ok: true, vehicles: vehicles.length, drivers: drivers.length, vehicle_status: vstatus.length, driver_status: dstatus.length })
+    return json({ ok: errs.length === 0, vehicles: vehicles.length, drivers: drivers.length, vehicle_status: vstatus.length, driver_status: dstatus.length, errors: errs })
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 502)
   }
