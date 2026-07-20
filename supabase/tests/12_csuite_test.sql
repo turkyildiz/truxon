@@ -2,7 +2,7 @@
 -- Sentinel safety + concentration insights.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(9);
+select plan(12);
 
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-0000000000c5'::uuid, 'csuite@test.local');
 update public.profiles set role = 'admin' where id = '00000000-0000-4000-8000-0000000000c5';
@@ -46,6 +46,12 @@ insert into public.safety_events (event_type, event_date, claim_amount) values (
 select is((public.safety_summary('2026-07-01','2026-08-01')->>'accidents')::int, 1, 'safety: one accident');
 select is((public.safety_summary('2026-07-01','2026-08-01')->>'out_of_service_rate_pct')::numeric, 50.0::numeric, 'safety: OOS rate 1 of 2 inspections');
 select is((public.safety_summary('2026-07-01','2026-08-01')->>'accidents_per_million_miles')::numeric, 625.00::numeric, 'safety: accidents/million mi (1 / 1600 mi)');
+
+-- ---------- scorecard: resurrected sections (Northstar night) ----------
+select is((public.company_scorecard('2026-07-01','2026-08-01')->'safety'->>'accidents_in_window')::int, 1, 'scorecard safety: accident in window now captured');
+select is((public.company_scorecard('2026-07-01','2026-08-01')->'safety'->>'preventable_accidents_in_window')::int, 1, 'scorecard safety: preventable accident captured');
+-- detention/telematics present (zero here — no ELD seed), and no longer in not_captured
+select ok(not (public.company_scorecard('2026-07-01','2026-08-01')->'not_captured' @> '["detention hours"]'::jsonb), 'detention no longer listed as not-captured');
 
 -- ---------- sentinel v2 ----------
 select public.sentinel_scan();
