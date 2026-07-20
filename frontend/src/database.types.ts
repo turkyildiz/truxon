@@ -2141,6 +2141,66 @@ export type Database = {
           },
         ]
       }
+      trux_observations: {
+        Row: {
+          classification: string
+          confidence: string
+          created_at: string
+          extracted: Json | null
+          id: number
+          matched_customer_id: number | null
+          matched_load_id: number | null
+          message_id: string
+          received_at: string | null
+          review_note: string
+          reviewed: boolean
+          sender_email: string
+          sender_name: string
+          subject: string
+          summary: string
+          would_action: string
+          would_detail: string
+        }
+        Insert: {
+          classification?: string
+          confidence?: string
+          created_at?: string
+          extracted?: Json | null
+          id?: never
+          matched_customer_id?: number | null
+          matched_load_id?: number | null
+          message_id: string
+          received_at?: string | null
+          review_note?: string
+          reviewed?: boolean
+          sender_email?: string
+          sender_name?: string
+          subject?: string
+          summary?: string
+          would_action?: string
+          would_detail?: string
+        }
+        Update: {
+          classification?: string
+          confidence?: string
+          created_at?: string
+          extracted?: Json | null
+          id?: never
+          matched_customer_id?: number | null
+          matched_load_id?: number | null
+          message_id?: string
+          received_at?: string | null
+          review_note?: string
+          reviewed?: boolean
+          sender_email?: string
+          sender_name?: string
+          subject?: string
+          summary?: string
+          would_action?: string
+          would_detail?: string
+        }
+        Relationships: []
+      }
       trux_sessions: {
         Row: {
           created_at: string
@@ -2915,6 +2975,7 @@ export type Database = {
         Args: { p_cents: number; p_provider: string }
         Returns: boolean
       }
+      log_observation: { Args: { p: Json }; Returns: number }
       maintenance_alerts: {
         Args: never
         Returns: {

@@ -396,6 +396,40 @@ export interface LoadFilters {
   date_to?: string
 }
 
+// ---------- Trux dispatch shadow (observe-only ledger) ----------
+
+export interface TruxObservation {
+  id: number
+  received_at: string | null
+  sender_email: string
+  sender_name: string
+  subject: string
+  classification: string
+  summary: string
+  extracted: { broker?: string | null; ref?: string | null; amount?: number | null } | null
+  would_action: string
+  would_detail: string
+  confidence: string
+  matched_customer_id: number | null
+  matched_load_id: number | null
+  reviewed: boolean
+  review_note: string
+  created_at: string
+}
+
+export async function listObservations(opts: { classification?: string; unreviewedOnly?: boolean; limit?: number } = {}): Promise<TruxObservation[]> {
+  let q = supabase.from('trux_observations').select('*').order('received_at', { ascending: false }).limit(opts.limit ?? 100)
+  if (opts.classification) q = q.eq('classification', opts.classification)
+  if (opts.unreviewedOnly) q = q.eq('reviewed', false)
+  const rows = unwrap(await q)
+  return rows as unknown as TruxObservation[]
+}
+
+export async function markObservationReviewed(id: number, reviewed: boolean): Promise<void> {
+  const { error } = await supabase.from('trux_observations').update({ reviewed }).eq('id', id)
+  if (error) throw error
+}
+
 /** Flag/clear "awaiting final paperwork" on a load (admin/dispatcher). */
 export async function setLoadPaperwork(id: number, awaiting: boolean): Promise<void> {
   const { error } = await supabase.rpc('set_load_paperwork', { p_id: id, p_awaiting: awaiting })
