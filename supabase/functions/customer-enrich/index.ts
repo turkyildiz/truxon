@@ -246,12 +246,22 @@ Deno.serve(async (req) => {
     const drivers = (await svc.from('drivers').select('full_name')).data ?? []
     const trucks = (await svc.from('trucks').select('unit_number')).data ?? []
     const loadNotes = (await svc.from('loads').select('load_number, notes')).data ?? []
+    // recent invoices (last 45 days) — to check gap-load revenue is captured
+    const since = new Date(Date.now() - 45 * 864e5).toISOString().slice(0, 10)
+    const inv = (await svc.from('invoices')
+      .select('invoice_number, total, invoice_date, source, load_id, qbo_doc_number, customer:customers(company_name)')
+      .gte('invoice_date', since).order('invoice_date', { ascending: false })).data ?? []
     return json({
       customers: custs.map((c) => c.company_name),
       customer_ids: custs.map((c) => ({ name: c.company_name, mc: c.mc_number, dot: c.usdot_number })),
       drivers: drivers.map((d) => d.full_name),
       trucks: trucks.map((t) => t.unit_number),
       existing_loads: loadNotes.map((l) => ({ n: l.load_number, its: /\[ITS #(\d+)\]/.exec(l.notes ?? '')?.[1] ?? null })),
+      recent_invoices: inv.map((i) => ({
+        num: i.invoice_number, total: i.total, date: i.invoice_date, source: i.source,
+        load_id: i.load_id, qbo: i.qbo_doc_number,
+        customer: (i.customer as { company_name?: string } | null)?.company_name ?? null,
+      })),
     })
   }
 
