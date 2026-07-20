@@ -257,6 +257,83 @@ export interface Invoice {
   source: 'truxon' | 'qbo'
   qbo_doc_number: string | null
   qbo_balance: number | null
+  paid_at: string | null
+  sent_at: string | null
+  sent_to: string | null
+}
+
+// ── Accounting module ────────────────────────────────────────────────────────
+
+export interface AcctSummary {
+  ar_total: number
+  ar_past_due: number
+  past_due_count: number
+  open_count: number
+  dso: number | null
+  avg_days_to_pay: number | null
+  unbilled_total: number
+  unbilled_count: number
+  mtd_billed: number
+  mtd_collected: number
+}
+
+export interface AgingRow {
+  customer_id: number
+  customer_name: string
+  current_due: number
+  d1_30: number
+  d31_60: number
+  d61_90: number
+  d90_plus: number
+  total: number
+  invoice_count: number
+}
+
+export interface UnbilledLoad {
+  load_id: number
+  load_number: string
+  customer_id: number
+  customer_name: string
+  delivered_at: string | null
+  days_unbilled: number
+  rate: number
+}
+
+export interface RevenueMonth {
+  month: string
+  billed: number
+  collected: number
+}
+
+export interface CustomerRevenue {
+  customer_id: number
+  customer_name: string
+  billed: number
+  share_pct: number | null
+  open_balance: number
+  past_due: number
+  avg_days_to_pay: number | null
+  invoice_count: number
+}
+
+export interface MarginMonth {
+  month: string
+  revenue: number
+  fuel: number
+  tolls: number
+  maintenance: number
+  margin: number
+  operating_ratio: number | null
+}
+
+export interface InvoicePayment {
+  id: number
+  invoice_id: number
+  amount: number
+  method: string
+  reference: string | null
+  notes: string | null
+  received_at: string
 }
 
 /** QuickBooks connection + sync status card (admin only). */

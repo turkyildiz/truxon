@@ -20,6 +20,13 @@ import type {
   FuelImportResult,
   Invoice,
   QboStatus,
+  AcctSummary,
+  AgingRow,
+  UnbilledLoad,
+  RevenueMonth,
+  CustomerRevenue,
+  MarginMonth,
+  InvoicePayment,
   Load,
   LoadStatus,
   MaintenanceAlert,
@@ -412,6 +419,75 @@ export async function setInvoiceStatus(id: number, status: string): Promise<void
 
 export async function voidInvoice(id: number): Promise<void> {
   unwrap(await supabase.rpc('void_invoice', { p_invoice_id: id }))
+}
+
+// ── Accounting module ───────────────────────────────────────────────────────
+
+export async function acctSummary(): Promise<AcctSummary> {
+  return unwrap(await supabase.rpc('acct_summary')) as unknown as AcctSummary
+}
+
+export async function acctAging(): Promise<AgingRow[]> {
+  return unwrap(await supabase.rpc('acct_aging')) as unknown as AgingRow[]
+}
+
+export async function acctUnbilledLoads(): Promise<UnbilledLoad[]> {
+  return unwrap(await supabase.rpc('acct_unbilled_loads')) as unknown as UnbilledLoad[]
+}
+
+export async function acctRevenueMonthly(months = 12): Promise<RevenueMonth[]> {
+  return unwrap(await supabase.rpc('acct_revenue_monthly', { p_months: months })) as unknown as RevenueMonth[]
+}
+
+export async function acctRevenueByCustomer(days = 365): Promise<CustomerRevenue[]> {
+  return unwrap(await supabase.rpc('acct_revenue_by_customer', { p_days: days })) as unknown as CustomerRevenue[]
+}
+
+export async function acctMarginMonthly(months = 12): Promise<MarginMonth[]> {
+  return unwrap(await supabase.rpc('acct_margin_monthly', { p_months: months })) as unknown as MarginMonth[]
+}
+
+export async function recordInvoicePayment(
+  invoiceId: number,
+  amount: number,
+  method: string,
+  reference?: string,
+  receivedAt?: string,
+  notes?: string,
+): Promise<{ balance: number; paid: boolean }> {
+  return unwrap(await supabase.rpc('record_invoice_payment', {
+    p_invoice_id: invoiceId,
+    p_amount: amount,
+    p_method: method,
+    p_reference: reference ?? undefined,
+    p_received_at: receivedAt ?? undefined,
+    p_notes: notes ?? undefined,
+  })) as unknown as { balance: number; paid: boolean }
+}
+
+export async function listInvoicePayments(invoiceId: number): Promise<InvoicePayment[]> {
+  return unwrap(await supabase.rpc('list_invoice_payments', { p_invoice_id: invoiceId })) as unknown as InvoicePayment[]
+}
+
+export async function deleteInvoicePayment(paymentId: number): Promise<void> {
+  unwrap(await supabase.rpc('delete_invoice_payment', { p_payment_id: paymentId }))
+}
+
+/** Email the invoice PDF to the customer's billing address (from trux@). */
+export async function emailInvoice(invoiceId: number, pdfBase64: string, to?: string): Promise<{ ok: boolean; to: string }> {
+  const { data, error } = await supabase.functions.invoke('invoice-send', {
+    body: { invoice_id: invoiceId, pdf_base64: pdfBase64, to },
+  })
+  if (error) {
+    // surface the function's error body when available
+    const ctx = (error as { context?: Response }).context
+    if (ctx) {
+      const body = await ctx.json().catch(() => null) as { error?: string } | null
+      if (body?.error) throw new Error(body.error)
+    }
+    throw error
+  }
+  return data as { ok: boolean; to: string }
 }
 
 // ── QuickBooks sync (transition mode: QBO is the books of record) ───────────

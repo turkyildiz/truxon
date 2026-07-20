@@ -90,7 +90,7 @@ const NAV_GROUPS: { title: string | null; items: NavItem[] }[] = [
   ] },
   { title: 'Accounting', items: [
     { key: 'reports', to: '/reports', label: 'Weekly Report', icon: '🧾' },
-    { key: 'invoices', to: '/invoices', label: 'Invoices', icon: '💵' },
+    { key: 'invoices', to: '/invoices', label: 'Accounting', icon: '💵' },
     { key: 'fuel', to: '/fuel', label: 'Fuel', icon: '⛽' },
     { key: 'tolls', to: '/tolls', label: 'Tolls', icon: '🛣️' },
   ] },

@@ -1,11 +1,11 @@
-/** Client-side invoice PDF generation with jsPDF. */
+/** Client-side invoice PDF generation with jsPDF — download or email-ready base64. */
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { getCompanySettings, getInvoiceFull } from './data'
 
 const NAVY = '#1e3a5f'
 
-export async function downloadInvoicePdf(invoiceId: number): Promise<void> {
+async function buildInvoicePdf(invoiceId: number): Promise<{ doc: jsPDF; invoiceNumber: string }> {
   const [inv, company] = await Promise.all([getInvoiceFull(invoiceId), getCompanySettings()])
   const doc = new jsPDF({ unit: 'pt', format: 'letter' })
 
@@ -51,5 +51,16 @@ export async function downloadInvoicePdf(invoiceId: number): Promise<void> {
     footStyles: { fillColor: '#f0f4f8', textColor: '#000000', fontStyle: 'bold' },
   })
 
-  doc.save(`${inv.invoice_number}.pdf`)
+  return { doc, invoiceNumber: inv.invoice_number }
+}
+
+export async function downloadInvoicePdf(invoiceId: number): Promise<void> {
+  const { doc, invoiceNumber } = await buildInvoicePdf(invoiceId)
+  doc.save(`${invoiceNumber}.pdf`)
+}
+
+/** The same PDF as base64 — what the invoice-send function emails to the broker. */
+export async function invoicePdfBase64(invoiceId: number): Promise<string> {
+  const { doc } = await buildInvoicePdf(invoiceId)
+  return doc.output('datauristring').split(',')[1]
 }

@@ -49,3 +49,33 @@ export async function sendMailAsTrux(tok: string, to: string[], subject: string,
   })
   return res.status === 202
 }
+
+/** Send an email with a file attachment (base64) from the Trux mailbox. */
+export async function sendMailWithAttachment(
+  tok: string,
+  to: string[],
+  subject: string,
+  body: string,
+  filename: string,
+  contentBase64: string,
+  contentType = 'application/pdf',
+): Promise<{ ok: boolean; status: number; detail?: string }> {
+  const res = await graph(tok, `/users/${encodeURIComponent(TRUX_MAILBOX)}/sendMail`, {
+    method: 'POST',
+    body: JSON.stringify({
+      message: {
+        subject,
+        body: { contentType: 'Text', content: body },
+        toRecipients: to.map((address) => ({ emailAddress: { address } })),
+        attachments: [{
+          '@odata.type': '#microsoft.graph.fileAttachment',
+          name: filename,
+          contentType,
+          contentBytes: contentBase64,
+        }],
+      },
+      saveToSentItems: true,
+    }),
+  })
+  return { ok: res.status === 202, status: res.status, detail: res.ok ? undefined : (await res.text()).slice(0, 300) }
+}

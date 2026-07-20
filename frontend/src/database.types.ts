@@ -548,6 +548,57 @@ export type Database = {
           },
         ]
       }
+      invoice_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: number
+          invoice_id: number
+          method: string
+          notes: string | null
+          received_at: string
+          recorded_by: string | null
+          reference: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: never
+          invoice_id: number
+          method?: string
+          notes?: string | null
+          received_at?: string
+          recorded_by?: string | null
+          reference?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: never
+          invoice_id?: number
+          method?: string
+          notes?: string | null
+          received_at?: string
+          recorded_by?: string | null
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_payments_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           created_at: string
@@ -556,10 +607,13 @@ export type Database = {
           id: number
           invoice_date: string
           invoice_number: string
+          paid_at: string | null
           qbo_balance: number | null
           qbo_doc_number: string | null
           qbo_id: string | null
           qbo_synced_at: string | null
+          sent_at: string | null
+          sent_to: string | null
           source: string
           status: Database["public"]["Enums"]["invoice_status"]
           total: number
@@ -571,10 +625,13 @@ export type Database = {
           id?: never
           invoice_date?: string
           invoice_number: string
+          paid_at?: string | null
           qbo_balance?: number | null
           qbo_doc_number?: string | null
           qbo_id?: string | null
           qbo_synced_at?: string | null
+          sent_at?: string | null
+          sent_to?: string | null
           source?: string
           status?: Database["public"]["Enums"]["invoice_status"]
           total?: number
@@ -586,10 +643,13 @@ export type Database = {
           id?: never
           invoice_date?: string
           invoice_number?: string
+          paid_at?: string | null
           qbo_balance?: number | null
           qbo_doc_number?: string | null
           qbo_id?: string | null
           qbo_synced_at?: string | null
+          sent_at?: string | null
+          sent_to?: string | null
           source?: string
           status?: Database["public"]["Enums"]["invoice_status"]
           total?: number
@@ -2062,6 +2122,66 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      acct_aging: {
+        Args: never
+        Returns: {
+          current_due: number
+          customer_id: number
+          customer_name: string
+          d1_30: number
+          d31_60: number
+          d61_90: number
+          d90_plus: number
+          invoice_count: number
+          total: number
+        }[]
+      }
+      acct_margin_monthly: {
+        Args: { p_months?: number }
+        Returns: {
+          fuel: number
+          maintenance: number
+          margin: number
+          month: string
+          operating_ratio: number
+          revenue: number
+          tolls: number
+        }[]
+      }
+      acct_revenue_by_customer: {
+        Args: { p_days?: number }
+        Returns: {
+          avg_days_to_pay: number
+          billed: number
+          customer_id: number
+          customer_name: string
+          invoice_count: number
+          open_balance: number
+          past_due: number
+          share_pct: number
+        }[]
+      }
+      acct_revenue_monthly: {
+        Args: { p_months?: number }
+        Returns: {
+          billed: number
+          collected: number
+          month: string
+        }[]
+      }
+      acct_summary: { Args: never; Returns: Json }
+      acct_unbilled_loads: {
+        Args: never
+        Returns: {
+          customer_id: number
+          customer_name: string
+          days_unbilled: number
+          delivered_at: string
+          load_id: number
+          load_number: string
+          rate: number
+        }[]
+      }
       acknowledge_insight: {
         Args: { p_id: number }
         Returns: {
@@ -2214,10 +2334,13 @@ export type Database = {
           id: number
           invoice_date: string
           invoice_number: string
+          paid_at: string | null
           qbo_balance: number | null
           qbo_doc_number: string | null
           qbo_id: string | null
           qbo_synced_at: string | null
+          sent_at: string | null
+          sent_to: string | null
           source: string
           status: Database["public"]["Enums"]["invoice_status"]
           total: number
@@ -2232,6 +2355,10 @@ export type Database = {
       create_work_order_draft: { Args: { p: Json }; Returns: number }
       current_odometer: { Args: { p_truck_id: number }; Returns: number }
       dashboard_summary: { Args: never; Returns: Json }
+      delete_invoice_payment: {
+        Args: { p_payment_id: number }
+        Returns: undefined
+      }
       drive_create_share: {
         Args: { p_expires_at?: string; p_file_id: number }
         Returns: string
@@ -2335,6 +2462,30 @@ export type Database = {
       import_fuel_transactions: { Args: { p_rows: Json }; Returns: Json }
       import_toll_transactions: { Args: { p_rows: Json }; Returns: Json }
       ingest_vehicle_positions: { Args: { p_points: Json }; Returns: Json }
+      invoice_balance: {
+        Args: { i: Database["public"]["Tables"]["invoices"]["Row"] }
+        Returns: number
+      }
+      list_invoice_payments: {
+        Args: { p_invoice_id: number }
+        Returns: {
+          amount: number
+          created_at: string
+          id: number
+          invoice_id: number
+          method: string
+          notes: string | null
+          received_at: string
+          recorded_by: string | null
+          reference: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "invoice_payments"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       llm_reserve_spend: {
         Args: { p_cents: number; p_provider: string }
         Returns: boolean
@@ -2436,6 +2587,17 @@ export type Database = {
       qbo_mark_voided: { Args: { p_qbo_ids: Json }; Returns: number }
       qbo_status: { Args: never; Returns: Json }
       qbo_upsert_invoices: { Args: { p_rows: Json }; Returns: Json }
+      record_invoice_payment: {
+        Args: {
+          p_amount: number
+          p_invoice_id: number
+          p_method?: string
+          p_notes?: string
+          p_received_at?: string
+          p_reference?: string
+        }
+        Returns: Json
+      }
       replace_load_stops: {
         Args: { p_load_id: number; p_stops?: Json }
         Returns: {
@@ -2500,10 +2662,13 @@ export type Database = {
           id: number
           invoice_date: string
           invoice_number: string
+          paid_at: string | null
           qbo_balance: number | null
           qbo_doc_number: string | null
           qbo_id: string | null
           qbo_synced_at: string | null
+          sent_at: string | null
+          sent_to: string | null
           source: string
           status: Database["public"]["Enums"]["invoice_status"]
           total: number
