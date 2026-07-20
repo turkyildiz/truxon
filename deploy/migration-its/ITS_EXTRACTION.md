@@ -1,66 +1,102 @@
-# ITS Dispatch extraction — reverse-engineered 2026-07-19
+# ITS Dispatch extraction — reverse-engineered & verified 2026-07-19
 
-ITS Dispatch is a **Truckstop.com** product (T&C/privacy links → truckstop.com).
-Legacy PHP shell (`app.itsdispatch.com/dispatch.php`) hosting modern JS editor
-bundles. All endpoints are **session-cookie authed** — a `fetch(url,{credentials:'include'})`
-from any `app.itsdispatch.com` page (i.e. run in the logged-in browser tab) works.
+ITS Dispatch is a **Truckstop.com** product. Legacy PHP shell
+(`app.itsdispatch.com/dispatch.php`) hosting a **cross-origin** editor/board
+iframe. Everything below is done with plain `fetch(url, {credentials:'include'})`
+from the logged-in `app.itsdispatch.com` origin (i.e. inside the tab, or inside
+a Playwright page after login) — no UI driving, no cross-origin walls.
 
-## Load list → editIds
-- Dispatch board grid lives in iframe `#glu` → `/sections/dispatchboard_list.php`
-  (search form: Load Number / Customer / Driver / Truck / **date From–To** =
-  fields `search_from` / `search_to`, set via `set_calendar('glu', ...)`).
-- Each result row's onclick: `showFrame_editload('<editId>', '0')`.
-  **`<editId>` is exactly the `[ITS #<editId>]` marker we already store in
-  `loads.notes`** — so the delta = board editIds whose id is NOT already in prod
-  notes. (Confirmed sample editIds: 104767261, 104834031, 104838729, 104838975.)
+> **⚠ Correction to the first draft:** the earlier note claimed per-load data
+> lived at `edit_data.php?LoadEditID=<id>`. **That is wrong** — `LoadEditID=`
+> returns a *blank editor template*, identical for every id (all four probes came
+> back byte-identical with a placeholder `sh_date_1=2025-04-22`). The real data
+> endpoint keys off **`id=`**, not `LoadEditID=`. Verified against live loads.
 
-## Per-load data (the goldmine)
-`GET /modules/loads/data/edit_data.php?LoadEditID=<editId>` → ~800KB HTML: the
-**fully-populated load editor**, 1,181 named inputs + 17 selects. (The sibling
-`load_edit.script.php` is just the JS shell — don't parse that one.)
+## 1. Enumerate loads → editIds  (POST, not GET)
+`POST /sections/dispatchboard_list.php` — form `frmAppLogin`'s sibling
+`dispatch_search` (method=post). Body fields:
+```
+searchinput= &search_filter=anything &search_from=YYYY-MM-DD &search_to=YYYY-MM-DD
+&show_time=1 &open_closed=open|closed
+```
+Response HTML carries `showFrame_editload('<editId>', ...)` per row → regex out
+the editIds. **`open_closed` is only honoured on POST** (GET query is ignored and
+always returns the open board). Union `open` + `closed` to catch in-transit AND
+recently-delivered loads. Once a load is invoiced it drops off the board — hence
+nightly capture.
 
-### Field map (verified names)
-- Core: `load_number`, `work_order`, `bol_sequence`, `ltl_number`
-- Customer: `customer_id` (select → option text is the broker name)
-- Money: `total_rate`, `fsc`, `fsc_percent`, `other_charges`, `other_amount_1..6`,
-  `total_practical_miles`, `empty_practical_miles`
-- Equipment: `driver_id`, `truck_id`, `trailer_id`, `trailer_type`,
-  `driver_internal_external`
-- Carrier (if brokered out): `carrier_id`, `carrier_total_rate`, `carrier_fsc`, …
-- Status: `status`
-- Invoice flags: `on_invoice1..6`
-- **Stops** — shipper (pickup) = `sh_*`, consignee (delivery) = `co_*`, numbered
-  1..N: `sh_date_N` (YYYY-MM-DD), `sh_hour_N`, `sh_minute_N`, `sh_N_show_time`
-  (1=timed). PO numbers `sh_po_numbers_N` / `co_po_numbers_N`.
+`search_filter` options (for targeted searches): `load_number`, `c.name`
+(customer), `a.work_order`, `entryb.name` (shipper), `entryc.name` (consignee),
+`sh_city`/`co_city`, `a.driver_id`, `a.truck_id`, …
 
-### ⚠ Open mapping work (do before trusting output)
-- **Some values are JS-populated**, not in the raw `value=` attr (e.g. a probe
-  saw `sh_date_1=2025-04-22` present but `load_number`/`customer_id` blank on a
-  detached DOMParser). Either parse in the LIVE tab after render, or find the JS
-  data object in the HTML (an `init={...}` / assignment carrying the load record)
-  and read from that instead of input values.
-- Shipper/consignee **name + address** field names not yet confirmed (not
-  `sh_name`/`sh_address`; likely `sh_shipper`/`sh_shipper_id` select + address
-  lines). Pull a real timed multi-stop load and enumerate all `sh_*`/`co_*`.
-- Map ITS `status` values → `STATUS_MAP` in import.mjs.
+## 2. Per-load full record  (the goldmine)
+```
+GET /modules/loads/data/edit_data.php
+    ?window_id=0&duplicate=0&id=<editId>&dispatch_status=open&pending=0&office_id=0
+```
+→ ~177 KB fully-populated editor HTML (session-cookie authed). `dispatch_status`
+is **ignored** (open/closed/delivered/empty all return the same data) — safe to
+hardcode `open`. `new_ltl_id` is **not** required.
 
-## Target shape (what import.mjs consumes: `its_loads_full.json`)
-Array of `{ meta:{loadNum, editId, invoiceNum, invoiceDate, listCustomer},
-stops:[{t:'pu'|'del', name, loc, date, h, m, ap, po}], customer_name, driver,
-truck, trailer, trailer_type, total_rate, total_miles, empty_miles, work_order,
-status, notes }`. Importer is **idempotent** (skips load_numbers already in prod)
-and auto-creates missing customers/drivers.
+**`editId` is the `[ITS #<editId>]` marker we already store in `loads.notes`** —
+so the delta = board editIds whose id is NOT already in prod notes.
 
-## Documents
-Per-load files: the original `receiver.mjs` (localhost:8123) captured docs the
-browser POSTed. Doc URLs hang off the load editor's attachments section
-(enumerate `edit_data.php` for file/attachment hrefs) — TODO if delta loads
-carry rate cons/PODs worth importing.
+## 3. Parse (static `value=` attrs + display-id typeaheads)
+Values live in the HTML's static `value=` attributes and in `<option selected>` —
+readable with a plain `DOMParser`, no script execution. Verified field map:
 
-## Delta cutover runbook (draft)
-1. In the logged-in ITS tab, search the board `search_from` = last import date →
-   collect all `showFrame_editload('<id>')` editIds.
-2. Filter to ids NOT in prod `loads.notes` (`[ITS #<id>]`).
-3. For each: fetch `edit_data.php`, parse → JSON row.
-4. Write `its_loads_full.json`, run `node import.mjs <admin> <pw>` (idempotent).
-5. Alias truck `003`→`03` first (AtoB name) or it punchlists.
+| Field | Source | Note |
+|---|---|---|
+| load_number | `[name=load_number]`.value | e.g. `1136` |
+| work_order | `[name=work_order]`.value | e.g. `941959` |
+| customer name | `#customer_id_display`.value | `[name=customer_id]` is a numeric ITS id |
+| total_rate | `[name=total_rate]`.value | `1000.00` |
+| miles | `[name=total_practical_miles]` / `[name=empty_practical_miles]` | 293 / 139 |
+| driver | `select[name=driver_id] option[selected]`.text | `Terrance Montrell Borum` |
+| truck | `select[name=truck_id] option[selected]`.text | unit `003` (option *text*, not value) |
+| trailer_type | `select[name=trailer_type] option[selected]`.text | `53' Van` |
+| status | `select[name=status] option[selected]`.text | `Unloading` (matches STATUS_MAP keys) |
+
+**Stops** — shipper `sh_*`, consignee `co_*`, numbered 1..N:
+- name → **`#sh_id_N_display` / `#co_id_N_display`** (stable ids; the typeahead's
+  `name=live_type_id_<random>` is NOT stable — use the id).
+- location → `sh_location_N` / `co_location_N` ("City, ST").
+- timing → `sh_date_N` (YYYY-MM-DD), `sh_hour_N`, `sh_minute_N`, `sh_am_N` (AM/PM),
+  `sh_N_show_time` (1=timed). PO → `sh_po_numbers_N`. Also present:
+  `sh_type_N`, `sh_quantity_N`, `sh_weight_N`, `sh_cargo_value_N`, `sh_notes_N`.
+
+Iterate N=1..; a stop exists when `sh_id_N` OR `sh_location_N` OR the display id
+has a value. **Validated live** against load 1136 (1 pu → 1 del) and load 1162
+(1 pu → 2 dels: correct sequence, correct final destination Channahon).
+
+## 4. Login (for headless/Playwright)
+`POST /login.php` (form `#frmAppLogin`). Fields: `account_numberlgn`
+(Aida = **IL76053**), `usernamelgn` **or** `email`, `password`, `remember_login`.
+Plain username/password — no Auth0/MFA — so `fetch-its.mjs` logs in from stored
+creds every run (more robust than the AtoB manual-login model).
+
+## 5. Target shape (what import.mjs consumes: `its_loads_full.json`)
+Array of `{ meta:{loadNum, editId, invoiceNum, invoiceDate, listCustomer,
+capturedAt}, customer_name, driver, truck, trailer, trailer_type, total_rate,
+total_miles, empty_miles, work_order, status, notes,
+stops:[{t:'pu'|'del', name, loc, date, h, m, ap, po}] }`. Importer is
+**idempotent** (skips load_numbers already in prod), maps status via `STATUS_MAP`,
+builds stop timestamps with AM/PM via `iso()`, auto-creates missing
+customers/drivers, and stamps `[ITS #<editId>]` into notes.
+
+## Nightly capture → cutover (the runbook)
+1. `fetch-its.mjs` runs on the NAS at 01:00 CST (Docker cron): login → enumerate
+   open+closed boards (rolling `ITS_LOOKBACK_DAYS` window) → fetch+parse each →
+   **accumulate** into `its_loads_full.json` + a dated `its_delta/YYYY-MM-DD.json`
+   snapshot. **Never touches prod.**
+2. `--selfcheck` asserts structural invariants (every load: number, customer,
+   ≥1 pickup, ≥1 delivery, numeric rate, valid dates) — a canary that ITS hasn't
+   changed its HTML.
+3. At cutover (~Aug 1): alias truck `003`→`03` (AtoB name), then
+   `node import.mjs <admin> <pw>` once against the accumulated file (idempotent).
+   Review `punchlist.json`.
+
+## Documents (TODO, lower priority)
+Per-load attachments (rate cons / PODs) hang off the load editor's attachments
+section. `receiver.mjs`/`upload_docs.mjs` handle the doc side if delta loads
+carry files worth importing — not wired into the nightly job yet.

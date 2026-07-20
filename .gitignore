@@ -13,3 +13,11 @@ mobile/android/app/google-services.json
 deploy/fuel/fuel.env
 deploy/fuel/.atob-profile/
 deploy/fuel/fuel.log
+
+# ITS delta fetcher: secrets, persisted session, captured load data (never commit)
+deploy/migration-its/its.env
+deploy/migration-its/.its-profile/
+deploy/migration-its/its.log
+deploy/migration-its/its_delta/
+deploy/migration-its/its_loads_full.json
+deploy/migration-its/files/

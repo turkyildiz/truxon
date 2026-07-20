@@ -1,0 +1,15 @@
+{
+  "name": "truxon-its-fetcher",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Nightly ITS Dispatch delta capture → local staging (never prod)",
+  "scripts": {
+    "fetch": "node fetch-its.mjs",
+    "selfcheck": "node fetch-its.mjs --selfcheck",
+    "login": "node fetch-its.mjs --login"
+  },
+  "dependencies": {
+    "playwright": "^1.61.0"
+  }
+}
