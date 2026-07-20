@@ -707,7 +707,8 @@ export async function downloadDocument(doc: DocumentMeta): Promise<void> {
 // ---------- Document semantic search (RAG) ----------
 
 export interface DocSearchMatch {
-  document_id: number
+  document_id: number | null
+  drive_file_id: number | null
   entity_type: string
   entity_id: number
   filename: string
@@ -744,6 +745,24 @@ export async function searchDocuments(
     if (data?.status === 'error') throw new Error(String(data.error ?? 'search failed'))
     if (Date.now() > deadline) throw new Error('Search timed out — the indexer may be busy. Try again in a moment.')
   }
+}
+
+/** Download a Team Drive file by its drive_files id (search results carry ids). */
+export async function downloadTeamDriveFileById(driveFileId: number): Promise<void> {
+  const { data: f, error } = await supabase
+    .from('drive_files')
+    .select('storage_path, filename')
+    .eq('id', driveFileId)
+    .single()
+  if (error || !f?.storage_path) throw new Error(error?.message ?? 'File not found')
+  const { data, error: dErr } = await supabase.storage.from('team').download(f.storage_path)
+  if (dErr) throw new Error(dErr.message)
+  const url = URL.createObjectURL(data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = f.filename ?? 'download'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 /** Download a document by its id (search results carry the id, not the path). */

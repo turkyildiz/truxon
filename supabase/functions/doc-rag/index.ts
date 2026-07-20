@@ -33,7 +33,9 @@ Deno.serve(async (req) => {
     const total = (await svc.from('documents').select('id', { count: 'exact', head: true })).count ?? 0
     const indexed = (await svc.from('documents').select('id', { count: 'exact', head: true }).not('indexed_at', 'is', null)).count ?? 0
     const chunks = (await svc.from('document_embeddings').select('id', { count: 'exact', head: true })).count ?? 0
-    return json({ total, indexed, unindexed: total - indexed, chunks })
+    const driveTotal = (await svc.from('drive_files').select('id', { count: 'exact', head: true }).eq('drive', 'team')).count ?? 0
+    const driveIndexed = (await svc.from('drive_files').select('id', { count: 'exact', head: true }).eq('drive', 'team').not('indexed_at', 'is', null)).count ?? 0
+    return json({ total, indexed, unindexed: total - indexed, chunks, drive_total: driveTotal, drive_indexed: driveIndexed })
   }
 
   // ── targets: docs needing embedding + signed URLs (NAS) ──
@@ -84,6 +86,41 @@ Deno.serve(async (req) => {
     })
     if (error) return json({ error: error.message }, 500)
     return json({ matches: data })
+  }
+
+  // ── drive_targets: Team Drive PDFs needing embedding + signed URLs (NAS) ──
+  if (body.mode === 'drive_targets') {
+    if (!cron) return json({ error: 'cron only' }, 403)
+    const afterId = Number(body.after_id) || 0
+    const limit = Math.min(Math.max(Number(body.limit) || 10, 1), 40)
+    const { data: files } = await svc.from('drive_files')
+      .select('id, filename, content_type, storage_path')
+      .eq('drive', 'team')
+      .is('indexed_at', null).gt('id', afterId).order('id', { ascending: true }).limit(limit)
+    const targets: Array<Record<string, unknown>> = []
+    let lastId = afterId
+    for (const f of files ?? []) {
+      lastId = f.id as number
+      const isPdf = /pdf/i.test(f.content_type) || /\.pdf$/i.test(f.filename)
+      if (!isPdf) continue
+      const { data: signed } = await svc.storage.from('team').createSignedUrl(f.storage_path, 900)
+      if (!signed?.signedUrl) continue
+      targets.push({ drive_file_id: f.id, filename: f.filename, url: signed.signedUrl })
+    }
+    return json({ targets, lastId, queried: (files ?? []).length })
+  }
+
+  // ── drive_upsert: store a Team Drive file's chunks (NAS) ──
+  if (body.mode === 'drive_upsert') {
+    if (!cron) return json({ error: 'cron only' }, 403)
+    const driveFileId = Number(body.drive_file_id)
+    if (!driveFileId) return json({ error: 'drive_file_id required' }, 400)
+    const { data: n, error } = await svc.rpc('upsert_drive_embeddings', {
+      p_drive_file_id: driveFileId,
+      p_chunks: body.chunks ?? [],
+    })
+    if (error) return json({ error: error.message }, 500)
+    return json({ chunks: Number(n) || 0 })
   }
 
   // ── search_targets: claim the oldest pending search request (NAS) ──

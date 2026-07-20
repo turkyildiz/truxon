@@ -54,40 +54,65 @@ function chunk(text, size = 1400, overlap = 180) {
   return out
 }
 
-async function main() {
-  if (!URL || !JWT) throw new Error('DOC_RAG_URL and SUPABASE_ANON_JWT required in rag.env')
-  log(`embed model=${EMBED_MODEL}`)
+/** Download a PDF, extract its text (qpdf-decrypt fallback), embed each chunk.
+ *  Returns null when the file has no usable text layer (needs OCR). */
+async function embedPdf(url) {
+  let dir
+  try {
+    const pdf = Buffer.from(await (await fetch(url)).arrayBuffer())
+    dir = mkdtempSync(join(tmpdir(), 'rag-'))
+    writeFileSync(join(dir, 'in.pdf'), pdf)
+    let src = join(dir, 'in.pdf')
+    try { execFileSync('qpdf', ['--decrypt', src, join(dir, 'dec.pdf')], { stdio: 'ignore' }); src = join(dir, 'dec.pdf') } catch { /* not encrypted */ }
+    execFileSync('pdftotext', ['-f', '1', '-l', String(PAGES), src, join(dir, 'out.txt')], { stdio: 'ignore' })
+    const text = readFileSync(join(dir, 'out.txt'), 'utf8')
+    if (text.replace(/\s/g, '').length < 40) return null
+    const chunks = []
+    for (const c of chunk(text)) chunks.push({ content: c, embedding: await embed(c) })
+    return chunks
+  } finally { if (dir) rmSync(dir, { recursive: true, force: true }) }
+}
+
+/** One cursor-paged sweep over a targets/upsert mode pair. */
+async function sweep({ targetsMode, upsertBody, label, budget }) {
   let after = 0, done = 0, indexed = 0, chunksTot = 0
-  while (done < MAX_DOCS) {
-    const { targets, lastId, queried } = await edge({ mode: 'targets', after_id: after, limit: 12 })
-    if (!queried) { log('no more documents'); break }
+  while (done < budget) {
+    const { targets, lastId, queried } = await edge({ mode: targetsMode, after_id: after, limit: 12 })
+    if (!queried) break
     for (const t of targets ?? []) {
-      if (done >= MAX_DOCS) break
+      if (done >= budget) break
       done++
-      let dir
       try {
-        const pdf = Buffer.from(await (await fetch(t.url)).arrayBuffer())
-        dir = mkdtempSync(join(tmpdir(), 'rag-'))
-        writeFileSync(join(dir, 'in.pdf'), pdf)
-        let src = join(dir, 'in.pdf')
-        try { execFileSync('qpdf', ['--decrypt', src, join(dir, 'dec.pdf')], { stdio: 'ignore' }); src = join(dir, 'dec.pdf') } catch { /* not encrypted */ }
-        execFileSync('pdftotext', ['-f', '1', '-l', String(PAGES), src, join(dir, 'out.txt')], { stdio: 'ignore' })
-        const text = readFileSync(join(dir, 'out.txt'), 'utf8')
-        if (text.replace(/\s/g, '').length < 40) { log(`skip ${t.filename} (no text layer — needs OCR)`); continue }
-        const parts = chunk(text)
-        const chunks = []
-        for (const c of parts) chunks.push({ content: c, embedding: await embed(c) })
-        const res = await edge({ mode: 'upsert', document_id: t.document_id, entity_type: t.entity_type, entity_id: t.entity_id, chunks })
+        const chunks = await embedPdf(t.url)
+        if (!chunks) { log(`skip ${t.filename} (no text layer — needs OCR)`); continue }
+        const res = await edge(upsertBody(t, chunks))
         const n = Number(res.chunks) || 0
         if (n > 0) { indexed++; chunksTot += n; log(`+${n} chunks  ${t.filename}`) }
         else log(`0  ${t.filename}${res.error ? ` [${res.error}]` : ''}`)
       } catch (e) {
         log(`${t.filename}: ${String(e).slice(0, 90)}`)
-      } finally { if (dir) rmSync(dir, { recursive: true, force: true }) }
+      }
     }
     if (lastId <= after) break
     after = lastId
   }
-  log(`DONE: processed ${done} docs, indexed ${indexed}, ${chunksTot} chunks`)
+  log(`${label}: processed ${done}, indexed ${indexed}, ${chunksTot} chunks`)
+  return done
+}
+
+async function main() {
+  if (!URL || !JWT) throw new Error('DOC_RAG_URL and SUPABASE_ANON_JWT required in rag.env')
+  log(`embed model=${EMBED_MODEL}`)
+  const usedDocs = await sweep({
+    targetsMode: 'targets',
+    upsertBody: (t, chunks) => ({ mode: 'upsert', document_id: t.document_id, entity_type: t.entity_type, entity_id: t.entity_id, chunks }),
+    label: 'documents', budget: MAX_DOCS,
+  })
+  await sweep({
+    targetsMode: 'drive_targets',
+    upsertBody: (t, chunks) => ({ mode: 'drive_upsert', drive_file_id: t.drive_file_id, chunks }),
+    label: 'team drive', budget: Math.max(MAX_DOCS - usedDocs, 0),
+  })
+  log('DONE')
 }
 main().catch((e) => { console.error(`[rag] ERROR: ${e.message}`); process.exit(1) })

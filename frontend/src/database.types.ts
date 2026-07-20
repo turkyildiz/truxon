@@ -319,7 +319,8 @@ export type Database = {
           chunk_index: number
           content: string
           created_at: string
-          document_id: number
+          document_id: number | null
+          drive_file_id: number | null
           embedding: string
           entity_id: number
           entity_type: string
@@ -329,7 +330,8 @@ export type Database = {
           chunk_index?: number
           content: string
           created_at?: string
-          document_id: number
+          document_id?: number | null
+          drive_file_id?: number | null
           embedding: string
           entity_id: number
           entity_type: string
@@ -339,7 +341,8 @@ export type Database = {
           chunk_index?: number
           content?: string
           created_at?: string
-          document_id?: number
+          document_id?: number | null
+          drive_file_id?: number | null
           embedding?: string
           entity_id?: number
           entity_type?: string
@@ -351,6 +354,13 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_embeddings_drive_file_id_fkey"
+            columns: ["drive_file_id"]
+            isOneToOne: false
+            referencedRelation: "drive_files"
             referencedColumns: ["id"]
           },
         ]
@@ -412,6 +422,7 @@ export type Database = {
           filename: string
           folder: string
           id: number
+          indexed_at: string | null
           is_folder: boolean
           owner_id: string
           parent: string
@@ -425,6 +436,7 @@ export type Database = {
           filename: string
           folder?: string
           id?: never
+          indexed_at?: string | null
           is_folder?: boolean
           owner_id: string
           parent?: string
@@ -438,6 +450,7 @@ export type Database = {
           filename?: string
           folder?: string
           id?: never
+          indexed_at?: string | null
           is_folder?: boolean
           owner_id?: string
           parent?: string
@@ -2836,6 +2849,7 @@ export type Database = {
           content: string
           doc_type: string
           document_id: number
+          drive_file_id: number
           entity_id: number
           entity_type: string
           filename: string
@@ -3055,6 +3069,10 @@ export type Database = {
           p_entity_id: number
           p_entity_type: string
         }
+        Returns: number
+      }
+      upsert_drive_embeddings: {
+        Args: { p_chunks: Json; p_drive_file_id: number }
         Returns: number
       }
       void_invoice: { Args: { p_invoice_id: number }; Returns: undefined }
