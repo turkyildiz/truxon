@@ -3,7 +3,7 @@
 -- stops the QBO invoice pull from resurrecting a merged duplicate.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(15);
+select plan(17);
 
 -- ── normalization ──
 select is(public.normalize_company_name('AM Trans Expedite, L.L.C.'),
@@ -72,6 +72,23 @@ select is((select count(*)::int from public.customers where company_name ilike '
   'invoice pull with merged qbo_id does NOT resurrect the dupe');
 select is((select customer_id from public.invoices where qbo_id = 'QI-500'),
           (select id from public.customers where company_name = 'Coyote Logistics LLC'), 'aliased invoice lands on the keeper');
+
+-- ── billed loads: merge may repoint them (customer_id only); direct edits stay locked ──
+insert into public.customers (company_name) values ('Billed Dupe LLC');
+insert into public.loads (load_number, customer_id, pickup_address, delivery_address, rate, status)
+  select 'MRG-BILLED', id, 'a', 'b', 500, 'billed' from public.customers where company_name = 'Billed Dupe LLC';
+do $$
+declare k bigint; d bigint;
+begin
+  select id into k from public.customers where company_name = 'Coyote Logistics LLC';
+  select id into d from public.customers where company_name = 'Billed Dupe LLC';
+  perform public.merge_customers(k, d);
+end $$;
+select is((select customer_id from public.loads where load_number = 'MRG-BILLED'),
+          (select id from public.customers where company_name = 'Coyote Logistics LLC'),
+          'merge repoints a billed load');
+select throws_like($$ update public.loads set rate = 1 where load_number = 'MRG-BILLED' $$,
+  '%Billed loads are locked%', 'billed load stays locked outside merge');
 
 -- ── gate: a driver cannot merge ──
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-000000000e27'::uuid, 'merge@test.local');
