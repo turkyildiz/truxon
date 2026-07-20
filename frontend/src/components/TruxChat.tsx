@@ -227,7 +227,7 @@ export function TruxLauncher() {
         aria-label={open ? 'Close Forest' : 'Open Forest'}
         className="fixed right-4 bottom-4 z-40 flex h-13 items-center gap-2 rounded-full bg-navy-900 px-4 text-white shadow-lg transition-transform hover:scale-105"
       >
-        <span className="text-xl">🤖</span>
+        <span className="text-xl">🌲</span>
         <span className="text-sm font-bold tracking-wide">{open ? 'Close' : 'Forest'}</span>
       </button>
     </>

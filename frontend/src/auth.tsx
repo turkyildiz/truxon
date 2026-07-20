@@ -96,11 +96,14 @@ export const useAuth = () => useContext(AuthContext)
 /** Which nav sections each role can see (admin sees everything). */
 const DRIVES = ['personal_drive', 'team_drive']
 export const ROLE_MODULES: Record<string, string[]> = {
+  // Forest ('trux') is available to every position — its capabilities are scoped
+  // per role server-side (roleGuidance + RLS), so each person's Forest only sees
+  // and does what their job allows.
   admin: ['dashboard', 'trux', 'track', 'loads', 'dispatch', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', 'tolls', ...DRIVES, 'doc_search', 'users', 'settings'],
-  dispatcher: ['dashboard', 'track', 'loads', 'dispatch', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', 'tolls', ...DRIVES, 'doc_search'],
-  accountant: ['dashboard', 'track', 'loads', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', 'tolls', ...DRIVES, 'doc_search'],
-  maintenance: ['trucks', 'trailers', 'maintenance', ...DRIVES],
-  driver: ['dashboard', ...DRIVES],
+  dispatcher: ['dashboard', 'trux', 'track', 'loads', 'dispatch', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', 'tolls', ...DRIVES, 'doc_search'],
+  accountant: ['dashboard', 'trux', 'track', 'loads', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', 'tolls', ...DRIVES, 'doc_search'],
+  maintenance: ['dashboard', 'trux', 'trucks', 'trailers', 'maintenance', ...DRIVES],
+  driver: ['dashboard', 'trux', ...DRIVES],
 }
 
 /** Map app route prefixes to ROLE_MODULES keys. */

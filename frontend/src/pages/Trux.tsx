@@ -19,6 +19,7 @@ import { errorMessage } from '../supabase'
 import { synthesizeSpeech } from '../data'
 import { LoadError } from '../components/ui'
 import { truxAgent, ToolResult, type Proposal } from '../components/TruxChat'
+import { useAuth } from '../auth'
 import TruxShadow from '../components/TruxShadow'
 import SentinelFeed from '../components/SentinelFeed'
 
@@ -155,6 +156,10 @@ function boostGain(audio: HTMLAudioElement): void {
 }
 
 export default function Trux() {
+  const { user } = useAuth()
+  // The Shadow tab surfaces the dispatch@ inbox observations — dispatch/owner
+  // only (the observation ledger's RLS enforces this server-side regardless).
+  const canSeeShadow = user?.role === 'admin' || user?.role === 'dispatcher'
   const [view, setView] = useState<'chat' | 'shadow'>('chat')
   const qc = useQueryClient()
   const [sessionId, setSessionId] = useState<string | null>(store.sessionId)
@@ -497,24 +502,26 @@ export default function Trux() {
           <h1 className="text-xl font-bold text-body">Forest</h1>
           <p className="text-sm text-muted">Your AI operations &amp; finance analyst</p>
         </div>
-        <div className="ml-auto flex overflow-hidden rounded-xl border border-line">
-          <button
-            onClick={() => setView('chat')}
-            className={`px-4 py-2 text-sm font-medium ${view === 'chat' ? 'bg-surface-2 text-body' : 'text-muted hover:text-body'}`}
-          >
-            💬 Chat
-          </button>
-          <button
-            onClick={() => setView('shadow')}
-            className={`px-4 py-2 text-sm font-medium ${view === 'shadow' ? 'bg-surface-2 text-body' : 'text-muted hover:text-body'}`}
-            title="What Forest would do with the dispatch inbox (observe-only)"
-          >
-            👁️ Shadow
-          </button>
-        </div>
+        {canSeeShadow && (
+          <div className="ml-auto flex overflow-hidden rounded-xl border border-line">
+            <button
+              onClick={() => setView('chat')}
+              className={`px-4 py-2 text-sm font-medium ${view === 'chat' ? 'bg-surface-2 text-body' : 'text-muted hover:text-body'}`}
+            >
+              💬 Chat
+            </button>
+            <button
+              onClick={() => setView('shadow')}
+              className={`px-4 py-2 text-sm font-medium ${view === 'shadow' ? 'bg-surface-2 text-body' : 'text-muted hover:text-body'}`}
+              title="What Forest would do with the dispatch inbox (observe-only)"
+            >
+              👁️ Shadow
+            </button>
+          </div>
+        )}
       </div>
 
-      {view === 'shadow' ? <TruxShadow /> : <>
+      {canSeeShadow && view === 'shadow' ? <TruxShadow /> : <>
 
       {/* Search bar — the centerpiece */}
       <div className={empty ? 'flex flex-1 flex-col justify-center' : ''}>
