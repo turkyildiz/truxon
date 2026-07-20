@@ -97,6 +97,60 @@ export interface EnrichBatch {
   customers: Array<{ id: number; company_name: string; docsUsed: number; filled: number; proposed: string[]; skipped: string[] }>
 }
 
+const ENRICH_STOP = new Set(['inc', 'llc', 'ltd', 'co', 'corp', 'company', 'group', 'the', 'and', 'logistics', 'transport', 'transportation', 'freight', 'trucking', 'carriers', 'carrier', 'services', 'service', 'brokerage', 'solutions', 'usa'])
+const enrichTokens = (s: string) => new Set(String(s ?? '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((t) => t.length > 2 && !ENRICH_STOP.has(t)))
+
+/** Customers still missing key contact fields (for the vision rate-con pass). */
+export async function customersMissingInfo(): Promise<{ id: number; company_name: string }[]> {
+  return unwrap(await supabase.from('customers').select('id, company_name').or('contact_person.eq.,phone.eq.,email.eq.').order('id'))
+}
+
+/** Vision-read a customer's loads' rate confirmations (scanned PDFs) in the
+ *  browser and fill any still-blank fields. This is the 3rd source: it reads
+ *  the image-only rate cons that text extraction and QBO can't cover. Slow
+ *  (renders + vision AI per doc), so run it targeted, not on every refresh. */
+export async function enrichCustomerFromRateCons(customerId: number, companyName: string): Promise<number> {
+  const { data: loads } = await supabase.from('loads').select('id').eq('customer_id', customerId).limit(80)
+  const loadIds = (loads ?? []).map((l) => l.id)
+  if (!loadIds.length) return 0
+  const { data: docs } = await supabase.from('documents')
+    .select('id, storage_path, filename, content_type')
+    .eq('entity_type', 'load').in('entity_id', loadIds)
+    .order('uploaded_at', { ascending: false }).limit(4)
+  const pdfs = (docs ?? []).filter((d) => /pdf/i.test(d.content_type) || /\.pdf$/i.test(d.filename))
+  const merged: Record<string, unknown> = {}
+  let sourceDocId: number | null = null
+  const a = enrichTokens(companyName)
+  for (const d of pdfs.slice(0, 2)) {
+    const { data: blob } = await supabase.storage.from('documents').download(d.storage_path)
+    if (!blob) continue
+    const file = new File([blob], d.filename, { type: 'application/pdf' })
+    let res = await extractCustomerPdf(file)
+    if (res.error && /rate limit/i.test(res.error)) throw new Error('RATE_LIMIT')
+    if (res.needs_images) {
+      const { renderPdfPages } = await import('./pdfPages')
+      const pages = await renderPdfPages(file)
+      if (pages.length) res = await extractCustomerPdf(file, pages)
+      if (res.error && /rate limit/i.test(res.error)) throw new Error('RATE_LIMIT')
+    }
+    const f = res.fields
+    if (!f) continue
+    // name-match guard: only trust a rate con whose broker matches this customer
+    if (f.company_name) { const b = enrichTokens(f.company_name); if (![...b].some((t) => a.has(t))) continue }
+    for (const k of ['contact_person', 'phone', 'email', 'billing_address'] as const) {
+      if (f[k] && !merged[k]) { merged[k] = f[k]; if (sourceDocId == null) sourceDocId = d.id }
+    }
+    if (f.mc_number && !merged.mc_number) merged.mc_number = f.mc_number
+    if (f.notes && !merged.notes) merged.notes = f.notes
+  }
+  if (Object.keys(merged).length === 0) return 0
+  const { data, error } = await supabase.functions.invoke('customer-enrich', {
+    body: { customer_id: customerId, fields: merged, source_document_id: sourceDocId },
+  })
+  if (error) throw error
+  return (data as { filled?: number })?.filled ?? 0
+}
+
 /** Enrich blank customer fields from QuickBooks (structured contact/address).
  *  Fast, one shot; fills billing address / email / contact best. */
 export async function enrichCustomersFromQbo(): Promise<{ matched: number; filledTotal: number; touched: number }> {

@@ -4,7 +4,7 @@ import { useAuth } from '../auth'
 import PdfDrop from '../components/PdfDrop'
 import ResourcePage from '../components/ResourcePage'
 import { Badge } from '../components/ui'
-import { createCustomer, deleteCustomer, enrichCustomersBatch, enrichCustomersFromQbo, extractCustomerPdf, listCustomers, updateCustomer } from '../data'
+import { createCustomer, customersMissingInfo, deleteCustomer, enrichCustomerFromRateCons, enrichCustomersBatch, enrichCustomersFromQbo, extractCustomerPdf, listCustomers, updateCustomer } from '../data'
 import { errorMessage } from '../supabase'
 import type { Customer } from '../types'
 
@@ -15,6 +15,8 @@ export default function Customers() {
   const [note, setNote] = useState('')
   const [enriching, setEnriching] = useState(false)
   const [enrichNote, setEnrichNote] = useState('')
+  const [scanning, setScanning] = useState(false)
+  const [scanNote, setScanNote] = useState('')
 
   async function runEnrich() {
     setEnriching(true)
@@ -43,6 +45,37 @@ export default function Customers() {
       setEnrichNote(errorMessage(e))
     } finally {
       setEnriching(false)
+    }
+  }
+
+  // 3rd source: vision-read each customer's loads' rate confirmations (scanned
+  // PDFs) in the browser. Slow + rate-limited (30 AI reads/hour), so it stops
+  // cleanly at the cap and can be resumed later.
+  async function runRateConScan() {
+    setScanning(true)
+    setScanNote('Finding customers still missing contact info…')
+    try {
+      const missing = await customersMissingInfo()
+      let done = 0, filled = 0, touched = 0, rateLimited = false
+      for (const c of missing) {
+        try {
+          const n = await enrichCustomerFromRateCons(c.id, c.company_name)
+          if (n > 0) { filled += n; touched++ }
+        } catch (err) {
+          if (err instanceof Error && err.message === 'RATE_LIMIT') { rateLimited = true; break }
+          // skip this customer on any other error
+        }
+        done++
+        setScanNote(`Read ${done}/${missing.length} customers’ rate confirmations… filled ${filled} fields on ${touched}`)
+      }
+      qc.invalidateQueries({ queryKey: ['customers-all'] })
+      setScanNote(rateLimited
+        ? `Paused at the hourly AI limit after ${done} customer(s) — filled ${filled} fields on ${touched}. Run again in an hour to continue.`
+        : `✓ Rate-con scan done — filled ${filled} field(s) on ${touched} customer(s) (${done} scanned).`)
+    } catch (e) {
+      setScanNote(errorMessage(e))
+    } finally {
+      setScanning(false)
     }
   }
 
@@ -100,6 +133,21 @@ export default function Customers() {
           </button>
           <span className="text-sm text-gray-500 dark:text-gray-400">
             {enrichNote || 'Trux fills only the empty fields from QuickBooks and each customer’s paperwork — never overwrites what’s there.'}
+          </span>
+        </div>
+      )}
+      {user?.role === 'admin' && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+          <button
+            type="button"
+            onClick={runRateConScan}
+            disabled={scanning}
+            className="rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+          >
+            {scanning ? 'Scanning…' : 'Scan rate confirmations (vision AI)'}
+          </button>
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {scanNote || 'Last resort for still-blank fields: reads each customer’s scanned rate cons with vision AI. Slow, and limited to 30 reads/hour — run again to continue.'}
           </span>
         </div>
       )}

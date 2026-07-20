@@ -49,9 +49,12 @@ interface BatchOpts {
   apiKey: string
   model: string
   carrier: string
+  deadlineMs?: number
 }
 
 // Process one page of candidate customers. Returns the report + the last id seen.
+// Stops early if `deadlineMs` is reached (PDF parse + LLM latency vary a lot, and
+// edge functions hard-cap at ~150s) — the caller resumes from `lastId`.
 async function runBatch(svc: SupabaseClient, o: BatchOpts) {
   let q = svc.from('customers')
     .select('id, company_name, contact_person, phone, email, billing_address, notes')
@@ -67,16 +70,19 @@ async function runBatch(svc: SupabaseClient, o: BatchOpts) {
   if (error) throw new Error(error.message)
 
   const report: Array<Record<string, unknown>> = []
+  const queried = (customers ?? []).length
   let lastId = o.afterId
   let filledTotal = 0
+  let processed = 0
 
   for (const c of customers ?? []) {
-    lastId = c.id as number
+    if (o.deadlineMs && Date.now() > o.deadlineMs) break // resume next call from lastId
+    processed++
     // gather source docs: the customer's own attachments first, then recent
     // rate cons from this customer's loads. PDFs only (text-layer extraction).
-    const docs: Array<{ id: number; storage_path: string; filename: string; content_type: string }> = []
+    const docs: Array<{ id: number; storage_path: string; filename: string; content_type: string; size_bytes: number }> = []
     const { data: ownDocs } = await svc.from('documents')
-      .select('id, storage_path, filename, content_type')
+      .select('id, storage_path, filename, content_type, size_bytes')
       .eq('entity_type', 'customer').eq('entity_id', c.id)
       .order('uploaded_at', { ascending: false }).limit(o.docsPerCustomer)
     for (const d of ownDocs ?? []) docs.push(d as typeof docs[number])
@@ -85,9 +91,9 @@ async function runBatch(svc: SupabaseClient, o: BatchOpts) {
       const loadIds = (loads ?? []).map((l) => l.id)
       if (loadIds.length) {
         const { data: loadDocs } = await svc.from('documents')
-          .select('id, storage_path, filename, content_type')
+          .select('id, storage_path, filename, content_type, size_bytes')
           .eq('entity_type', 'load').in('entity_id', loadIds)
-          .order('uploaded_at', { ascending: false }).limit(o.docsPerCustomer * 2)
+          .order('uploaded_at', { ascending: false }).limit(o.docsPerCustomer * 3)
         for (const d of loadDocs ?? []) { if (docs.length >= o.docsPerCustomer) break; docs.push(d as typeof docs[number]) }
       }
     }
@@ -98,12 +104,22 @@ async function runBatch(svc: SupabaseClient, o: BatchOpts) {
     const skipped: string[] = []
     for (const d of docs) {
       if (!/pdf/i.test(d.content_type) && !/\.pdf$/i.test(d.filename)) { skipped.push(`${d.filename}: not a PDF`); continue }
+      // Big PDFs are almost always scanned images (no text layer) — parsing them
+      // wastes ~a minute and yields nothing. Skip them fast.
+      if (d.size_bytes && d.size_bytes > 4_000_000) { skipped.push(`${d.filename}: too large (likely scanned)`); continue }
       let text = ''
       try {
-        const { data: blob, error: dlErr } = await svc.storage.from('documents').download(d.storage_path)
-        if (dlErr || !blob) { skipped.push(`${d.filename}: download failed`); continue }
-        const pdf = await getDocumentProxy(new Uint8Array(await blob.arrayBuffer()))
-        text = (await extractText(pdf, { mergePages: true })).text
+        const parse = (async () => {
+          const { data: blob, error: dlErr } = await svc.storage.from('documents').download(d.storage_path)
+          if (dlErr || !blob) throw new Error('download failed')
+          const pdf = await getDocumentProxy(new Uint8Array(await blob.arrayBuffer()))
+          return (await extractText(pdf, { mergePages: true })).text
+        })()
+        // hard cap per doc so a slow/scanned PDF can't blow the wall clock
+        text = await Promise.race([
+          parse,
+          new Promise<string>((_, rej) => setTimeout(() => rej(new Error('parse timeout')), 18_000)),
+        ])
       } catch { skipped.push(`${d.filename}: read error`); continue }
       if (!text.trim()) { skipped.push(`${d.filename}: scanned/no text layer`); continue }
 
@@ -143,9 +159,10 @@ async function runBatch(svc: SupabaseClient, o: BatchOpts) {
       filledTotal += filled
     }
     report.push({ id: c.id, company_name: c.company_name, docsUsed, filled, proposed: Object.keys(proposed), skipped })
+    lastId = c.id as number
   }
 
-  return { processed: (customers ?? []).length, lastId, filledTotal, customers: report }
+  return { queried, processed, lastId, filledTotal, customers: report }
 }
 
 Deno.serve(async (req) => {
@@ -194,40 +211,60 @@ Deno.serve(async (req) => {
     return json({ probe: true, total, anyBlank, noContact, noPhone, noEmail, noBilling, enriched, customerDocs: custDocs, loadDocs })
   }
 
+  // ── apply pre-extracted fields (client-side vision of a rate con) ──
+  // The browser renders a scanned rate-con to images and reads it with the
+  // vision model (extract-pdf), then posts the fields here; we apply blanks-only.
+  if (body.customer_id && body.fields && typeof body.fields === 'object') {
+    const f = body.fields as Record<string, unknown>
+    const mc = f.mc_number ? `MC# ${String(f.mc_number).trim()}` : ''
+    const noteVal = [mc, f.notes ? String(f.notes).trim() : ''].filter(Boolean).join(' — ')
+    const fields: Record<string, unknown> = {
+      contact_person: f.contact_person, phone: f.phone, email: f.email,
+      billing_address: f.billing_address, notes: noteVal || null,
+    }
+    const { data: n, error: rpcErr } = await svc.rpc('apply_customer_enrichment', {
+      p_customer_id: Number(body.customer_id), p_fields: fields, p_source_document_id: body.source_document_id ?? null, p_model: 'vision:ratecon',
+    })
+    if (rpcErr) return json({ error: rpcErr.message }, 500)
+    return json({ filled: Number(n) || 0 })
+  }
+
   // ── cron / anon: maintenance sweep (apply, loop under a time budget) ──
   // Honours optional limit / max_batches so a first run can be kept small and
   // watched; returns the customers it actually filled for observability.
   if (isCron || body.cron === true) {
     const started = Date.now()
-    const BUDGET_MS = 90_000 // return well under the platform's 150s ceiling
+    const deadline = started + 100_000 // return well under the platform's 150s ceiling
     const maxBatches = Math.min(Math.max(Number(body.max_batches) || 4, 1), 40)
     const perBatch = Math.min(Math.max(Number(body.limit) || 6, 1), 50)
     let afterId = Number(body.after_id) || 0
-    let scanned = 0, filledTotal = 0, touched = 0, batches = 0
+    let scanned = 0, processed = 0, filledTotal = 0, touched = 0, batches = 0
     const filledCustomers: Array<Record<string, unknown>> = []
     for (let i = 0; i < maxBatches; i++) {
-      const r = await runBatch(svc, { afterId, limit: perBatch, docsPerCustomer, apply: true, oneCustomer: null, apiKey, model, carrier })
+      const r = await runBatch(svc, { afterId, limit: perBatch, docsPerCustomer, apply: true, oneCustomer: null, apiKey, model, carrier, deadlineMs: deadline })
       batches++
-      if (r.processed === 0 || r.lastId <= afterId) break
-      scanned += r.processed
+      scanned += r.queried
+      processed += r.processed
       filledTotal += r.filledTotal
       for (const c of r.customers as Array<Record<string, unknown>>) {
         if (Number(c.filled) > 0) { touched++; if (filledCustomers.length < 60) filledCustomers.push({ id: c.id, company_name: c.company_name, filled: c.filled, fields: c.proposed }) }
       }
+      if (r.queried === 0 || r.lastId <= afterId) break // no more candidates, or deadline hit
       afterId = r.lastId
-      if (Date.now() - started > BUDGET_MS) break
+      if (Date.now() > deadline) break
     }
-    return json({ mode: 'cron', scanned, filledTotal, touched, batches, lastId: afterId, filledCustomers })
+    return json({ mode: 'cron', scanned, processed, filledTotal, touched, batches, lastId: afterId, filledCustomers })
   }
 
   // ── admin: one cursor-paged batch (the UI loops) ──
   const r = await runBatch(svc, {
     afterId: Number(body.after_id) || 0,
-    limit: Math.min(Math.max(Number(body.limit) || 25, 1), 50),
+    limit: Math.min(Math.max(Number(body.limit) || 6, 1), 50),
     docsPerCustomer,
     apply: body.apply === true,
     oneCustomer: body.customer_id ? Number(body.customer_id) : null,
     apiKey, model, carrier,
+    deadlineMs: Date.now() + 110_000,
   })
   return json({ apply: body.apply === true, ...r })
 })
