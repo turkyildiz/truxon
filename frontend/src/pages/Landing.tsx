@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { supabase } from '../supabase'
 
 const FEATURES = [
   {
@@ -39,6 +41,125 @@ const STEPS = [
   { n: '3', title: 'Deliver & bill', text: 'Advance the load, generate the invoice, run weekly pay.' },
 ]
 
+const EQUIPMENT = ['Dry Van', 'Reefer', 'Flatbed', 'Power Only', 'Drayage / Container', 'Other']
+
+const inputCls =
+  'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-body placeholder:text-muted focus:border-blue-500 focus:outline-none'
+
+/** Public freight-quote form. Origin/destination each accept City + State OR a
+ *  Zip — filling either one satisfies the requirement (crew feedback). */
+function QuoteForm() {
+  const [f, setF] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(false)
+  const [error, setError] = useState('')
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setF((p) => ({ ...p, [k]: e.target.value }))
+  const v = (k: string) => (f[k] ?? '').trim()
+
+  const originOk = v('origin_zip') !== '' || (v('origin_city') !== '' && v('origin_state') !== '')
+  const destOk = v('dest_zip') !== '' || (v('dest_city') !== '' && v('dest_state') !== '')
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    if (!v('contact_name')) { setError('Please tell us your name.'); return }
+    if (!v('email') && !v('phone')) { setError('An email or phone number is required so we can reach you.'); return }
+    if (!originOk) { setError('Origin needs City + State, or a Zip code — either one works.'); return }
+    if (!destOk) { setError('Destination needs City + State, or a Zip code — either one works.'); return }
+    setBusy(true)
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke('quote-request', { body: f })
+      if (fnErr || data?.error) throw new Error(data?.error ?? 'Could not send — please try again.')
+      setDone(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send — please try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="rounded-2xl bg-surface p-10 text-center shadow-sm">
+        <div className="text-4xl">✅</div>
+        <h3 className="mt-3 text-xl font-semibold text-body">Quote request received</h3>
+        <p className="mt-2 text-muted">We'll get back to you shortly with a rate.</p>
+      </div>
+    )
+  }
+
+  return (
+    <form onSubmit={submit} className="rounded-2xl bg-surface p-6 text-left shadow-sm sm:p-8">
+      {/* honeypot — humans never see or fill this */}
+      <input type="text" name="website" value={f.website ?? ''} onChange={set('website')} className="hidden" tabIndex={-1} autoComplete="off" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-body">Your name *</label>
+          <input className={inputCls} value={f.contact_name ?? ''} onChange={set('contact_name')} placeholder="Jane Smith" />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-body">Company</label>
+          <input className={inputCls} value={f.company ?? ''} onChange={set('company')} placeholder="Acme Shipping Co." />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-body">Email</label>
+          <input className={inputCls} type="email" value={f.email ?? ''} onChange={set('email')} placeholder="jane@acme.com" />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-body">Phone</label>
+          <input className={inputCls} type="tel" value={f.phone ?? ''} onChange={set('phone')} placeholder="(555) 123-4567" />
+        </div>
+      </div>
+      <p className="mt-1 text-xs text-muted">Email or phone — at least one, so we can reach you.</p>
+
+      {(['origin', 'dest'] as const).map((side) => (
+        <div key={side} className="mt-5">
+          <div className="mb-1 flex items-baseline justify-between">
+            <label className="block text-sm font-semibold text-body">{side === 'origin' ? 'Pickup from *' : 'Deliver to *'}</label>
+            <span className={`text-xs ${side === 'origin' ? (originOk ? 'text-emerald-600' : 'text-muted') : destOk ? 'text-emerald-600' : 'text-muted'}`}>
+              City + State, <em>or</em> Zip — either one
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_6rem_1px_7rem]">
+            <input className={inputCls} value={f[`${side}_city`] ?? ''} onChange={set(`${side}_city`)} placeholder="City" />
+            <input className={inputCls} value={f[`${side}_state`] ?? ''} onChange={set(`${side}_state`)} placeholder="State" maxLength={20} />
+            <div className="hidden self-stretch bg-line sm:block" />
+            <input className={inputCls} value={f[`${side}_zip`] ?? ''} onChange={set(`${side}_zip`)} placeholder="Zip" maxLength={12} />
+          </div>
+        </div>
+      ))}
+
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-body">Equipment</label>
+          <select className={inputCls} value={f.equipment ?? ''} onChange={set('equipment')}>
+            <option value="">Not sure</option>
+            {EQUIPMENT.map((eq) => <option key={eq} value={eq}>{eq}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-body">Pickup date</label>
+          <input className={inputCls} type="date" value={f.pickup_date ?? ''} onChange={set('pickup_date')} />
+        </div>
+      </div>
+      <div className="mt-4">
+        <label className="mb-1 block text-sm font-medium text-body">Anything else?</label>
+        <textarea className={inputCls} rows={3} value={f.notes ?? ''} onChange={set('notes')} placeholder="Weight, commodity, special requirements…" />
+      </div>
+
+      {error && <p className="mt-4 rounded-lg bg-red-500/10 px-4 py-2.5 text-sm font-medium text-red-600">{error}</p>}
+      <button
+        type="submit"
+        disabled={busy}
+        className="mt-5 w-full rounded-lg bg-blue-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-blue-600/30 transition-colors hover:bg-blue-500 disabled:opacity-60 sm:w-auto"
+      >
+        {busy ? 'Sending…' : 'Get My Quote'}
+      </button>
+    </form>
+  )
+}
+
 export default function Landing() {
   return (
     <div className="min-h-screen bg-surface text-body">
@@ -52,6 +173,7 @@ export default function Landing() {
           <nav className="hidden items-center gap-8 text-sm font-medium text-navy-100 md:flex">
             <a href="#features" className="hover:text-white">Features</a>
             <a href="#how" className="hover:text-white">How it works</a>
+            <a href="#quote" className="hover:text-white">Get a Quote</a>
             <a href="#contact" className="hover:text-white">Contact</a>
           </nav>
           <Link
@@ -142,6 +264,19 @@ export default function Landing() {
               Role-based access for dispatchers, accountants, and mechanics. Every change audit-logged.
               Business rules enforced in the database itself — encrypted in transit and at rest, with automated backups.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Quote request */}
+      <section id="quote" className="bg-surface py-20">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+          <h2 className="text-center text-3xl font-bold text-body sm:text-4xl">Need something moved? Get a quote</h2>
+          <p className="mx-auto mt-3 max-w-xl text-center text-muted">
+            Tell us where it's going and we'll come back with a rate — usually within the hour during business hours.
+          </p>
+          <div className="mt-10">
+            <QuoteForm />
           </div>
         </div>
       </section>

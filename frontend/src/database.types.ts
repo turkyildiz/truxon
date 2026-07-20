@@ -1485,6 +1485,63 @@ export type Database = {
         }
         Relationships: []
       }
+      quote_requests: {
+        Row: {
+          company: string
+          contact_name: string
+          created_at: string
+          dest_city: string
+          dest_state: string
+          dest_zip: string
+          email: string
+          equipment: string
+          id: number
+          notes: string
+          origin_city: string
+          origin_state: string
+          origin_zip: string
+          phone: string
+          pickup_date: string | null
+          status: string
+        }
+        Insert: {
+          company?: string
+          contact_name: string
+          created_at?: string
+          dest_city?: string
+          dest_state?: string
+          dest_zip?: string
+          email?: string
+          equipment?: string
+          id?: never
+          notes?: string
+          origin_city?: string
+          origin_state?: string
+          origin_zip?: string
+          phone?: string
+          pickup_date?: string | null
+          status?: string
+        }
+        Update: {
+          company?: string
+          contact_name?: string
+          created_at?: string
+          dest_city?: string
+          dest_state?: string
+          dest_zip?: string
+          email?: string
+          equipment?: string
+          id?: never
+          notes?: string
+          origin_city?: string
+          origin_state?: string
+          origin_zip?: string
+          phone?: string
+          pickup_date?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       rate_limit_events: {
         Row: {
           action: string

@@ -67,3 +67,11 @@ verify_jwt = false
 [functions.customer-enrich]
 # admin JWT verified in-function via getCaller; monthly cron uses the anon bearer
 verify_jwt = false
+
+[functions.doc-rag]
+# NAS worker uses the anon bearer (cron gate in-function); search gated via getCaller
+verify_jwt = false
+
+[functions.quote-request]
+# public landing-page form: honeypot + validation + per-IP cooldown in-function
+verify_jwt = false
