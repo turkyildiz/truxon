@@ -13,7 +13,13 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-GH="$HOME/dev-tools/gh"
+# gh + flutter wherever this box keeps them (release machine used ~/dev-tools;
+# the dev box uses ~/.local/bin + ~/sdk/flutter). truxon-env.sh is optional.
+GH="$(command -v gh || echo "$HOME/dev-tools/gh")"
+[ -f "$HOME/dev-tools/truxon-env.sh" ] && source "$HOME/dev-tools/truxon-env.sh"
+for f in "$HOME/dev-tools/flutter/bin" "$HOME/sdk/flutter/bin"; do
+  [ -d "$f" ] && export PATH="$f:$PATH"
+done
 REPO="turkyildiz/truxon-releases"
 NOTES="${1:-Update}"
 
@@ -26,8 +32,6 @@ sed -i -E "s/^version:.*/version: ${name}+${newcode}/" pubspec.yaml
 echo "==> version ${name}+${newcode} (versionCode ${newcode})"
 
 # 2) build the release APK
-source "$HOME/dev-tools/truxon-env.sh"
-export PATH="$HOME/dev-tools/flutter/bin:$PATH"
 ./build-apk.sh release
 # Give the asset its FINAL filename. `gh release create path#Label` only sets a
 # display label, NOT the download filename — the /latest/download/ URL always

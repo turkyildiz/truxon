@@ -59,6 +59,7 @@ android {
 
     buildTypes {
         release {
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (hasReleaseKeystore) {
                 signingConfig = signingConfigs.getByName("release")
             } else if (gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }) {
