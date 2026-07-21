@@ -32,6 +32,7 @@ class _MapScreenState extends State<MapScreen> {
   String? _routeSummary;
   bool _routed = false; // true when Valhalla produced a real truck route
   List<Map<String, dynamic>> _pois = [];
+  List<Map<String, dynamic>> _parking = [];
   bool _showPois = true;
 
   Future<void> _loadPois() async {
@@ -49,6 +50,12 @@ class _MapScreenState extends State<MapScreen> {
       if (mounted) setState(() => _pois = pois);
     } catch (e) {
       Diag.log('map: poi load failed: $e');
+    }
+    try {
+      final parking = await api.parkingInBbox(minLat, minLon, maxLat, maxLon);
+      if (mounted) setState(() => _parking = parking);
+    } catch (e) {
+      Diag.log('map: parking load failed: $e');
     }
   }
 
@@ -126,6 +133,20 @@ class _MapScreenState extends State<MapScreen> {
         });
       }
     }
+  }
+
+  static Color _parkColor(String available) {
+    final n = int.tryParse(available);
+    if (n != null) return n > 5 ? Colors.green.shade700 : Colors.orange.shade800;
+    if (available.toLowerCase() == 'low') return Colors.orange.shade800;
+    return Colors.blueGrey;
+  }
+
+  static String _parkLabel(String available) {
+    final n = int.tryParse(available);
+    if (n != null) return '$n';
+    if (available.toLowerCase() == 'low') return 'low';
+    return '?';
   }
 
   /// Valhalla emits polyline6.
@@ -218,6 +239,31 @@ class _MapScreenState extends State<MapScreen> {
                                     _ => '⚖',
                                   },
                                   style: const TextStyle(fontSize: 18),
+                                ),
+                              ),
+                            ),
+                        ]),
+                      // Live TPIMS parking: green = spots, amber = low, grey = unknown.
+                      if (_showPois && _parking.isNotEmpty)
+                        MarkerLayer(markers: [
+                          for (final p in _parking)
+                            Marker(
+                              point: LatLng((p['lat'] as num).toDouble(), (p['lon'] as num).toDouble()),
+                              width: 40,
+                              height: 22,
+                              child: Tooltip(
+                                message: '${p['name']}',
+                                child: Container(
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: _parkColor(p['available'] as String? ?? ''),
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: Text(
+                                    'P ${_parkLabel(p['available'] as String? ?? '')}',
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
                                 ),
                               ),
                             ),

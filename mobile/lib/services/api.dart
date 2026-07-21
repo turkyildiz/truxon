@@ -46,6 +46,20 @@ class CompanionApi {
         .toList();
   }
 
+  /// Live truck-parking availability (TPIMS state feeds) inside a map box.
+  Future<List<Map<String, dynamic>>> parkingInBbox(
+      double minLat, double minLon, double maxLat, double maxLon) async {
+    final data = await _sb.rpc('parking_in_bbox', params: {
+      'p_min_lat': minLat,
+      'p_min_lon': minLon,
+      'p_max_lat': maxLat,
+      'p_max_lon': maxLon,
+    });
+    return ((data as List?) ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
+
   /// Trucks a driver can inspect (DVIR).
   Future<List<Map<String, dynamic>>> listTrucks() async {
     final data = await _sb
