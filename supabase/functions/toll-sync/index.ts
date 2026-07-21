@@ -96,11 +96,23 @@ Deno.serve(withCors(async (req) => {
     if (caller.role !== 'admin') return json({ error: 'Admin or toll key required' }, 403)
   }
 
+  const body = await req.json().catch(() => ({}))
+
+  // ── SFTP path: PrePass delivers CSVs over SFTP (not the API for this
+  // account). The NAS parses each file into RPC-shaped rows and posts them
+  // here; the service key + dedup/truck-match RPC stay server-side. ──
+  if (body.mode === 'import_rows') {
+    const rows = Array.isArray(body.rows) ? body.rows : []
+    if (rows.length === 0) return json({ ok: true, received: 0 })
+    const svc = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+    const { data, error } = await svc.rpc('import_toll_transactions', { p_rows: rows })
+    if (error) return json({ error: error.message }, 500)
+    return json({ ok: true, ...(data as Record<string, unknown>) })
+  }
+
   const clientId = Deno.env.get('PREPASS_CLIENT_ID')
   const accounts = Deno.env.get('PREPASS_ACCOUNT_NUMBERS')
   if (!clientId || !accounts) return json({ skipped: 'not configured (PREPASS_* secrets absent)' })
-
-  const body = await req.json().catch(() => ({}))
   const lookback = Number(body.lookback_days ?? LOOKBACK)
   const end = new Date()
   const start = new Date(end.getTime() - lookback * 86400_000)
