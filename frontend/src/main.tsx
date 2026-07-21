@@ -28,6 +28,7 @@ const Trucks = lazy(() => import('./pages/Equipment').then((m) => ({ default: m.
 const Trailers = lazy(() => import('./pages/Equipment').then((m) => ({ default: m.Trailers })))
 const Maintenance = lazy(() => import('./pages/Maintenance'))
 const Reports = lazy(() => import('./pages/Reports'))
+const BoardPack = lazy(() => import('./pages/BoardPack'))
 const Invoices = lazy(() => import('./pages/Invoices'))
 const Fuel = lazy(() => import('./pages/Fuel'))
 const Tolls = lazy(() => import('./pages/Tolls'))
@@ -97,6 +98,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/trailers" element={<Trailers />} />
               <Route path="/maintenance" element={<Maintenance />} />
               <Route path="/reports" element={<Reports />} />
+              <Route path="/reports/board" element={<BoardPack />} />
               <Route path="/invoices" element={<Invoices />} />
               <Route path="/fuel" element={<Fuel />} />
               <Route path="/tolls" element={<Tolls />} />

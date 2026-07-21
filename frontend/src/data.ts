@@ -794,6 +794,23 @@ export async function glCfoSnapshot(): Promise<CfoSnapshot> {
   return unwrap(await supabase.rpc('gl_cfo_snapshot')) as unknown as CfoSnapshot
 }
 
+export interface BalanceRatios {
+  available: boolean
+  as_of: string | null
+  debt: number | null
+  leverage: number | null
+  net_debt: number | null
+  ebitda_12m: number | null
+  debt_to_equity: number | null
+  net_debt_to_ebitda: number | null
+  roe_12m_pct: number | null
+  quick_ratio: number | null
+}
+
+export async function glBalanceRatios(): Promise<BalanceRatios> {
+  return unwrap(await supabase.rpc('gl_balance_ratios')) as unknown as BalanceRatios
+}
+
 /** Email the invoice PDF to the customer's billing address (from trux@). */
 export async function emailInvoice(invoiceId: number, pdfBase64: string, to?: string): Promise<{ ok: boolean; to: string }> {
   const { data, error } = await supabase.functions.invoke('invoice-send', {

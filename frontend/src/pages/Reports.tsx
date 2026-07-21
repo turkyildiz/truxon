@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
 import { customerKeepFire, driverNpsSummary, driverScorecard, laneSummary, loadActuals, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import type { WeeklyRow } from '../types'
@@ -316,6 +317,9 @@ export default function Reports() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-body">Weekly Accounting Report</h1>
         <div className="flex items-center gap-2">
+          <Link to="/reports/board" className="rounded-lg border border-edge px-3 py-1.5 text-sm font-medium text-muted hover:text-body">
+            🏦 Lender pack
+          </Link>
           <Button variant="secondary" onClick={() => setWeekOf(shiftWeek(weekOf, -1))}>
             ← Prev
           </Button>
