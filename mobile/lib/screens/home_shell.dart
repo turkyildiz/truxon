@@ -91,9 +91,19 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   Future<void> _bootstrap() async {
     try {
       _tracking.init();
-      // Alarm + urgent-push plumbing (best-effort; app works without them).
-      await Alarms.requestPermissions();
-      await PushService.init(_api);
+      // Alarm + urgent-push plumbing — TRULY best-effort: a driver dismissing
+      // a permission dialog throws PlatformException, and that must never
+      // take down the whole app (emulator-verified failure mode).
+      try {
+        await Alarms.requestPermissions();
+      } catch (e) {
+        Diag.log('bootstrap: alarm perms: $e');
+      }
+      try {
+        await PushService.init(_api);
+      } catch (e) {
+        Diag.log('bootstrap: push init: $e');
+      }
       final p = await _api.profile();
       setState(() => _profile = p);
       // Hand the radio username to the background receiver (RadioRx) so it
@@ -142,7 +152,38 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    if (_error != null) return Scaffold(body: Center(child: Text(_error!)));
+    if (_error != null) {
+      // Friendly error state with a retry — never a raw exception wall.
+      final scheme = Theme.of(context).colorScheme;
+      return Scaffold(
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.cloud_off, size: 56, color: scheme.outline),
+                  const SizedBox(height: 12),
+                  Text(_error!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: scheme.onSurfaceVariant)),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () {
+                      setState(() => _error = null);
+                      _bootstrap();
+                    },
+                    child: Text(tr('retry')),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     if (_profile == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
