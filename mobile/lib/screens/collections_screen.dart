@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../format.dart';
 import '../i18n.dart';
 import '../services/api.dart';
 
@@ -43,17 +44,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-  }
-
-  String _money(num? v) {
-    final n = (v ?? 0).round();
-    final s = n.toString();
-    final b = StringBuffer();
-    for (var i = 0; i < s.length; i++) {
-      if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
-      b.write(s[i]);
-    }
-    return '\$$b';
   }
 
   @override
@@ -111,11 +101,11 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         gradient: LinearGradient(colors: [scheme.primaryContainer, scheme.secondaryContainer]),
       ),
       child: Row(children: [
-        kpi(tr('collArTotal'), _money(s['ar_total'] as num?)),
-        kpi(tr('collPastDue'), _money(s['ar_past_due'] as num?),
+        kpi(tr('collArTotal'), money(s['ar_total'] as num?)),
+        kpi(tr('collPastDue'), money(s['ar_past_due'] as num?),
             color: (s['ar_past_due'] as num? ?? 0) > 0 ? Colors.red.shade700 : null),
         kpi('DSO', '${(s['dso'] as num?)?.round() ?? 0}'),
-        kpi(tr('collUnbilled'), _money(s['unbilled_total'] as num?)),
+        kpi(tr('collUnbilled'), money(s['unbilled_total'] as num?)),
       ]),
     );
   }
@@ -141,7 +131,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                   Text(name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                   const SizedBox(height: 4),
                   Row(children: [
-                    Text(_money(overdue),
+                    Text(money(overdue),
                         style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: hot ? Colors.red.shade700 : scheme.onSurface)),

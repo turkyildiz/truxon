@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../format.dart';
 import '../i18n.dart';
 import '../services/api.dart';
 
@@ -55,17 +56,6 @@ class _CommandScreenState extends State<CommandScreen> {
     } finally {
       if (mounted) setState(() => _acking.remove(id));
     }
-  }
-
-  String _money(num? v) {
-    final n = (v ?? 0).round();
-    final s = n.toString();
-    final b = StringBuffer();
-    for (var i = 0; i < s.length; i++) {
-      if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
-      b.write(s[i]);
-    }
-    return '\$$b';
   }
 
   ({Color fg, Color bg, IconData icon}) _sev(BuildContext ctx, String severity, String category) {
@@ -140,10 +130,10 @@ class _CommandScreenState extends State<CommandScreen> {
         gradient: LinearGradient(colors: [scheme.primaryContainer, scheme.secondaryContainer]),
       ),
       child: Row(children: [
-        kpi(tr('collArTotal'), _money(s['ar_total'] as num?)),
-        kpi(tr('collPastDue'), _money(s['ar_past_due'] as num?),
+        kpi(tr('collArTotal'), money(s['ar_total'] as num?)),
+        kpi(tr('collPastDue'), money(s['ar_past_due'] as num?),
             color: (s['ar_past_due'] as num? ?? 0) > 0 ? Colors.red.shade700 : null),
-        kpi(tr('cmdUnbilled'), _money(s['unbilled_total'] as num?)),
+        kpi(tr('cmdUnbilled'), money(s['unbilled_total'] as num?)),
         kpi('DSO', '${(s['dso'] as num?)?.round() ?? 0}'),
       ]),
     );

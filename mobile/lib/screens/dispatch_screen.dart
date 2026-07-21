@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../format.dart';
 import '../i18n.dart';
 import '../services/api.dart';
 
@@ -41,15 +42,8 @@ class _DispatchScreenState extends State<DispatchScreen> {
     }
   }
 
-  String _ago(String? iso) {
-    if (iso == null) return '—';
-    final t = DateTime.tryParse(iso);
-    if (t == null) return '—';
-    final m = DateTime.now().toUtc().difference(t.toUtc()).inMinutes;
-    if (m < 1) return tr('justNow');
-    if (m < 60) return '${m}m';
-    return '${(m / 60).floor()}h';
-  }
+  String _ago(String? iso) =>
+      relativeAgo(iso, now: DateTime.now().toUtc(), justNow: tr('justNow'));
 
   @override
   Widget build(BuildContext context) {
@@ -97,9 +91,8 @@ class _DispatchScreenState extends State<DispatchScreen> {
     final unit = t['truck_unit']?.toString() ?? '?';
     final driver = t['driver_name']?.toString() ?? tr('dispUnassigned');
     final loadNo = t['load_number']?.toString();
-    final speed = (t['speed_mps'] as num?) ?? 0;
-    final mph = (speed * 2.23694).round();
-    final moving = mph > 3;
+    final mph = mphFromMps(t['speed_mps'] as num?);
+    final moving = isMoving(mph);
     final phone = t['driver_phone']?.toString();
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
