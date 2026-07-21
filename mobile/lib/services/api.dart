@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'session_store.dart';
+import 'tracking_service.dart';
 
 final _sb = Supabase.instance.client;
 
@@ -142,7 +144,21 @@ class CompanionApi {
     await SessionStore.saveAccessToken(session?.accessToken);
   }
 
-  Future<void> signOut() => _sb.auth.signOut();
+  /// Sign out MUST also kill the GPS foreground service and wipe the offline
+  /// queues — a returned/shared device must not keep tracking or hold the
+  /// previous driver's queued points (security report P0).
+  Future<void> signOut() async {
+    try {
+      await TruxTrackingService.instance.setTracking(false);
+    } catch (_) {/* never block sign-out on the tracker */}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(SessionStore.kGpsQueue);
+      await prefs.remove('status_outbox');
+    } catch (_) {}
+    await SessionStore.saveAccessToken(null);
+    await _sb.auth.signOut();
+  }
 }
 
 /// Offline outbox for status changes + GPS points (SharedPreferences-backed simple JSON).
