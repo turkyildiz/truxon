@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/doc_scan.dart';
+import 'map_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../i18n.dart';
@@ -281,6 +282,14 @@ class _LoadsScreenState extends State<LoadsScreen> {
                         FilledButton(
                           onPressed: () => _queueOrSendStatus(load, next),
                           child: Text(_label(load.status)),
+                        ),
+                      if (load.status == 'assigned' || load.status == 'in_transit')
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => MapScreen(load: load)),
+                          ),
+                          icon: const Icon(Icons.navigation_outlined, size: 18),
+                          label: Text(tr('mapNavigate')),
                         ),
                       OutlinedButton(
                         onPressed: () => _openDocs(load),

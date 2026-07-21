@@ -20,6 +20,11 @@ class AppConfig {
     defaultValue: 'en-US',
   );
 
+  // ---- Truck navigation (tablet day) ----
+  /// Self-hosted Valhalla routing endpoint (e.g. https://route.truxon.com).
+  /// Empty = the map shows a straight bearing line until hosting exists.
+  static const valhallaUrl = String.fromEnvironment('VALHALLA_URL', defaultValue: '');
+
   // ---- Mumble PTT (Feature 5) ----
   /// NAS tailnet address of the Murmur server (reachable over the Tailscale VPN).
   static const mumbleHost = String.fromEnvironment(
