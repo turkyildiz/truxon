@@ -1,0 +1,16 @@
+# Self-scheduling vision-enrichment backfill. node:18 (has global fetch + can
+# apt-get poppler); --network host so it reaches the signed PDF URLs AND the
+# local Ollama at 127.0.0.1 (the playwright-image path hit a fetch quirk on this
+# box — plain node + host net works). The loop is load-gated so it only runs
+# when the NAS isn't transcoding media. Survives reboot (restart: unless-stopped)
+# without needing host cron / sudo.
+services:
+  truxon-vision-enrich:
+    image: node:18
+    container_name: truxon-vision-enrich
+    restart: unless-stopped
+    network_mode: host
+    working_dir: /app
+    volumes:
+      - /volume1/docker/truxon-vision:/app
+    command: sh vision-loop.sh

@@ -40,11 +40,27 @@ API keys.
    ```
    The job authenticates with `CRON_SECRET` via the `x-cron-key` header — the
    anon JWT alone gets 401 from customer-enrich (admin/cron gate).
-3. Run it (`run-vision.sh` runs the container with `--network host` so it reaches
-   both the signed PDF URLs and Ollama at 127.0.0.1; poppler installed at runtime):
+3. **Recommended — self-scheduling container** (survives reboot, no host cron/sudo,
+   load-gated so it only runs when the NAS isn't transcoding media):
    ```
-   /volume1/docker/truxon-vision/run-vision.sh
+   cd /volume1/docker/truxon-vision && docker compose up -d   # truxon-vision-enrich
    ```
+   `docker-compose.yaml` runs `node:18` with `--network host` and loops
+   `vision-loop.sh`: install poppler once, then every 30 min run the backfill
+   **only when 1-min load < 6** (Jellyfin/Plex transcoding pins the CPU and
+   starves minicpm-v). Logs to `logs/vision_cron.log`.
+
+   One-shot alternatives:
+   - `node vision-enrich.mjs` on the host (node 18 + poppler are installed there).
+   - `run-vision-host.sh` — same, with the load guard, for host cron.
+   - `run-vision.sh` — the original playwright-container path (hit a fetch quirk
+     on this box; prefer the node paths above).
+
+**Note on speed:** minicpm-v is CPU-only here (~1–2 tok/s under load). This is an
+overnight backfill. For faster throughput swap `OLLAMA_MODEL=granite3.2-vision`
+(2B) in vision.env. Watch progress: `docker logs -f truxon-vision-enrich` or
+`tail -f logs/vision_cron.log`; results land in `customer_enrichment_log`
+(model `vision:ratecon`) and on the customers page.
 
 ## Notes
 - Blanks-only + a broker name-match guard. Every fill logged to
