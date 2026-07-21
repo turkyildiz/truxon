@@ -286,7 +286,7 @@ class _LoadsScreenState extends State<LoadsScreen> {
                       if (load.status == 'assigned' || load.status == 'in_transit')
                         OutlinedButton.icon(
                           onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => MapScreen(load: load)),
+                            MaterialPageRoute(builder: (_) => MapScreen(load: load, api: widget.api)),
                           ),
                           icon: const Icon(Icons.navigation_outlined, size: 18),
                           label: Text(tr('mapNavigate')),

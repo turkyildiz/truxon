@@ -18,8 +18,9 @@ import '../services/diag.dart';
 /// bearing line, clearly labeled as not a road route. No deep links to side
 /// apps; the one-app rule holds.
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key, required this.load});
+  const MapScreen({super.key, required this.load, this.api});
   final DriverLoad load;
+  final CompanionApi? api;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -30,6 +31,26 @@ class _MapScreenState extends State<MapScreen> {
   List<LatLng> _route = [];
   String? _routeSummary;
   bool _routed = false; // true when Valhalla produced a real truck route
+  List<Map<String, dynamic>> _pois = [];
+  bool _showPois = true;
+
+  Future<void> _loadPois() async {
+    final api = widget.api;
+    final me = _me;
+    final target = _target;
+    if (api == null || me == null || target == null) return;
+    // box around truck + stop, padded half a degree (~35 mi)
+    final minLat = (me.latitude < target.latitude ? me.latitude : target.latitude) - 0.5;
+    final maxLat = (me.latitude > target.latitude ? me.latitude : target.latitude) + 0.5;
+    final minLon = (me.longitude < target.longitude ? me.longitude : target.longitude) - 0.5;
+    final maxLon = (me.longitude > target.longitude ? me.longitude : target.longitude) + 0.5;
+    try {
+      final pois = await api.poisInBbox(minLat, minLon, maxLat, maxLon);
+      if (mounted) setState(() => _pois = pois);
+    } catch (e) {
+      Diag.log('map: poi load failed: $e');
+    }
+  }
 
   LatLng? get _target {
     final r = widget.load.raw;
@@ -53,6 +74,7 @@ class _MapScreenState extends State<MapScreen> {
       if (!mounted) return;
       setState(() => _me = LatLng(pos.latitude, pos.longitude));
       await _routeTo();
+      await _loadPois();
     } catch (e) {
       Diag.log('map: locate failed: $e');
     }
@@ -138,6 +160,14 @@ class _MapScreenState extends State<MapScreen> {
       appBar: AppBar(
         title: Text('${widget.load.loadNumber} — '
             '${widget.load.status == 'in_transit' ? tr('mapToDelivery') : tr('mapToPickup')}'),
+        actions: [
+          if (_pois.isNotEmpty)
+            IconButton(
+              tooltip: tr('mapPois'),
+              icon: Icon(_showPois ? Icons.local_gas_station : Icons.local_gas_station_outlined),
+              onPressed: () => setState(() => _showPois = !_showPois),
+            ),
+        ],
       ),
       body: target == null
           ? Center(child: Text(tr('mapNoCoords')))
@@ -169,6 +199,28 @@ class _MapScreenState extends State<MapScreen> {
                             strokeWidth: 4,
                             color: _routed ? Colors.indigo : Colors.grey,
                           ),
+                        ]),
+                      if (_showPois && _pois.isNotEmpty)
+                        MarkerLayer(markers: [
+                          for (final p in _pois)
+                            Marker(
+                              point: LatLng((p['lat'] as num).toDouble(), (p['lon'] as num).toDouble()),
+                              width: 26,
+                              height: 26,
+                              child: Tooltip(
+                                message: (p['name'] as String?)?.isNotEmpty == true
+                                    ? p['name'] as String
+                                    : p['kind'] as String,
+                                child: Text(
+                                  switch (p['kind']) {
+                                    'truck_stop' => '⛽',
+                                    'rest_area' => '🅿',
+                                    _ => '⚖',
+                                  },
+                                  style: const TextStyle(fontSize: 18),
+                                ),
+                              ),
+                            ),
                         ]),
                       MarkerLayer(markers: [
                         if (_me != null)

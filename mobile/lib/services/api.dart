@@ -29,6 +29,23 @@ class CompanionApi {
     return await _sb.from('profiles').select().eq('id', uid).maybeSingle();
   }
 
+  /// Trucker POIs (truck stops / rest areas / weigh stations) inside a
+  /// map box — served from our own cache, never Overpass.
+  Future<List<Map<String, dynamic>>> poisInBbox(
+      double minLat, double minLon, double maxLat, double maxLon,
+      {List<String>? kinds}) async {
+    final data = await _sb.rpc('pois_in_bbox', params: {
+      'p_min_lat': minLat,
+      'p_min_lon': minLon,
+      'p_max_lat': maxLat,
+      'p_max_lon': maxLon,
+      if (kinds != null) 'p_kinds': kinds,
+    });
+    return ((data as List?) ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
+
   /// Trucks a driver can inspect (DVIR).
   Future<List<Map<String, dynamic>>> listTrucks() async {
     final data = await _sb
