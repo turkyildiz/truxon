@@ -1,5 +1,9 @@
 # Go-live checklist (companion + Trux agent)
 
+> **HISTORICAL (pre-launch, week of 2026-07-14).** The audited Aug-1 cutover
+> status is [GO_LIVE_AUG1.md](GO_LIVE_AUG1.md); ops reference is
+> [OPERATIONS.md](OPERATIONS.md). §6 (Exchange app policy) is still owed.
+
 ## Trux email door (trux@truxon.com) — owner setup
 
 Code is deployed (`trux-inbox` polls every 2 min via pg_cron and no-ops until
