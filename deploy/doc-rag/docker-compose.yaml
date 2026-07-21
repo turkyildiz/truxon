@@ -1,0 +1,15 @@
+# Doc-RAG search worker as a supervised container (was a bare nohup node
+# process — a NAS reboot killed document search silently). Host network so
+# 127.0.0.1:11434 still reaches the ollama container's published port.
+# Worker has zero npm deps; the node image runs the script straight off the
+# bind mount. Logs: docker logs truxon-rag-search.
+services:
+  rag-search:
+    image: node:20-slim
+    container_name: truxon-rag-search
+    restart: unless-stopped
+    network_mode: host
+    working_dir: /app
+    volumes:
+      - /volume1/docker/truxon-rag:/app
+    command: node search-worker.mjs

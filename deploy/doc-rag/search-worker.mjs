@@ -19,6 +19,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const env = loadEnv(join(HERE, 'rag.env'))
 const URL = env.DOC_RAG_URL
 const JWT = env.SUPABASE_ANON_JWT
+const CRON = env.CRON_SECRET || ''
 const OLLAMA = (env.OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/$/, '')
 const EMBED_MODEL = env.EMBED_MODEL || 'nomic-embed-text'
 const POLL_MS = Number(env.POLL_MS || 2000)
@@ -34,7 +35,7 @@ const log = (m) => console.log(`[search] ${new Date().toISOString()} ${m}`)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 async function edge(body) {
-  const r = await fetch(URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${JWT}` }, body: JSON.stringify(body) })
+  const r = await fetch(URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${JWT}`, ...(CRON ? { 'x-cron-key': CRON } : {}) }, body: JSON.stringify(body) })
   return r.json()
 }
 async function embed(text) {
@@ -52,7 +53,12 @@ async function main() {
   for (;;) {
     let req
     try {
-      ({ request: req } = await edge({ mode: 'search_targets' }))
+      const resp = await edge({ mode: 'search_targets' })
+      if (resp.error) { // auth/gate failures must be LOUD, not read as "no work"
+        log(`GATE ERROR: ${resp.error} — check CRON_SECRET in rag.env`)
+        await sleep(POLL_MS * 10); continue
+      }
+      req = resp.request
     } catch (e) {
       log(`poll error: ${String(e).slice(0, 80)}`); await sleep(POLL_MS * 3); continue
     }
