@@ -630,6 +630,23 @@ export async function loadActuals(days = 60): Promise<LoadActual[]> {
   return unwrap(await supabase.rpc('load_actuals', { p_days: days })) as unknown as LoadActual[]
 }
 
+export interface NextLoadSuggestion {
+  load_id: number
+  load_number: string
+  customer: string
+  pickup_address: string | null
+  pickup_state: string | null
+  deadhead_miles: number
+  rate: number
+  miles: number
+  rpm: number | null
+  pickup_time: string | null
+}
+
+export async function nextLoadSuggestions(loadId: number): Promise<NextLoadSuggestion[]> {
+  return unwrap(await supabase.rpc('next_load_suggestions', { p_load_id: loadId })) as unknown as NextLoadSuggestion[]
+}
+
 export interface IftaQuarterRow {
   jurisdiction: string
   miles: number

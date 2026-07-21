@@ -4,7 +4,40 @@ import { useParams } from 'react-router-dom'
 import DocsNotes from '../components/DocsNotes'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Badge, Button, Card, Field, formatDateTime, Input, LoadError, money, Select, Textarea } from '../components/ui'
-import { cancelLoad, changeLoadStatus, getLoad, listStops, replaceStops, setLoadPaperwork, uncancelLoad, updateLoad } from '../data'
+import { cancelLoad, changeLoadStatus, getLoad, listStops, nextLoadSuggestions, replaceStops, setLoadPaperwork, uncancelLoad, updateLoad } from '../data'
+import { Link } from 'react-router-dom'
+
+/** Deadhead assist: once a load is moving/done, show the closest open pickups. */
+function NextLoadCard({ loadId, show }: { loadId: number; show: boolean }) {
+  const q = useQuery({
+    queryKey: ['next-load', loadId],
+    queryFn: () => nextLoadSuggestions(loadId),
+    enabled: show,
+    retry: false,
+  })
+  const rows = q.data ?? []
+  if (!show || q.isError || rows.length === 0) return null
+  return (
+    <Card title="🧭 Nearest next pickups (open, unassigned)">
+      <table className="w-full text-sm">
+        <tbody>
+          {rows.map((s) => (
+            <tr key={s.load_id} className="border-t border-edge/50">
+              <td className="py-1.5 pr-3 font-medium">
+                <Link className="text-brand hover:underline" to={`/loads/${s.load_id}`}>{s.load_number}</Link>
+              </td>
+              <td className="py-1.5 pr-3">{s.customer}</td>
+              <td className="py-1.5 pr-3 text-muted">{s.pickup_address || s.pickup_state || '—'}</td>
+              <td className="py-1.5 pr-3 font-semibold">{Math.round(Number(s.deadhead_miles))} mi deadhead</td>
+              <td className="py-1.5">{money(Number(s.rate))}{s.rpm != null && <span className="text-muted"> (${Number(s.rpm).toFixed(2)}/mi)</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-2 text-[11px] text-muted">Straight-line miles from this load's delivery — road miles run longer.</p>
+    </Card>
+  )
+}
 import { errorMessage } from '../supabase'
 import { ReferenceDataBanner, useReferenceData } from '../useReferenceData'
 import { LOAD_STATUSES, type Load } from '../types'
@@ -376,6 +409,8 @@ export default function LoadDetail() {
           </Card>
         </div>
       )}
+
+      <NextLoadCard loadId={Number(id)} show={['in_transit', 'delivered', 'completed'].includes(load.status)} />
 
       <DocsNotes entityType="load" entityId={id!} docTypes={['Rate Confirmation', 'BOL', 'POD', 'Photo', 'Other']} />
     </div>

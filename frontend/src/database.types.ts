@@ -4040,6 +4040,21 @@ export type Database = {
       my_week_scorecard: { Args: { p_week_offset?: number }; Returns: Json }
       next_invoice_number: { Args: never; Returns: string }
       next_load_number: { Args: never; Returns: string }
+      next_load_suggestions: {
+        Args: { p_load_id: number }
+        Returns: {
+          customer: string
+          deadhead_miles: number
+          load_id: number
+          load_number: string
+          miles: number
+          pickup_address: string
+          pickup_state: string
+          pickup_time: string
+          rate: number
+          rpm: number
+        }[]
+      }
       normalize_company_name: { Args: { p: string }; Returns: string }
       playbook_coverage: { Args: never; Returns: Json }
       playbook_metrics_list: {
