@@ -491,7 +491,7 @@ ${mode === 'propose'
       if (
         completion.content && !ranReadTool && !announceNudged && round < maxRounds - 1 &&
         completion.content.length < 400 &&
-        /\b(let me|i'?ll|i will|going to|gonna)\b[^.!?]{0,80}\b(pull|run|check|look|grab|fetch|get|dig|review)\b/i.test(completion.content)
+        /\b(let me|i['\u2019]?ll|i will|going to|gonna)\b[^.!?]{0,80}\b(pull|run|check|look|grab|fetch|get|dig|review)\b/i.test(completion.content)
       ) {
         announceNudged = true
         forceTools = true // next completion MUST call a tool (tool_choice: any)
@@ -514,9 +514,12 @@ ${mode === 'propose'
         args = {}
       }
 
-      // The model may only use tools granted to this role.
+      // The model may only use tools granted to this role. A hallucinated tool
+      // name (e.g. a report FUNCTION used as a tool name) must keep the loop
+      // alive so the model can correct itself — not break out with the preamble.
       if (!tools.some((t) => t.name === tc.name)) {
-        messages.push({ role: 'user', content: `Tool ${tc.name} is not available to this user.` })
+        hadTool = true
+        messages.push({ role: 'user', content: `Tool ${tc.name} does not exist. The report functions are called through query_data with SQL, e.g. select * from public.${tc.name}(...). Do that instead.` })
         continue
       }
 
