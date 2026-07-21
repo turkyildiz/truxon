@@ -1,7 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
-import { Card, LoadError, money, Table } from '../components/ui'
-import { customerProfile } from '../data'
+import { Card, formatDate, LoadError, money, Table } from '../components/ui'
+import { collectionsQueue, customerExposure, customerKeepFire, customerProfile } from '../data'
+
+const VERDICT_STYLE: Record<string, string> = {
+  grow: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  keep: 'bg-surface-2 text-muted',
+  'fix-price': 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  fire: 'bg-red-500/15 text-red-700 dark:text-red-300',
+}
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
@@ -20,6 +27,27 @@ export default function CustomerDetail() {
     queryFn: () => customerProfile(Number(id)),
     enabled: !!id,
   })
+  const exposureQ = useQuery({
+    queryKey: ['customer-exposure', id],
+    queryFn: () => customerExposure(Number(id)),
+    enabled: !!id,
+    retry: false,
+  })
+  const verdictQ = useQuery({
+    queryKey: ['keep-fire'],
+    queryFn: () => customerKeepFire(365),
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  })
+  const collectionsQ = useQuery({
+    queryKey: ['collections-queue'],
+    queryFn: collectionsQueue,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  })
+  const verdict = verdictQ.data?.find((r) => r.customer_id === Number(id))
+  const exposure = exposureQ.data
+  const collections = collectionsQ.data?.find((r) => r.customer_id === Number(id))
 
   if (q.isError) return <LoadError error={q.error} onRetry={() => q.refetch()} />
   if (!q.data) return <p className="py-8 text-center text-muted">Loading…</p>
@@ -38,6 +66,14 @@ export default function CustomerDetail() {
           <Link to="/customers" className="text-sm text-brand hover:underline">← Customers</Link>
           <h1 className="text-xl font-bold text-body">
             {c.company_name}
+            {verdict && (
+              <span
+                className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${VERDICT_STYLE[verdict.recommendation]}`}
+                title={verdict.reason || undefined}
+              >
+                {verdict.recommendation}
+              </span>
+            )}
             {c.do_not_use && (
               <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-300">Do Not Use</span>
             )}
@@ -103,6 +139,55 @@ export default function CustomerDetail() {
           </p>
         </Card>
       </div>
+
+      {(exposure || collections) && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {exposure && (
+            <Card title="Credit exposure">
+              <div className="flex items-baseline gap-3">
+                <span className={`text-2xl font-bold ${exposure.over_limit ? 'text-rose-600 dark:text-rose-400' : 'text-body'}`}>
+                  {money(Number(exposure.exposure))}
+                </span>
+                <span className="text-sm text-muted">of a {money(Number(exposure.limit))} limit</span>
+                {exposure.over_limit && (
+                  <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-semibold text-red-700 dark:text-red-300">over limit</span>
+                )}
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-2">
+                <div
+                  className={`h-full ${exposure.over_limit ? 'bg-rose-500' : Number(exposure.exposure) / Math.max(Number(exposure.limit), 1) > 0.75 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                  style={{ width: `${Math.min(100, (Number(exposure.exposure) / Math.max(Number(exposure.limit), 1)) * 100)}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-muted">
+                {money(Number(exposure.open_ar))} open AR + {money(Number(exposure.unbilled))} unbilled +{' '}
+                {money(Number(exposure.open_loads))} in motion. Rule: {exposure.rule}.
+              </p>
+            </Card>
+          )}
+          {collections && (
+            <Card title="In collections">
+              <p className="text-sm">
+                <span className="font-semibold text-rose-600 dark:text-rose-400">{money(Number(collections.overdue_total))}</span>{' '}
+                overdue across {collections.overdue_count} invoice{collections.overdue_count === 1 ? '' : 's'}, oldest{' '}
+                {collections.oldest_days} days.
+              </p>
+              {collections.last_promise ? (
+                <p className="mt-2 text-sm text-muted">
+                  Latest promise: {collections.last_promise.note}
+                  {collections.last_promise.promised_amount != null && ` — ${money(Number(collections.last_promise.promised_amount))}`}
+                  {collections.last_promise.promised_date && ` by ${formatDate(collections.last_promise.promised_date)}`}
+                </p>
+              ) : (
+                <p className="mt-2 text-sm text-muted">No promise on file — they're on the call list.</p>
+              )}
+              <p className="mt-2 text-[11px] text-muted">
+                Work the queue: <Link className="text-brand hover:underline" to="/invoices?tab=collections">Collections tab →</Link>
+              </p>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   )
 }
