@@ -29,7 +29,8 @@ API keys.
 2. `deploy/vision-enrich/vision.env` (chmod 600):
    ```
    CUSTOMER_ENRICH_URL=https://okoeeyxxvzypjiumraxq.supabase.co/functions/v1/customer-enrich
-   SUPABASE_ANON_JWT=<public JWT-format anon token>
+   CRON_SECRET=<the CRON_SECRET edge env>   # customer-enrich is admin/cron-gated
+   SUPABASE_ANON_JWT=<public JWT-format anon token>  # sent alongside; not sufficient alone
    OLLAMA_URL=http://127.0.0.1:11434
    OLLAMA_MODEL=minicpm-v
    CARRIER=Aida Logistics LLC
@@ -37,7 +38,10 @@ API keys.
    RASTER_DPI=130
    MAX_PAGES=2
    ```
-3. Run it (container joins host net to reach Ollama; poppler installed at runtime):
+   The job authenticates with `CRON_SECRET` via the `x-cron-key` header — the
+   anon JWT alone gets 401 from customer-enrich (admin/cron gate).
+3. Run it (`run-vision.sh` runs the container with `--network host` so it reaches
+   both the signed PDF URLs and Ollama at 127.0.0.1; poppler installed at runtime):
    ```
    /volume1/docker/truxon-vision/run-vision.sh
    ```

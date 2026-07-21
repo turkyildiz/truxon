@@ -30,6 +30,9 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const env = loadEnv(join(HERE, 'vision.env'))
 const URL = env.CUSTOMER_ENRICH_URL
 const JWT = env.SUPABASE_ANON_JWT
+// customer-enrich is admin/cron-gated; the anon JWT alone is rejected (401), so
+// we authenticate the job with the CRON_SECRET via the x-cron-key header.
+const CRON = env.CRON_SECRET || ''
 const OLLAMA = (env.OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/$/, '')
 const MODEL = env.OLLAMA_MODEL || 'minicpm-v'
 const CARRIER = env.CARRIER || 'Aida Logistics LLC'
@@ -57,7 +60,7 @@ Respond with ONLY a JSON object, null for anything not shown:
 IMPORTANT: return the BROKER "${broker}"'s details, NOT "${CARRIER}" — that is the trucking carrier being hired, ignore its contact info.`
 
 async function edge(body) {
-  const r = await fetch(URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${JWT}` }, body: JSON.stringify(body) })
+  const r = await fetch(URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${JWT}`, 'x-cron-key': CRON }, body: JSON.stringify(body) })
   return r.json()
 }
 
@@ -81,7 +84,7 @@ async function ollamaVision(images, prompt) {
 }
 
 async function main() {
-  if (!URL || !JWT) throw new Error('CUSTOMER_ENRICH_URL and SUPABASE_ANON_JWT required in vision.env')
+  if (!URL || !CRON) throw new Error('CUSTOMER_ENRICH_URL and CRON_SECRET required in vision.env')
   log(`model=${MODEL} ollama=${OLLAMA}`)
   let after = 0, done = 0, filled = 0, touched = 0
   while (done < MAX_CUSTOMERS) {
