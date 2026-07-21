@@ -609,6 +609,27 @@ export interface StressPack {
   perfect_storm: ScenarioResult
 }
 
+export interface LoadActual {
+  load_id: number
+  load_number: string
+  customer: string
+  delivered_on: string
+  rate: number
+  miles: number
+  eld_miles: number | null
+  driver_pay: number
+  est_fuel: number
+  actual_fuel: number
+  tolls: number
+  est_margin: number
+  actual_margin: number
+  variance: number
+}
+
+export async function loadActuals(days = 60): Promise<LoadActual[]> {
+  return unwrap(await supabase.rpc('load_actuals', { p_days: days })) as unknown as LoadActual[]
+}
+
 export interface NpsQuarter {
   quarter: string
   responses: number

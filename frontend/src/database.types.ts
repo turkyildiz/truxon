@@ -3813,6 +3813,25 @@ export type Database = {
         Args: { p_cents: number; p_provider: string }
         Returns: boolean
       }
+      load_actuals: {
+        Args: { p_days?: number }
+        Returns: {
+          actual_fuel: number
+          actual_margin: number
+          customer: string
+          delivered_on: string
+          driver_pay: number
+          eld_miles: number
+          est_fuel: number
+          est_margin: number
+          load_id: number
+          load_number: string
+          miles: number
+          rate: number
+          tolls: number
+          variance: number
+        }[]
+      }
       loads_missing_pod: {
         Args: { p_days?: number }
         Returns: {

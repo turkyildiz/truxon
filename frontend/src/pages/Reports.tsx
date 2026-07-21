@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { driverNpsSummary, driverScorecard, laneSummary, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { driverNpsSummary, driverScorecard, laneSummary, loadActuals, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -73,6 +73,35 @@ function DriverCards({ weekOffset }: { weekOffset: number }) {
 }
 
 /** Every state→state lane, ranked by revenue, margined at the GL all-in $/mi. */
+function ActualsCard() {
+  const q = useQuery({ queryKey: ['load-actuals'], queryFn: () => loadActuals(30), retry: false })
+  const rows = q.data ?? []
+  if (q.isError || rows.length === 0) return null
+  const worst = [...rows].sort((a, b) => Number(a.variance) - Number(b.variance)).slice(0, 8)
+  return (
+    <Card title="🎯 Booked vs actual — where estimates lied (30 days)">
+      <p className="mb-2 text-xs text-muted">
+        Actual = real driver pay + transponder tolls + banked ELD miles (deadhead included) × GL fuel $/mi.
+        Negative variance means the load made less than the booking math promised.
+      </p>
+      <Table headers={['Load', 'Customer', 'Rate', 'Est. margin', 'Actual', 'Variance']}>
+        {worst.map((r) => (
+          <tr key={r.load_id} className="hover:bg-surface-2">
+            <td className="px-3 py-2.5 font-medium text-brand">{r.load_number}</td>
+            <td className="px-3 py-2.5">{r.customer}</td>
+            <td className="px-3 py-2.5">{money(Number(r.rate))}</td>
+            <td className="px-3 py-2.5 text-muted">{money(Number(r.est_margin))}</td>
+            <td className="px-3 py-2.5 font-semibold">{money(Number(r.actual_margin))}</td>
+            <td className={`px-3 py-2.5 font-semibold ${Number(r.variance) < 0 ? 'text-red-600 dark:text-red-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
+              {Number(r.variance) > 0 ? '+' : ''}{money(Number(r.variance))}
+            </td>
+          </tr>
+        ))}
+      </Table>
+    </Card>
+  )
+}
+
 function NpsCard() {
   const q = useQuery({ queryKey: ['driver-nps'], queryFn: driverNpsSummary, retry: false })
   const rows = q.data ?? []
@@ -322,6 +351,7 @@ export default function Reports() {
           <DriverCards weekOffset={Math.max(0, Math.round((new Date(todayISO() + 'T00:00:00').getTime() - new Date(weekOf + 'T00:00:00').getTime()) / (7 * 86400000)))} />
           <LanesCard />
           <StressCard />
+          <ActualsCard />
           <NpsCard />
         </>
       )}
