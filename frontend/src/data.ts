@@ -1827,3 +1827,30 @@ export async function laneSummary(days = 180): Promise<LaneSummary | null> {
   const data = unwrap(await supabase.rpc('lane_summary', { p_days: days }))
   return (data as unknown as LaneSummary) ?? null
 }
+
+// ---------- Driver scorecards ----------
+
+export interface DriverCard {
+  driver: string
+  loads: number
+  total_miles: number
+  revenue: number
+  rpm: number | null
+  est_pay: number
+  on_time_pct: number | null
+  detention_hours: number
+  violations: number
+}
+
+export interface DriverScorecard {
+  week_start: string
+  week_end: string
+  solo_revenue_per_driver_per_week: number | null
+  drivers: DriverCard[]
+}
+
+/** Weekly per-driver card: revenue, pay, ELD on-time, detention, violations. */
+export async function driverScorecard(weekOffset = 0): Promise<DriverScorecard | null> {
+  const data = unwrap(await supabase.rpc('driver_scorecard', { p_week_offset: weekOffset }))
+  return (data as unknown as DriverScorecard) ?? null
+}

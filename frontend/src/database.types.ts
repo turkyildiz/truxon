@@ -3439,6 +3439,7 @@ export type Database = {
       driver_my_loads: { Args: never; Returns: Json }
       driver_owns_load: { Args: { p_load_id: number }; Returns: boolean }
       driver_owns_load_path: { Args: { p_name: string }; Returns: boolean }
+      driver_scorecard: { Args: { p_week_offset?: number }; Returns: Json }
       driver_set_duty: {
         Args: { p_on_duty: boolean }
         Returns: {

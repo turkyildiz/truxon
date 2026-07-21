@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { laneSummary, weeklyFlash, weeklyReport } from '../data'
+import { driverScorecard, laneSummary, weeklyFlash, weeklyReport } from '../data'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -37,6 +37,37 @@ function OwnerFlash({ weekOffset }: { weekOffset: number }) {
           accent={f.sentinel.critical ? 'text-rose-600 dark:text-rose-400' : safetyEvents ? 'text-amber-600' : undefined}
         />
       </div>
+    </Card>
+  )
+}
+
+/** Weekly per-driver card: revenue, pay, on-time, detention, violations. */
+function DriverCards({ weekOffset }: { weekOffset: number }) {
+  const q = useQuery({ queryKey: ['driver-scorecard', weekOffset], queryFn: () => driverScorecard(weekOffset), retry: false })
+  const s = q.data
+  if (q.isError || !s || s.drivers.length === 0) return null
+  return (
+    <Card title="🧑‍✈️ Driver Scorecards">
+      <Table headers={['Driver', 'Loads', 'Miles', 'Revenue', '$/mi', 'Pay', 'On-time', 'Detention hrs', 'Violations']}>
+        {s.drivers.map((d) => (
+          <tr key={d.driver}>
+            <td className="px-3 py-2 font-medium">{d.driver}</td>
+            <td className="px-3 py-2">{d.loads}</td>
+            <td className="px-3 py-2">{Number(d.total_miles).toLocaleString()}</td>
+            <td className="px-3 py-2">{money(d.revenue)}</td>
+            <td className="px-3 py-2">{d.rpm != null ? `$${Number(d.rpm).toFixed(2)}` : '—'}</td>
+            <td className="px-3 py-2 font-semibold text-brand">{money(d.est_pay)}</td>
+            <td className="px-3 py-2">{d.on_time_pct != null ? `${d.on_time_pct}%` : '—'}</td>
+            <td className="px-3 py-2">{Number(d.detention_hours) > 0 ? d.detention_hours : '—'}</td>
+            <td className={`px-3 py-2 ${d.violations > 0 ? 'font-semibold text-rose-600 dark:text-rose-400' : ''}`}>
+              {d.violations > 0 ? d.violations : '—'}
+            </td>
+          </tr>
+        ))}
+      </Table>
+      <p className="mt-1 text-[11px] text-muted">
+        On-time is measured from ELD arrival vs appointment (+2h grace) where GPS coverage exists; detention from measured dwell on the driver&rsquo;s loads.
+      </p>
     </Card>
   )
 }
@@ -214,6 +245,7 @@ export default function Reports() {
           </div>
           <ReportTable title="By Truck" rows={data.by_truck} />
           <ReportTable title="By Driver" rows={data.by_driver} isDriver />
+          <DriverCards weekOffset={Math.max(0, Math.round((new Date(todayISO() + 'T00:00:00').getTime() - new Date(weekOf + 'T00:00:00').getTime()) / (7 * 86400000)))} />
           <LanesCard />
         </>
       )}
