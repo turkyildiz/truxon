@@ -19,6 +19,8 @@ import 'radio_screen.dart';
 import 'dispatch_screen.dart';
 import 'collections_screen.dart';
 import 'command_screen.dart';
+import '../services/forest_radio.dart';
+import '../services/forest_copilot.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -44,6 +46,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   // UI-side session never quietly expires now that the SDK auto-refresh is off.
   Timer? _keepFresh;
 
+  // Proactive Forest — drivers only. Speaks up on weather + stop arrival.
+  ForestCopilot? _copilot;
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +62,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   @override
   void dispose() {
     _keepFresh?.cancel();
+    _copilot?.stop();
     FlutterForegroundTask.removeTaskDataCallback(_onTrackingData);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -119,6 +125,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       // Drivers share location continuously — always on, no toggle.
       if ((p?['role'] as String?) == 'driver') {
         await _startTracking();
+        // Proactive co-pilot: speaks weather + arrival heads-ups to the driver.
+        _copilot ??= ForestCopilot(_api, ForestRadio(_api))..start();
       }
       // Self-update check (best-effort; prompts only if a newer APK is hosted).
       if (mounted) UpdateService.checkAndPrompt(context);

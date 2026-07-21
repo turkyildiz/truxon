@@ -30,6 +30,21 @@ class CompanionApi {
     return await _sb.from('profiles').select().eq('id', uid).maybeSingle();
   }
 
+  /// Severe-weather alerts pushed to THIS driver's truck (RLS: own alerts),
+  /// not yet expired. Feeds the proactive co-pilot.
+  Future<List<Map<String, dynamic>>> myWeatherAlerts() async {
+    final uid = _sb.auth.currentUser?.id;
+    if (uid == null) return const [];
+    final data = await _sb
+        .from('weather_alerts')
+        .select('alert_id, event, severity, headline, area, expires_at')
+        .eq('driver_user_id', uid)
+        .or('expires_at.is.null,expires_at.gt.${DateTime.now().toUtc().toIso8601String()}')
+        .order('created_at', ascending: false)
+        .limit(10);
+    return (data as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
   /// Trucker POIs (truck stops / rest areas / weigh stations) inside a
   /// map box — served from our own cache, never Overpass.
   Future<List<Map<String, dynamic>>> poisInBbox(

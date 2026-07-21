@@ -44,6 +44,18 @@ class ForestRadio {
 
   bool get busy => _busy;
 
+  /// Speak a line to the DRIVER locally (not broadcast). Used by the proactive
+  /// co-pilot — a "storm ahead" heads-up is personal, not fleet radio.
+  Future<void> speak(String text) async {
+    if (!await _init()) return;
+    try {
+      await _tts.stop();
+      await _tts.speak(text);
+    } catch (e) {
+      Diag.log('forest-radio: speak failed: $e');
+    }
+  }
+
   /// Hold: start listening for the question.
   Future<bool> startListening() async {
     if (_busy || !await _init()) return false;
