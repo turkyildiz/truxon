@@ -840,17 +840,32 @@ export interface InvoiceFull {
   due_date: string | null
   total: number
   customer: { company_name: string; billing_address: string; payment_terms: string }
-  loads: { load_number: string; pickup_address: string; delivery_address: string; miles: number; rate: number }[]
+  loads: { id: number; load_number: string; pickup_address: string; delivery_address: string; miles: number; rate: number }[]
+  accessorials?: LoadAccessorial[]
 }
 
 export async function getInvoiceFull(id: number): Promise<InvoiceFull> {
-  return unwrap(
+  const inv = unwrap(
     await supabase
       .from('invoices')
       .select('*, customer:customers(company_name, billing_address, payment_terms), loads(*)')
       .eq('id', id)
       .single(),
-  )
+  ) as InvoiceFull
+  // Invoiced accessorials (detention etc.) belong on the PDF — without them
+  // the line table doesn't sum to the invoice total the broker is billed.
+  const loadIds = (inv.loads ?? []).map((l: { id: number }) => l.id)
+  if (loadIds.length > 0) {
+    const { data } = await supabase
+      .from('load_accessorials')
+      .select('*')
+      .in('load_id', loadIds)
+      .eq('status', 'invoiced')
+    inv.accessorials = (data ?? []) as unknown as LoadAccessorial[]
+  } else {
+    inv.accessorials = []
+  }
+  return inv
 }
 
 // ---------- Documents (Supabase Storage + metadata table) ----------
