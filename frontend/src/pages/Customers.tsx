@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useAuth } from '../auth'
@@ -161,7 +162,7 @@ export default function Customers() {
         onPrefillConsumed={() => setPrefill(null)}
         docs={{ entityType: 'customer', docTypes: ['Contract', 'Rate Agreement', 'Insurance', 'Other'], label: (c) => c.company_name }}
         columns={[
-          { header: 'Company', render: (c) => <span className="font-medium">{c.company_name}</span> },
+          { header: 'Company', render: (c) => <Link className="font-medium text-brand hover:underline" to={`/customers/${c.id}`} onClick={(e) => e.stopPropagation()}>{c.company_name}</Link> },
           { header: 'Contact', render: (c) => c.contact_person || '—' },
           { header: 'Phone', render: (c) => c.phone || '—' },
           { header: 'Email', render: (c) => c.email || '—' },

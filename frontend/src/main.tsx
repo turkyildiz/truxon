@@ -20,6 +20,7 @@ const Trux = lazy(() => import('./pages/Trux'))
 const FleetMap = lazy(() => import('./pages/FleetMap'))
 const Loads = lazy(() => import('./pages/Loads'))
 const LoadDetail = lazy(() => import('./pages/LoadDetail'))
+const CustomerDetail = lazy(() => import('./pages/CustomerDetail'))
 const Dispatch = lazy(() => import('./pages/Dispatch'))
 const Customers = lazy(() => import('./pages/Customers'))
 const Drivers = lazy(() => import('./pages/Drivers'))
@@ -90,6 +91,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/loads/:id" element={<LoadDetail />} />
               <Route path="/dispatch" element={<Dispatch />} />
               <Route path="/customers" element={<Customers />} />
+              <Route path="/customers/:id" element={<CustomerDetail />} />
               <Route path="/drivers" element={<Drivers />} />
               <Route path="/trucks" element={<Trucks />} />
               <Route path="/trailers" element={<Trailers />} />

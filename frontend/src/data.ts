@@ -1854,3 +1854,32 @@ export async function driverScorecard(weekOffset = 0): Promise<DriverScorecard |
   const data = unwrap(await supabase.rpc('driver_scorecard', { p_week_offset: weekOffset }))
   return (data as unknown as DriverScorecard) ?? null
 }
+
+// ---------- Customer profile ----------
+
+export interface CustomerProfile {
+  found: boolean
+  customer: {
+    id: number; company_name: string; contact_person: string | null; phone: string | null
+    email: string | null; payment_terms: string | null; is_active: boolean; do_not_use: boolean
+    [k: string]: unknown
+  }
+  all_in_rpm_basis: number
+  totals: {
+    loads_12m: number; revenue_12m: number | null; rpm_12m: number | null
+    est_margin_12m: number | null; margin_pct_12m: number | null
+    first_load: string | null; last_load: string | null
+  }
+  monthly: { month: string; loads: number; revenue: number; rpm: number | null }[]
+  pay: {
+    avg_days_to_pay: number | null; paid_invoices_12m: number | null
+    open_outstanding: number; past_due_outstanding: number; open_invoices: number
+  }
+  activity: { open_loads: number; unbilled_completed: number; documents: number; detention_hours_45d: number }
+}
+
+/** Everything the owner needs to judge one customer, in one call. */
+export async function customerProfile(customerId: number): Promise<CustomerProfile | null> {
+  const data = unwrap(await supabase.rpc('customer_profile', { p_customer_id: customerId }))
+  return (data as unknown as CustomerProfile) ?? null
+}

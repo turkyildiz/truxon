@@ -3365,6 +3365,7 @@ export type Database = {
           paid_count: number
         }[]
       }
+      customer_profile: { Args: { p_customer_id: number }; Returns: Json }
       customer_rate_profile: { Args: { p_customer_id: number }; Returns: Json }
       dashboard_summary: { Args: never; Returns: Json }
       decide_accessorial: {
