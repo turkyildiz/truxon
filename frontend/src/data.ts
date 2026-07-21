@@ -452,8 +452,10 @@ export async function listObservations(opts: { classification?: string; unreview
   return rows as unknown as TruxObservation[]
 }
 
-export async function markObservationReviewed(id: number, reviewed: boolean): Promise<void> {
-  const { error } = await supabase.from('trux_observations').update({ reviewed }).eq('id', id)
+export async function markObservationReviewed(id: number, reviewed: boolean, note = ''): Promise<void> {
+  const { error } = await supabase.from('trux_observations')
+    .update(note ? { reviewed, review_note: note } : { reviewed })
+    .eq('id', id)
   if (error) throw error
 }
 
@@ -1710,4 +1712,21 @@ export function estimateLoadMargin(rate: number, miles: number, emptyMiles: numb
   const all_in_rpm = total > 0 ? rate / total : 0
   const verdict: LoadMargin['verdict'] = net < 0 ? 'loss' : all_in_rpm < b.breakeven_rpm * 1.15 ? 'thin' : 'good'
   return { total_miles: total, fuel, driver, tolls, fixed, cost, net, margin_pct: rate > 0 ? (net / rate) * 100 : 0, all_in_rpm, verdict }
+}
+
+// ---------- Forest Shadow review (summary RPC; feed uses listObservations) ----------
+
+export interface ShadowSummary {
+  total: number
+  unreviewed: number
+  last_7d: number
+  last_email_at: string | null
+  by_classification: Record<string, number>
+  by_would_action: Record<string, number>
+}
+
+/** Header stats for the Shadow review page (admin/dispatcher; null otherwise). */
+export async function shadowSummary(): Promise<ShadowSummary | null> {
+  const data = unwrap(await supabase.rpc('shadow_summary'))
+  return (data as unknown as ShadowSummary) ?? null
 }

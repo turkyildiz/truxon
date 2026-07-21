@@ -35,6 +35,7 @@ const Settings = lazy(() => import('./pages/Settings'))
 const Drive = lazy(() => import('./pages/Drive'))
 const DocSearch = lazy(() => import('./pages/DocSearch'))
 const Playbook = lazy(() => import('./pages/Playbook'))
+const Shadow = lazy(() => import('./pages/Shadow'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 15_000 } },
@@ -101,6 +102,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/team-drive" element={<Drive drive="team" />} />
               <Route path="/doc-search" element={<DocSearch />} />
               <Route path="/playbook" element={<Playbook />} />
+              <Route path="/shadow" element={<Shadow />} />
               <Route path="/users" element={<Users />} />
               <Route path="/settings" element={<Settings />} />
             </Route>

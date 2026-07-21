@@ -3799,6 +3799,7 @@ export type Database = {
         Args: { p_awaiting: boolean; p_id: number }
         Returns: undefined
       }
+      shadow_summary: { Args: never; Returns: Json }
       slow_pay_risk: {
         Args: never
         Returns: {
