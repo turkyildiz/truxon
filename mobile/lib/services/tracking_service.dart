@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 import '../i18n.dart';
 import 'diag.dart';
+import 'radio_rx.dart';
 import 'session_store.dart';
 
 /// ALWAYS-ON background GPS (Feature 4).
@@ -105,10 +106,14 @@ void trackingCallback() {
 class _TrackingHandler extends TaskHandler {
   final GpsQueue _queue = GpsQueue();
   final AuthOutage _outage = AuthOutage();
+  // The always-on radio receiver rides the same service: fleet audio keeps
+  // playing when the app is closed, exactly like GPS keeps sampling.
+  final RadioRx _radio = RadioRx();
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
     await _loadQueue();
+    await _radio.tick(); // radio up within seconds of the service starting
     // Take one fix immediately so the map lights up without waiting a minute.
     await _sample();
   }
@@ -117,10 +122,12 @@ class _TrackingHandler extends TaskHandler {
   @override
   void onRepeatEvent(DateTime timestamp) {
     _sample();
+    _radio.tick(); // reconnect / re-auth / heartbeat
   }
 
   @override
   Future<void> onDestroy(DateTime timestamp) async {
+    await _radio.dispose();
     await _persistQueue();
   }
 

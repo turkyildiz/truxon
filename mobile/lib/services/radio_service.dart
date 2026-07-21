@@ -6,10 +6,12 @@ import 'package:flutter_pcm_sound/flutter_pcm_sound.dart';
 import 'package:opus_dart/opus_dart.dart';
 import 'package:opus_flutter/opus_flutter.dart' as opus_flutter;
 import 'package:record/record.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'diag.dart';
 import 'radio_codec.dart';
+import 'radio_rx.dart';
 
 /// One-app push-to-talk: Opus voice over the already-authenticated Supabase
 /// Realtime socket (private topic radio:fleet). Replaces the Mumla +
@@ -39,10 +41,29 @@ class RadioService {
   bool _audioReady = false;
   Timer? _talkingClear;
 
+  // While the background RadioRx (foreground service) is alive it owns
+  // playback; the UI keeps indicators only, so audio never plays twice.
+  bool _bgOwnsPlayback = false;
+  Timer? _bgCheck;
+
+  Future<void> _refreshBgOwnership() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      final ts = prefs.getInt(RadioRx.kAlive) ?? 0;
+      _bgOwnsPlayback =
+          DateTime.now().millisecondsSinceEpoch - ts < 150000; // ~2.5 ticks
+    } catch (_) {/* keep last known state */}
+  }
+
   Future<void> connect(String username) async {
     if (_channel != null) return;
     _me = username;
     status.value = 'connecting';
+    await _refreshBgOwnership();
+    _bgCheck?.cancel();
+    _bgCheck = Timer.periodic(
+        const Duration(seconds: 30), (_) => _refreshBgOwnership());
     try {
       if (!_audioReady) {
         initOpus(await opus_flutter.load());
@@ -109,6 +130,7 @@ class RadioService {
     talking.value = msg.user;
     _talkingClear?.cancel();
     _talkingClear = Timer(const Duration(milliseconds: 600), () => talking.value = null);
+    if (_bgOwnsPlayback) return; // background RadioRx is playing this already
     final dec = _decoder;
     if (dec == null) return;
     for (final frame in msg.frames) {
@@ -203,6 +225,8 @@ class RadioService {
 
   Future<void> disconnect() async {
     await stopTalking();
+    _bgCheck?.cancel();
+    _bgCheck = null;
     final ch = _channel;
     _channel = null;
     if (ch != null) await Supabase.instance.client.removeChannel(ch);

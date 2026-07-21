@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../i18n.dart';
 import '../services/alarms.dart';
 import '../services/api.dart';
 import '../services/diag.dart';
 import '../services/push.dart';
 import '../services/nps_service.dart';
+import '../services/radio_rx.dart';
 import '../services/tracking_service.dart';
 import '../services/update_service.dart';
 import 'dvir_screen.dart';
@@ -85,6 +87,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       await PushService.init(_api);
       final p = await _api.profile();
       setState(() => _profile = p);
+      // Hand the radio username to the background receiver (RadioRx) so it
+      // can filter own-mic echo and show this driver on the fleet roster.
+      final radioName = (p?['full_name'] as String?)?.isNotEmpty == true
+          ? p!['full_name'] as String
+          : (p?['username'] as String? ?? 'User');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(RadioRx.kUser, radioName);
       // Drivers share location continuously — always on, no toggle.
       if ((p?['role'] as String?) == 'driver') {
         await _startTracking();
