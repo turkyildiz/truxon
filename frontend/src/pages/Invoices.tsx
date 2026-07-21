@@ -5,13 +5,14 @@
  * reports. QuickBooks stays an optional mirror (QBO-badged rows), not a
  * dependency. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Badge, Button, Card, Field, formatDate, LoadError, Modal, money, Select, Table } from '../components/ui'
 import {
   acctAging, acctMarginMonthly, acctRevenueByCustomer, acctRevenueMonthly, acctSummary, acctUnbilledLoads,
-  cashflowForecast, createInvoice, decideAccessorial, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
+  addCollectionNote, cashflowForecast, collectionsQueue, type CollectionRow,
+  createInvoice, decideAccessorial, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
   listAccessorials, proposeDetentionAccessorials,
   glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
   qboConnectUrl, qboStatus, recordInvoicePayment, revenueForecast, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
@@ -20,13 +21,14 @@ import { downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
 import { errorMessage } from '../supabase'
 import type { Invoice } from '../types'
 
-type Tab = 'overview' | 'receivables' | 'aging' | 'unbilled' | 'detention' | 'forecast' | 'reports'
+type Tab = 'overview' | 'receivables' | 'aging' | 'collections' | 'unbilled' | 'detention' | 'forecast' | 'reports'
 type Filter = 'all' | 'unpaid' | 'pastdue' | 'paid' | 'draft' | 'void'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
   { key: 'receivables', label: 'Receivables' },
   { key: 'aging', label: 'Aging' },
+  { key: 'collections', label: '📞 Collections' },
   { key: 'unbilled', label: 'Unbilled' },
   { key: 'detention', label: '⏱️ Detention' },
   { key: 'forecast', label: '🔮 Forecast' },
@@ -106,7 +108,7 @@ function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: 
 export default function Invoices() {
   const qc = useQueryClient()
   const [params] = useSearchParams()
-  const initialTab = (['overview', 'receivables', 'aging', 'unbilled', 'detention', 'forecast', 'reports'] as Tab[])
+  const initialTab = (['overview', 'receivables', 'aging', 'collections', 'unbilled', 'detention', 'forecast', 'reports'] as Tab[])
     .find((t) => t === params.get('tab')) ?? 'overview'
   const [tab, setTab] = useState<Tab>(initialTab)
   const [filter, setFilter] = useState<Filter>('unpaid')
@@ -352,6 +354,7 @@ export default function Invoices() {
       )}
 
       {tab === 'aging' && <AgingTab />}
+      {tab === 'collections' && <CollectionsTab />}
       {tab === 'unbilled' && <UnbilledTab onBill={billCustomer} />}
       {tab === 'detention' && <DetentionTab />}
       {tab === 'forecast' && <ForecastTab />}
@@ -518,6 +521,125 @@ function ForecastTab() {
           </Table>
         )}
       </Card>
+    </div>
+  )
+}
+
+function CollectionsTab() {
+  const qc = useQueryClient()
+  const q = useQuery({ queryKey: ['collections-queue'], queryFn: collectionsQueue, retry: false })
+  const [open, setOpen] = useState<number | null>(null)
+  const [noteFor, setNoteFor] = useState<CollectionRow | null>(null)
+  const [note, setNote] = useState('')
+  const [promiseAmt, setPromiseAmt] = useState('')
+  const [promiseDate, setPromiseDate] = useState('')
+
+  const saveNote = useMutation({
+    mutationFn: () => addCollectionNote({
+      customer_id: noteFor!.customer_id,
+      note,
+      promised_amount: promiseAmt ? Number(promiseAmt) : null,
+      promised_date: promiseDate || null,
+    }),
+    onSuccess: () => {
+      setNoteFor(null); setNote(''); setPromiseAmt(''); setPromiseDate('')
+      qc.invalidateQueries({ queryKey: ['collections-queue'] })
+    },
+  })
+
+  if (q.isLoading) return <p className="py-8 text-center text-muted">Loading…</p>
+  if (q.isError) return <LoadError error={q.error} onRetry={() => q.refetch()} />
+  const rows = q.data ?? []
+  if (rows.length === 0) return <p className="py-8 text-center text-muted">Nothing overdue. 🎉</p>
+  const total = rows.reduce((s, r) => s + Number(r.overdue_total), 0)
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted">
+        {money(total)} overdue across {rows.length} customer{rows.length === 1 ? '' : 's'}, ranked by
+        dollars × age. Forest drafts a payment reminder for review every Monday — nothing sends without you.
+      </p>
+      <Table headers={['Customer', 'Contact', 'Overdue', 'Inv.', 'Oldest', 'Usually pays in', 'Promise', '']}>
+        {rows.map((r) => (
+          <Fragment key={r.customer_id}>
+            <tr className="cursor-pointer hover:bg-surface-2" onClick={() => setOpen(open === r.customer_id ? null : r.customer_id)}>
+              <td className="px-3 py-2.5 font-medium">{r.company_name}</td>
+              <td className="px-3 py-2.5 text-muted">
+                {r.contact_person || '—'}
+                {r.phone && <span className="block text-xs">{r.phone}</span>}
+                {r.email && <span className="block text-xs">{r.email}</span>}
+              </td>
+              <td className="px-3 py-2.5 font-semibold text-red-600 dark:text-red-300">{money(Number(r.overdue_total))}</td>
+              <td className="px-3 py-2.5 text-muted">{r.overdue_count}</td>
+              <td className="px-3 py-2.5">
+                <span className={r.oldest_days >= 30 ? 'font-semibold text-red-600 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}>
+                  {r.oldest_days}d
+                </span>
+              </td>
+              <td className="px-3 py-2.5 text-muted">{r.avg_days_to_pay != null ? `${r.avg_days_to_pay}d` : '—'}</td>
+              <td className="px-3 py-2.5 text-sm">
+                {r.last_promise ? (
+                  <span title={r.last_promise.note}>
+                    {r.last_promise.promised_amount != null && money(Number(r.last_promise.promised_amount))}
+                    {r.last_promise.promised_date && ` by ${formatDate(r.last_promise.promised_date)}`}
+                    {r.last_promise.promised_amount == null && !r.last_promise.promised_date && '📝'}
+                  </span>
+                ) : '—'}
+              </td>
+              <td className="px-3 py-2.5">
+                <Button variant="secondary" onClick={(e) => { e.stopPropagation(); setNoteFor(r) }}>+ Note</Button>
+              </td>
+            </tr>
+            {open === r.customer_id && (
+              <tr>
+                <td colSpan={8} className="bg-surface-2 px-6 py-3">
+                  <ul className="space-y-1 text-sm">
+                    {r.invoices.map((inv) => (
+                      <li key={inv.invoice_id} className="flex gap-4">
+                        <span className="font-medium">{inv.invoice_number}</span>
+                        <span>{money(Number(inv.balance))}</span>
+                        <span className="text-muted">due {formatDate(inv.due_date)}</span>
+                        <span className="text-red-600 dark:text-red-300">{inv.days_late} days late</span>
+                      </li>
+                    ))}
+                  </ul>
+                </td>
+              </tr>
+            )}
+          </Fragment>
+        ))}
+      </Table>
+
+      {noteFor && (
+        <Modal title={`Call note — ${noteFor.company_name}`} open onClose={() => setNoteFor(null)}>
+          <div className="space-y-3">
+            <Field label="What happened">
+              <textarea
+                className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm"
+                rows={3} value={note} onChange={(e) => setNote(e.target.value)}
+                placeholder="Spoke with AP — check going out Friday…"
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Promised amount (optional)">
+                <input type="number" className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm"
+                  value={promiseAmt} onChange={(e) => setPromiseAmt(e.target.value)} />
+              </Field>
+              <Field label="Promised date (optional)">
+                <input type="date" className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm"
+                  value={promiseDate} onChange={(e) => setPromiseDate(e.target.value)} />
+              </Field>
+            </div>
+            {saveNote.isError && <p className="text-sm text-red-600">{errorMessage(saveNote.error)}</p>}
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setNoteFor(null)}>Cancel</Button>
+              <Button onClick={() => saveNote.mutate()} disabled={!note.trim() || saveNote.isPending}>
+                {saveNote.isPending ? 'Saving…' : 'Save note'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

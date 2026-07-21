@@ -242,6 +242,54 @@ export type Database = {
         }
         Relationships: []
       }
+      collection_notes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_id: number
+          id: number
+          invoice_id: number | null
+          note: string
+          promised_amount: number | null
+          promised_date: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_id: number
+          id?: never
+          invoice_id?: number | null
+          note: string
+          promised_amount?: number | null
+          promised_date?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_id?: number
+          id?: never
+          invoice_id?: number | null
+          note?: string
+          promised_amount?: number | null
+          promised_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_notes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_notes_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companion_config: {
         Row: {
           flags: Json
@@ -792,6 +840,44 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eld_daily_miles: {
+        Row: {
+          created_at: string
+          day: string
+          miles: number
+          path: Json
+          points: number
+          state: string
+          truck_id: number
+        }
+        Insert: {
+          created_at?: string
+          day: string
+          miles?: number
+          path?: Json
+          points?: number
+          state?: string
+          truck_id: number
+        }
+        Update: {
+          created_at?: string
+          day?: string
+          miles?: number
+          path?: Json
+          points?: number
+          state?: string
+          truck_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eld_daily_miles_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
             referencedColumns: ["id"]
           },
         ]
@@ -1941,6 +2027,8 @@ export type Database = {
         Row: {
           access_expires_at: string
           access_token: string
+          connect_ticket_expires: string | null
+          connect_ticket_hash: string | null
           connected_at: string
           id: number
           oauth_state: string | null
@@ -1951,6 +2039,8 @@ export type Database = {
         Insert: {
           access_expires_at: string
           access_token: string
+          connect_ticket_expires?: string | null
+          connect_ticket_hash?: string | null
           connected_at?: string
           id?: number
           oauth_state?: string | null
@@ -1961,6 +2051,8 @@ export type Database = {
         Update: {
           access_expires_at?: string
           access_token?: string
+          connect_ticket_expires?: string | null
+          connect_ticket_hash?: string | null
           connected_at?: string
           id?: number
           oauth_state?: string | null
@@ -2188,6 +2280,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      state_polygons: {
+        Row: {
+          geom: unknown
+          name: string
+          stusps: string
+        }
+        Insert: {
+          geom: unknown
+          name: string
+          stusps: string
+        }
+        Update: {
+          geom?: unknown
+          name?: string
+          stusps?: string
+        }
+        Relationships: []
       }
       toll_transactions: {
         Row: {
@@ -3315,6 +3425,23 @@ export type Database = {
           query: string
         }[]
       }
+      collections_queue: {
+        Args: never
+        Returns: {
+          avg_days_to_pay: number
+          company_name: string
+          contact_person: string
+          customer_id: number
+          email: string
+          invoices: Json
+          last_promise: Json
+          oldest_days: number
+          overdue_count: number
+          overdue_total: number
+          phone: string
+          priority: number
+        }[]
+      }
       company_scorecard: {
         Args: { p_end: string; p_start: string }
         Returns: Json
@@ -3399,6 +3526,7 @@ export type Database = {
           stop_type: string
         }[]
       }
+      draft_dunning_notices: { Args: never; Returns: number }
       drive_create_share: {
         Args: { p_expires_at?: string; p_file_id: number }
         Returns: string
@@ -3585,6 +3713,19 @@ export type Database = {
       gl_upsert_monthly: { Args: { p_rows: Json }; Returns: number }
       global_search: { Args: { q: string }; Returns: Json }
       idle_summary: { Args: { p_days?: number }; Returns: Json }
+      ifta_attribute_states: { Args: { p_day?: string }; Returns: number }
+      ifta_miles_status: { Args: never; Returns: Json }
+      ifta_quarter: {
+        Args: { p_quarter?: string }
+        Returns: {
+          fuel_spend: number
+          fuel_transactions: number
+          gallons: number
+          jurisdiction: string
+          miles: number
+          share_pct: number
+        }[]
+      }
       import_fuel_transactions: { Args: { p_rows: Json }; Returns: Json }
       import_toll_transactions: { Args: { p_rows: Json }; Returns: Json }
       ingest_vehicle_positions: { Args: { p_points: Json }; Returns: Json }
@@ -3852,6 +3993,7 @@ export type Database = {
           week_start: string
         }[]
       }
+      rollup_eld_daily: { Args: { p_day?: string }; Returns: number }
       safety_summary: {
         Args: { p_end: string; p_start: string }
         Returns: Json
@@ -3891,6 +4033,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      set_cron_config: {
+        Args: { p_key: string; p_value: string }
+        Returns: undefined
       }
       set_invoice_status: {
         Args: {
@@ -3999,6 +4145,7 @@ export type Database = {
         Returns: number
       }
       trux_query: { Args: { p_sql: string }; Returns: Json }
+      trux_state_at: { Args: { p_lat: number; p_lng: number }; Returns: string }
       trux_week_end: { Args: { d: string }; Returns: string }
       trux_week_label: { Args: { d: string }; Returns: string }
       trux_week_number: { Args: { d: string }; Returns: number }
@@ -4096,6 +4243,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      weekly_digest_observation: { Args: never; Returns: number }
       weekly_flash: { Args: { p_week_offset?: number }; Returns: Json }
       weekly_report: { Args: { p_week_of?: string }; Returns: Json }
     }

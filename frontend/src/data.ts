@@ -597,6 +597,42 @@ export async function acctAging(): Promise<AgingRow[]> {
   return unwrap(await supabase.rpc('acct_aging')) as unknown as AgingRow[]
 }
 
+export interface CollectionInvoice {
+  invoice_id: number
+  invoice_number: string
+  balance: number
+  due_date: string
+  days_late: number
+}
+export interface CollectionRow {
+  customer_id: number
+  company_name: string
+  contact_person: string | null
+  phone: string | null
+  email: string | null
+  overdue_total: number
+  overdue_count: number
+  oldest_days: number
+  avg_days_to_pay: number | null
+  last_promise: { note: string; promised_amount: number | null; promised_date: string | null; created_at: string } | null
+  invoices: CollectionInvoice[]
+  priority: number
+}
+
+export async function collectionsQueue(): Promise<CollectionRow[]> {
+  return unwrap(await supabase.rpc('collections_queue')) as unknown as CollectionRow[]
+}
+
+export async function addCollectionNote(input: {
+  customer_id: number
+  note: string
+  promised_amount?: number | null
+  promised_date?: string | null
+}): Promise<void> {
+  const { error } = await supabase.from('collection_notes').insert(input)
+  if (error) throw error
+}
+
 export async function acctUnbilledLoads(): Promise<UnbilledLoad[]> {
   return unwrap(await supabase.rpc('acct_unbilled_loads')) as unknown as UnbilledLoad[]
 }
