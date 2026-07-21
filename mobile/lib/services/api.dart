@@ -59,6 +59,14 @@ class CompanionApi {
     });
   }
 
+  /// The driver's own weekly card (loads, miles, est pay, on-time,
+  /// detention). Null for unlinked/office logins.
+  Future<Map<String, dynamic>?> myWeekScorecard() async {
+    final data = await _sb.rpc('my_week_scorecard', params: {'p_week_offset': 0});
+    if (data == null) return null;
+    return Map<String, dynamic>.from(data as Map);
+  }
+
   Future<List<DriverLoad>> myLoads() async {
     final data = await _sb.rpc('driver_my_loads');
     final list = (data as List?) ?? [];

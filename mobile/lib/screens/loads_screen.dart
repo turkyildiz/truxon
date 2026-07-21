@@ -17,8 +17,45 @@ class LoadsScreen extends StatefulWidget {
 
 class _LoadsScreenState extends State<LoadsScreen> {
   List<DriverLoad> _loads = [];
+  Map<String, dynamic>? _week;
   bool _loading = true;
   String? _error;
+
+  /// "My week" strip above the load list — the driver's own numbers only.
+  Widget _weekCard() {
+    final w = _week;
+    if (w == null || (w['loads'] as num? ?? 0) == 0) return const SizedBox.shrink();
+    Widget stat(String label, String value) => Expanded(
+          child: Column(
+            children: [
+              Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+            ],
+          ),
+        );
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Column(
+          children: [
+            Text(tr('myWeekTitle'), style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                stat(tr('myWeekLoads'), '${w['loads']}'),
+                stat(tr('myWeekMiles'), '${(w['total_miles'] as num?)?.round() ?? 0}'),
+                stat(tr('myWeekPay'), '\$${(w['est_pay'] as num?)?.round() ?? 0}'),
+                if (w['on_time_pct'] != null) stat(tr('myWeekOnTime'), '${(w['on_time_pct'] as num).round()}%'),
+                if ((w['detention_hours'] as num? ?? 0) > 0)
+                  stat(tr('myWeekDetention'), '${w['detention_hours']}h'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -36,7 +73,14 @@ class _LoadsScreenState extends State<LoadsScreen> {
       final loads = await widget.api.myLoads();
       final active = loads.any((l) => l.status == 'assigned' || l.status == 'in_transit');
       widget.onTrackingHint?.call(active);
-      setState(() => _loads = loads);
+      Map<String, dynamic>? week;
+      try {
+        week = await widget.api.myWeekScorecard();
+      } catch (_) {} // the card is a bonus — never block the load list
+      setState(() {
+        _loads = loads;
+        _week = week;
+      });
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -208,10 +252,11 @@ class _LoadsScreenState extends State<LoadsScreen> {
       onRefresh: _refresh,
       child: ListView.separated(
         padding: const EdgeInsets.all(12),
-        itemCount: _loads.length,
+        itemCount: _loads.length + 1,
         separatorBuilder: (_, _) => const SizedBox(height: 8),
         itemBuilder: (context, i) {
-          final load = _loads[i];
+          if (i == 0) return _weekCard();
+          final load = _loads[i - 1];
           final next = _nextStatus(load.status);
           return Card(
             child: Padding(
