@@ -767,6 +767,41 @@ export type Database = {
           },
         ]
       }
+      driver_nps: {
+        Row: {
+          comment: string
+          created_at: string
+          driver_user_id: string
+          id: number
+          quarter: string
+          score: number
+        }
+        Insert: {
+          comment?: string
+          created_at?: string
+          driver_user_id: string
+          id?: never
+          quarter: string
+          score: number
+        }
+        Update: {
+          comment?: string
+          created_at?: string
+          driver_user_id?: string
+          id?: never
+          quarter?: string
+          score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_nps_driver_user_id_fkey"
+            columns: ["driver_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drivers: {
         Row: {
           address: string
@@ -3566,6 +3601,18 @@ export type Database = {
       driver_list_documents: { Args: { p_load_id: number }; Returns: Json }
       driver_load_dto: { Args: { p_load_id: number }; Returns: Json }
       driver_my_loads: { Args: never; Returns: Json }
+      driver_nps_summary: {
+        Args: never
+        Returns: {
+          comments: Json
+          detractors: number
+          nps: number
+          passives: number
+          promoters: number
+          quarter: string
+          responses: number
+        }[]
+      }
       driver_owns_load: { Args: { p_load_id: number }; Returns: boolean }
       driver_owns_load_path: { Args: { p_name: string }; Returns: boolean }
       driver_scorecard: { Args: { p_week_offset?: number }; Returns: Json }

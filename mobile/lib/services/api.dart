@@ -29,6 +29,36 @@ class CompanionApi {
     return await _sb.from('profiles').select().eq('id', uid).maybeSingle();
   }
 
+  /// Current NPS quarter label, e.g. 2026-Q3.
+  static String npsQuarter([DateTime? now]) {
+    final d = now ?? DateTime.now();
+    return '${d.year}-Q${((d.month - 1) ~/ 3) + 1}';
+  }
+
+  /// Has this driver already answered the current quarter's survey?
+  Future<bool> npsAnswered() async {
+    final uid = _sb.auth.currentUser?.id;
+    if (uid == null) return true; // signed out — never prompt
+    final row = await _sb
+        .from('driver_nps')
+        .select('id')
+        .eq('driver_user_id', uid)
+        .eq('quarter', npsQuarter())
+        .maybeSingle();
+    return row != null;
+  }
+
+  Future<void> submitNps(int score, String comment) async {
+    final uid = _sb.auth.currentUser?.id;
+    if (uid == null) return;
+    await _sb.from('driver_nps').insert({
+      'driver_user_id': uid,
+      'quarter': npsQuarter(),
+      'score': score,
+      'comment': comment.trim(),
+    });
+  }
+
   Future<List<DriverLoad>> myLoads() async {
     final data = await _sb.rpc('driver_my_loads');
     final list = (data as List?) ?? [];

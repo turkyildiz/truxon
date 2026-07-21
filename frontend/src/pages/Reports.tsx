@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { driverScorecard, laneSummary, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { driverNpsSummary, driverScorecard, laneSummary, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -73,6 +73,43 @@ function DriverCards({ weekOffset }: { weekOffset: number }) {
 }
 
 /** Every state→state lane, ranked by revenue, margined at the GL all-in $/mi. */
+function NpsCard() {
+  const q = useQuery({ queryKey: ['driver-nps'], queryFn: driverNpsSummary, retry: false })
+  const rows = q.data ?? []
+  if (q.isError) return null
+  if (rows.length === 0) {
+    return (
+      <Card title="🚚 Driver NPS">
+        <p className="py-4 text-center text-sm text-muted">
+          No responses yet — the quarterly survey is live in the driver app. Answers are anonymous to dispatch.
+        </p>
+      </Card>
+    )
+  }
+  return (
+    <Card title="🚚 Driver NPS — anonymous quarterly survey">
+      {rows.map((r) => (
+        <div key={r.quarter} className="mb-3">
+          <div className="flex items-baseline gap-3">
+            <span className="font-medium">{r.quarter}</span>
+            <span className={`text-2xl font-bold ${Number(r.nps) >= 30 ? 'text-emerald-700 dark:text-emerald-300' : Number(r.nps) >= 0 ? 'text-amber-700 dark:text-amber-300' : 'text-red-600 dark:text-red-300'}`}>
+              {Number(r.nps) > 0 ? '+' : ''}{r.nps}
+            </span>
+            <span className="text-sm text-muted">
+              {r.responses} response{r.responses === 1 ? '' : 's'} · {r.promoters} promoters / {r.passives} passive / {r.detractors} detractors
+            </span>
+          </div>
+          {r.comments.length > 0 && (
+            <ul className="mt-1 space-y-0.5 text-sm text-muted">
+              {r.comments.map((c, i) => <li key={i}>“{c}”</li>)}
+            </ul>
+          )}
+        </div>
+      ))}
+    </Card>
+  )
+}
+
 function StressCard() {
   const q = useQuery({ queryKey: ['stress-test'], queryFn: stressTest, retry: false })
   const p = q.data
@@ -285,6 +322,7 @@ export default function Reports() {
           <DriverCards weekOffset={Math.max(0, Math.round((new Date(todayISO() + 'T00:00:00').getTime() - new Date(weekOf + 'T00:00:00').getTime()) / (7 * 86400000)))} />
           <LanesCard />
           <StressCard />
+          <NpsCard />
         </>
       )}
     </div>

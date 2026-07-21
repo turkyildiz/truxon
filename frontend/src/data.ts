@@ -609,6 +609,20 @@ export interface StressPack {
   perfect_storm: ScenarioResult
 }
 
+export interface NpsQuarter {
+  quarter: string
+  responses: number
+  promoters: number
+  passives: number
+  detractors: number
+  nps: number
+  comments: string[]
+}
+
+export async function driverNpsSummary(): Promise<NpsQuarter[]> {
+  return unwrap(await supabase.rpc('driver_nps_summary')) as unknown as NpsQuarter[]
+}
+
 export async function stressTest(): Promise<StressPack> {
   return unwrap(await supabase.rpc('stress_test')) as unknown as StressPack
 }

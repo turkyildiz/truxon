@@ -5,6 +5,7 @@ import '../services/alarms.dart';
 import '../services/api.dart';
 import '../services/diag.dart';
 import '../services/push.dart';
+import '../services/nps_service.dart';
 import '../services/tracking_service.dart';
 import '../services/update_service.dart';
 import 'loads_screen.dart';
@@ -89,6 +90,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       }
       // Self-update check (best-effort; prompts only if a newer APK is hosted).
       if (mounted) UpdateService.checkAndPrompt(context);
+      // Quarterly NPS — drivers only, once per quarter, snoozable.
+      if (mounted && (p?['role'] as String?) == 'driver') {
+        NpsService.checkAndPrompt(context, _api);
+      }
     } catch (e) {
       setState(() => _error = e.toString());
     }
