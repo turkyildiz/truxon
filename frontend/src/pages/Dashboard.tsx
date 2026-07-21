@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useAuth } from '../auth'
 import { Badge, Button, Card, cityState, formatDate, formatDateTime, LoadError, money, StatCard } from '../components/ui'
-import { cashflowForecast, dashboardSummary, slowPayRisk } from '../data'
+import { cashflowForecast, collectionsQueue, customerKeepFire, dashboardSummary, slowPayRisk } from '../data'
 import { weekTitle } from '../lib/week'
 import type { TrendPoint } from '../types'
 
@@ -86,6 +86,38 @@ function Mini({ label, value, tone }: { label: string; value: string; tone: 'pos
       <p className="text-xs text-muted">{label}</p>
       <p className={`text-sm font-bold ${tone === 'pos' ? 'text-emerald-600' : 'text-red-600'}`}>{value}</p>
     </div>
+  )
+}
+
+/** The morning strip: who to call, what's overdue, who's on the fire list. */
+function TodayGlance() {
+  const colQ = useQuery({ queryKey: ['collections-queue'], queryFn: collectionsQueue, refetchInterval: 600_000, retry: false })
+  const kfQ = useQuery({ queryKey: ['keep-fire'], queryFn: () => customerKeepFire(365), staleTime: 30 * 60 * 1000, retry: false })
+  const rows = colQ.data ?? []
+  if (colQ.isLoading || rows.length === 0) return null
+  const top = rows[0]
+  const overdueTotal = rows.reduce((s, r) => s + Number(r.overdue_total), 0)
+  const fireCount = (kfQ.data ?? []).filter((r) => r.recommendation === 'fire').length
+  return (
+    <Card
+      title="📞 Today"
+      actions={
+        <Link to="/invoices?tab=collections" className="text-xs font-semibold text-brand">
+          Collections →
+        </Link>
+      }
+    >
+      <p className="text-sm">
+        Call <span className="font-semibold">{top.company_name}</span> first —{' '}
+        <span className="font-semibold text-red-600 dark:text-red-300">{money(Number(top.overdue_total))}</span> overdue,
+        oldest {top.oldest_days} days{top.phone ? ` · ${top.phone}` : ''}.
+      </p>
+      <p className="mt-1 text-xs text-muted">
+        {money(overdueTotal)} overdue across {rows.length} customers
+        {fireCount > 0 && <> · {fireCount} on the <Link to="/reports" className="text-brand hover:underline">fire list</Link></>}
+        {top.last_promise?.promised_date && ` · latest promise: ${formatDate(top.last_promise.promised_date)}`}
+      </p>
+    </Card>
   )
 }
 
@@ -247,6 +279,7 @@ export default function Dashboard() {
         </span>
       </div>
 
+      {FINANCE_ROLES.includes(user?.role ?? '') && <TodayGlance />}
       {FINANCE_ROLES.includes(user?.role ?? '') && <ForecastGlance />}
 
       {/* Revenue trend */}
