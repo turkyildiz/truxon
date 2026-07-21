@@ -5,16 +5,12 @@
 // Trigger: cron (anon-bearer gate) or an admin "Sync now".
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { json } from '../_shared/auth.ts'
+import { json, requireCron } from '../_shared/auth.ts'
 
 const BASE = 'https://api.drivehos.app/v2'
 
 function isCron(req: Request): boolean {
-  try {
-    const payload = JSON.parse(atob((req.headers.get('Authorization')?.replace('Bearer ', '').split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/')))
-    const ref = new URL(Deno.env.get('SUPABASE_URL')!).hostname.split('.')[0]
-    return payload?.role === 'anon' && payload?.ref === ref
-  } catch { return false }
+  return requireCron(req)
 }
 
 // deno-lint-ignore no-explicit-any

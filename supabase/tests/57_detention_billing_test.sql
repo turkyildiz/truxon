@@ -33,7 +33,10 @@ select is(
   (select amount from public.load_accessorials
     where load_id = (select id from public.loads where load_number = 'DB-1')),
   100.00, 'amount is server-computed from the dwell (2h over free @ $50)');
-select ok(public.propose_detention_accessorials() = 0, 're-proposing is idempotent');
+select ok(public.propose_detention_accessorials() >= 0
+  and (select count(*) from public.load_accessorials
+        where load_id = (select id from public.loads where load_number = 'DB-1')) = 1,
+  're-proposing refreshes in place — still exactly one row');
 
 -- approve, then bill the load
 select public.decide_accessorial(

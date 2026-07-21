@@ -21,7 +21,7 @@
 
 import { extractText, getDocumentProxy } from 'npm:unpdf@0.12.1'
 import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, getCaller, json } from '../_shared/auth.ts'
+import { corsResponse, getCaller, json, requireCron } from '../_shared/auth.ts'
 import { customerPrompt, extractFields, sliceText } from '../_shared/extract_llm.ts'
 
 const STOPWORDS = new Set([
@@ -204,13 +204,8 @@ Deno.serve(async (req) => {
   const ref = new URL(supaUrl).hostname.split('.')[0]
   const svc = createClient(supaUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
-  // ── auth: anon-bearer cron caller, else an admin session ──
-  const auth = req.headers.get('Authorization') ?? ''
-  let isCron = false
-  try {
-    const payload = JSON.parse(atob((auth.replace('Bearer ', '').split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/')))
-    isCron = payload?.role === 'anon' && payload?.ref === ref
-  } catch { /* not a decodable bearer */ }
+  // ── auth: CRON_SECRET header for jobs, else an admin session ──
+  const isCron = requireCron(req)
   const body = await req.json().catch(() => ({})) as Record<string, unknown>
   if (!isCron) {
     const caller = await getCaller(req)

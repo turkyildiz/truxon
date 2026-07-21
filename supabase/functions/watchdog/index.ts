@@ -31,7 +31,7 @@
 // GET ?approve=<token>       prefetch-safe confirmation page for the email link
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { json } from '../_shared/auth.ts'
+import { getCaller, json, requireCron } from '../_shared/auth.ts'
 import { graph, graphConfigured, graphToken, sendMailAsTrux, TRUX_MAILBOX } from '../_shared/msgraph.ts'
 import { type Remediation, remediationFor, type Svc } from '../_shared/remediations.ts'
 
@@ -380,6 +380,16 @@ Deno.serve(async (req) => {
 
   const svc = svcClient()
 
+  // --- one-time setter: store the DB-side cron secret (admin session only) ---
+  if (body.set_cron_secret) {
+    const caller = await getCaller(req)
+    if (caller instanceof Response) return caller
+    if (caller.role !== 'admin') return json({ error: 'Admin only' }, 403)
+    const { error } = await svc.rpc('set_cron_config', { p_key: 'cron_secret', p_value: String(body.set_cron_secret) })
+    if (error) return json({ error: error.message }, 400)
+    return json({ ok: true })
+  }
+
   // --- approval execution ---
   if (body.approve_token && body.confirm) {
     const res = await executeApproved(svc, String(body.approve_token))
@@ -412,7 +422,8 @@ Deno.serve(async (req) => {
     return json({ recorded: String(body.heartbeat) })
   }
 
-  // --- default: run checks + self-heal ---
+  // --- default: run checks + self-heal --- (S-05: cron-only door)
+  if (!requireCron(req)) return json({ error: 'Not authorized' }, 401)
   let playbook: string[] = []
   if (graphConfigured()) {
     try { playbook = await runPlaybooks(svc, await graphToken()) } catch { /* never break checks */ }

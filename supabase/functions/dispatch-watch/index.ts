@@ -15,18 +15,14 @@
 // box (default dispatch@aidalogistics.com). Dormant until those + Graph access exist.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { json } from '../_shared/auth.ts'
+import { json, requireCron } from '../_shared/auth.ts'
 import { graph, graphToken } from '../_shared/msgraph.ts'
 import { callLlm, parseFields, sliceText } from '../_shared/extract_llm.ts'
 
 const MAILBOX = Deno.env.get('DISPATCH_MAILBOX') ?? 'dispatch@aidalogistics.com'
 
 function isCron(req: Request): boolean {
-  try {
-    const payload = JSON.parse(atob((req.headers.get('Authorization')?.replace('Bearer ', '').split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/')))
-    const ref = new URL(Deno.env.get('SUPABASE_URL')!).hostname.split('.')[0]
-    return payload?.role === 'anon' && payload?.ref === ref
-  } catch { return false }
+  return requireCron(req)
 }
 
 const SHADOW_PROMPT = `You are Forest, a freight dispatcher's assistant, reading ONE email from a trucking company's dispatch inbox. Classify it and say what a dispatcher would DO with it — but you are only OBSERVING, you take no action.

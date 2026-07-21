@@ -26,13 +26,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       if (data.session) {
+        // A deactivated account must not resume from a cached session (S-06):
+        // sign it out entirely instead of restoring with residual privileges.
+        const restore = async () => {
+          const profile = await fetchProfile(data.session!.user.id)
+          if (!profile || !profile.is_active) {
+            await supabase.auth.signOut()
+            return
+          }
+          setUser(profile)
+        }
         try {
-          setUser(await fetchProfile(data.session.user.id))
+          await restore()
         } catch {
           // Transient failure restoring the session — retry once before
           // falling back to the login screen.
           try {
-            setUser(await fetchProfile(data.session.user.id))
+            await restore()
           } catch {
             /* leave user null; Protected routes redirect to /login */
           }

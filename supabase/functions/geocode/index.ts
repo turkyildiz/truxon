@@ -8,14 +8,10 @@
 // Trigger: cron (anon-bearer gate) or an admin/dispatcher call.
 
 import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, json } from '../_shared/auth.ts'
+import { corsResponse, json, requireCron } from '../_shared/auth.ts'
 
 function isCron(req: Request): boolean {
-  try {
-    const payload = JSON.parse(atob((req.headers.get('Authorization')?.replace('Bearer ', '').split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/')))
-    const ref = new URL(Deno.env.get('SUPABASE_URL')!).hostname.split('.')[0]
-    return payload?.role === 'anon' && payload?.ref === ref
-  } catch { return false }
+  return requireCron(req)
 }
 
 // Cache key: lowercase, strip punctuation noise, collapse whitespace.

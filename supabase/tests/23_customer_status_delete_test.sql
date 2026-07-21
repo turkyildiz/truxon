@@ -37,6 +37,9 @@ select throws_like(
   '%have hauled their cargo%', 'delete blocked when invoices exist');
 
 -- non-admin cannot delete
+-- a second active admin so the last-admin trigger allows this demotion
+insert into auth.users (id, email) values ('00000000-0000-4000-8000-00000000aaaa'::uuid, 'second-admin-23@test.local');
+update public.profiles set role = 'admin' where id = '00000000-0000-4000-8000-00000000aaaa';
 update public.profiles set role = 'dispatcher' where id = '00000000-0000-4000-8000-000000000e23';
 select throws_like(
   $$select public.delete_customer((select id from public.customers where company_name = 'DoNu Test Broker'))$$,

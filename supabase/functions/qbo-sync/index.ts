@@ -12,7 +12,7 @@
 // Intuit OAuth notes: refresh tokens ROTATE on every refresh — the new one is
 // persisted before any API call so a crash can't strand the connection.
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
-import { getCaller, json } from '../_shared/auth.ts'
+import { getCaller, json, requireCron } from '../_shared/auth.ts'
 
 const AUTH_URL = 'https://appcenter.intuit.com/connect/oauth2'
 const TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer'
@@ -375,12 +375,7 @@ Deno.serve(async (req) => {
     // match, accept any bearer whose JWT payload is this project's anon role
     // (same trust level: the anon key is public; pull is read-only sync).
     const auth = req.headers.get('Authorization') ?? ''
-    let isCron = false
-    try {
-      const payload = JSON.parse(atob((auth.replace('Bearer ', '').split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/')))
-      const ref = new URL(Deno.env.get('SUPABASE_URL')!).hostname.split('.')[0]
-      isCron = payload?.role === 'anon' && payload?.ref === ref
-    } catch { /* not a JWT */ }
+    const isCron = requireCron(req)
     if (!isCron) {
       const caller = await getCaller(req)
       if (caller instanceof Response) return caller
@@ -392,12 +387,7 @@ Deno.serve(async (req) => {
   if (body.mode === 'pnl') {
     // same gate as pull: cron anon bearer or an admin session
     const auth = req.headers.get('Authorization') ?? ''
-    let ok = false
-    try {
-      const payload = JSON.parse(atob((auth.replace('Bearer ', '').split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/')))
-      const ref = new URL(Deno.env.get('SUPABASE_URL')!).hostname.split('.')[0]
-      ok = payload?.role === 'anon' && payload?.ref === ref
-    } catch { /* not a JWT */ }
+    const ok = requireCron(req)
     if (!ok) {
       const caller = await getCaller(req)
       if (caller instanceof Response) return caller
@@ -415,12 +405,7 @@ Deno.serve(async (req) => {
   if (body.mode === 'customers') {
     // same gate as pull/pnl: cron anon bearer or an admin session
     const auth = req.headers.get('Authorization') ?? ''
-    let ok = false
-    try {
-      const payload = JSON.parse(atob((auth.replace('Bearer ', '').split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/')))
-      const ref = new URL(Deno.env.get('SUPABASE_URL')!).hostname.split('.')[0]
-      ok = payload?.role === 'anon' && payload?.ref === ref
-    } catch { /* not a JWT */ }
+    const ok = requireCron(req)
     if (!ok) {
       const caller = await getCaller(req)
       if (caller instanceof Response) return caller
@@ -439,12 +424,7 @@ Deno.serve(async (req) => {
     // Diagnostic: QBO-mirror rows that look like duplicates of native invoices,
     // matched by the digits of the doc number. Same gate as pull/pnl.
     const auth = req.headers.get('Authorization') ?? ''
-    let ok = false
-    try {
-      const payload = JSON.parse(atob((auth.replace('Bearer ', '').split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/')))
-      const ref = new URL(Deno.env.get('SUPABASE_URL')!).hostname.split('.')[0]
-      ok = payload?.role === 'anon' && payload?.ref === ref
-    } catch { /* not a JWT */ }
+    const ok = requireCron(req)
     if (!ok) {
       const caller = await getCaller(req)
       if (caller instanceof Response) return caller

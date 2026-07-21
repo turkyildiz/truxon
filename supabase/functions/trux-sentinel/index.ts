@@ -10,7 +10,7 @@
 // call the RPCs as that admin. Pushes go through the notify function, which
 // authenticates on an exact service-key match (claim-independent).
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
-import { json } from '../_shared/auth.ts'
+import { json, requireCron } from '../_shared/auth.ts'
 
 function svc(): SupabaseClient {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
@@ -52,6 +52,9 @@ async function pushAdmins(s: SupabaseClient, title: string, body: string, urgent
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  // S-05: scan + brief push notifications and run admin-minted RPCs — the
+  // public anon JWT is not authorization. Jobs present the CRON_SECRET header.
+  if (!requireCron(req)) return json({ error: 'Not authorized' }, 401)
   const s = svc()
 
   let mode = 'scan'

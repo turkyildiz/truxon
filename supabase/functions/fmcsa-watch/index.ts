@@ -7,16 +7,12 @@
 // The FMCSA data is public, read-only; the webKey lives only in the secret store.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { json } from '../_shared/auth.ts'
+import { json, requireCron } from '../_shared/auth.ts'
 
 const BASE = 'https://mobile.fmcsa.dot.gov/qc/services'
 
 function isCron(req: Request): boolean {
-  try {
-    const payload = JSON.parse(atob((req.headers.get('Authorization')?.replace('Bearer ', '').split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/')))
-    const ref = new URL(Deno.env.get('SUPABASE_URL')!).hostname.split('.')[0]
-    return payload?.role === 'anon' && payload?.ref === ref
-  } catch { return false }
+  return requireCron(req)
 }
 
 // deno-lint-ignore no-explicit-any

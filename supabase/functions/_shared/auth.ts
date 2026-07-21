@@ -42,3 +42,15 @@ export async function getCaller(req: Request): Promise<Caller | Response> {
 
   return { client, userId: userData.user.id, role: profile.role }
 }
+
+/** Privileged cron/job door (S-01): the request must present the CRON_SECRET
+ * header. The public anon JWT is NEVER authorization. Fail closed: with
+ * CRON_SECRET unset, nothing passes. */
+export function requireCron(req: Request): boolean {
+  const secret = Deno.env.get('CRON_SECRET') ?? ''
+  const got = req.headers.get('x-cron-key') ?? ''
+  if (!secret || got.length !== secret.length) return false
+  let diff = 0
+  for (let i = 0; i < secret.length; i++) diff |= secret.charCodeAt(i) ^ got.charCodeAt(i)
+  return diff === 0
+}
