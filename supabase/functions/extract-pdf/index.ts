@@ -9,7 +9,7 @@
 // OpenRouter), LLM_MODEL (text), LLM_VISION_MODEL (scanned docs).
 
 import { extractText, getDocumentProxy } from 'npm:unpdf@0.12.1'
-import { corsResponse, getCaller, json } from '../_shared/auth.ts'
+import { corsResponse, getCaller, json, withCors } from '../_shared/auth.ts'
 import { customerPrompt, extractFields, sliceText, workOrderPrompt, type LlmContent } from '../_shared/extract_llm.ts'
 
 function extractionPrompt(carrierName: string): string {
@@ -36,7 +36,7 @@ Two-digit years are 20xx. Use null for anything genuinely absent.`
 // LLM plumbing (callLlm / extractFields / parseFields / sliceText) lives in
 // ../_shared/extract_llm.ts so trux-inbox's work-order path shares one brain.
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
 
   const caller = await getCaller(req)
@@ -120,4 +120,4 @@ Deno.serve(async (req) => {
   } catch (err) {
     return json({ raw_text: text, fields: null, error: `AI extraction failed: ${err}` })
   }
-})
+}))

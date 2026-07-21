@@ -6,12 +6,12 @@
 //
 // POST { invoice_id, pdf_base64, to? }   (to overrides the customer email)
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, getCaller, json } from '../_shared/auth.ts'
+import { corsResponse, getCaller, json, withCors } from '../_shared/auth.ts'
 import { graphConfigured, graphToken, sendMailWithAttachment, TRUX_MAILBOX } from '../_shared/msgraph.ts'
 
 const MAX_PDF_BYTES = 5 * 1024 * 1024 // base64 of a ~3.7MB pdf
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
@@ -71,4 +71,4 @@ Deno.serve(async (req) => {
   })
 
   return json({ ok: true, to })
-})
+}))

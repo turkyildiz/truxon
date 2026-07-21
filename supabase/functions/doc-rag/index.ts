@@ -10,13 +10,13 @@
 //   probe    (cron/admin) → indexing progress counts
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, getCaller, json, requireCron } from '../_shared/auth.ts'
+import { corsResponse, getCaller, json, requireCron, withCors } from '../_shared/auth.ts'
 
 function isCronBearer(req: Request): boolean {
   return requireCron(req)
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
   const svc = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   const body = await req.json().catch(() => ({})) as Record<string, unknown>
@@ -220,4 +220,4 @@ Deno.serve(async (req) => {
   }
 
   return json({ error: 'unknown mode' }, 400)
-})
+}))

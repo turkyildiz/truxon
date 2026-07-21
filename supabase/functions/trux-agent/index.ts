@@ -10,14 +10,14 @@
 // }
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, getCaller, json } from '../_shared/auth.ts'
+import { corsResponse, getCaller, json, withCors } from '../_shared/auth.ts'
 import { executeWrite, runTrux, toolsForRole } from '../_shared/truxcore.ts'
 
 function admin() {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
@@ -141,4 +141,4 @@ Deno.serve(async (req) => {
     const msg = e instanceof Error ? e.message : String(e)
     return json({ error: msg }, 502)
   }
-})
+}))

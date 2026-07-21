@@ -2,9 +2,9 @@
 // {miles: null, available: false} when no key is configured — the UI
 // falls back to manual mileage entry.
 
-import { corsResponse, getCaller, json } from '../_shared/auth.ts'
+import { corsResponse, getCaller, json, withCors } from '../_shared/auth.ts'
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
 
   const caller = await getCaller(req)
@@ -35,4 +35,4 @@ Deno.serve(async (req) => {
   } catch {
     return json({ miles: null, available: false })
   }
-})
+}))

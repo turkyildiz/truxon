@@ -31,7 +31,7 @@
 // GET ?approve=<token>       prefetch-safe confirmation page for the email link
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { getCaller, json, requireCron } from '../_shared/auth.ts'
+import { getCaller, json, requireCron, withCors } from '../_shared/auth.ts'
 import { graph, graphConfigured, graphToken, sendMailAsTrux, TRUX_MAILBOX } from '../_shared/msgraph.ts'
 import { type Remediation, remediationFor, type Svc } from '../_shared/remediations.ts'
 
@@ -349,7 +349,7 @@ button{font:600 16px system-ui;padding:.75rem 1.5rem;border:0;border-radius:.75r
   return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   const url = new URL(req.url)
 
   // Prefetch-safe approval link (GET renders confirm page).
@@ -508,4 +508,4 @@ Deno.serve(async (req) => {
     recent_failures: recentFailures,
     alerted,
   })
-})
+}))

@@ -4,7 +4,7 @@
 // storage lives in a different failure domain than the Postgres instance.
 // Door: CRON_SECRET only (an admin session may also trigger a manual run).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { getCaller, json, requireCron } from '../_shared/auth.ts'
+import { getCaller, json, requireCron, withCors } from '../_shared/auth.ts'
 
 const TABLES = [
   'customers', 'drivers', 'trucks', 'trailers', 'loads', 'load_stops',
@@ -17,7 +17,7 @@ const TABLES = [
 const KEEP_DAYS = 30
 const BUCKET = 'db-backups'
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
   if (!requireCron(req)) {
     const caller = await getCaller(req)
@@ -66,4 +66,4 @@ Deno.serve(async (req) => {
   }
 
   return json({ ok: errors.length === 0, stamp, tables: counts, pruned, errors })
-})
+}))

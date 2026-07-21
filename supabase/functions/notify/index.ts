@@ -17,7 +17,7 @@
 //   NOTIFY_WEBHOOK_SECRET — required for send/notify_load without service role
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, getCaller, json } from '../_shared/auth.ts'
+import { corsResponse, getCaller, json, withCors } from '../_shared/auth.ts'
 
 type Platform = 'ios' | 'android'
 
@@ -145,7 +145,7 @@ async function sendFcm(
   return { ok: false, invalid, detail: text.slice(0, 400) }
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
@@ -278,4 +278,4 @@ Deno.serve(async (req) => {
   }
 
   return json({ error: 'Unknown action' }, 400)
-})
+}))

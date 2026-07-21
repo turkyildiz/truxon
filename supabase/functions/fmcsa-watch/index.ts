@@ -7,7 +7,7 @@
 // The FMCSA data is public, read-only; the webKey lives only in the secret store.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { json, requireCron } from '../_shared/auth.ts'
+import { json, requireCron, withCors } from '../_shared/auth.ts'
 
 const BASE = 'https://mobile.fmcsa.dot.gov/qc/services'
 
@@ -44,7 +44,7 @@ function mapBasic(code: string): string | null {
   return null
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   // cron OR an admin ("Check now")
   if (!isCron(req)) {
     const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
@@ -114,4 +114,4 @@ Deno.serve(async (req) => {
   const { data: result, error } = await svc.rpc('fmcsa_record', { p_snapshot: snapshot, p_basics: basics })
   if (error) return json({ error: error.message }, 500)
   return json({ ok: true, dot, ...(result as Record<string, unknown>) })
-})
+}))

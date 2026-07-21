@@ -4,7 +4,7 @@
 // Each accepted request pushes a notification to every active admin.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, json } from '../_shared/auth.ts'
+import { corsResponse, json, withCors } from '../_shared/auth.ts'
 
 const recent = new Map<string, number>() // ip → last accepted (per-instance, best-effort)
 
@@ -12,7 +12,7 @@ function s(v: unknown, max = 120): string {
   return String(v ?? '').trim().slice(0, max)
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
   const body = await req.json().catch(() => ({})) as Record<string, unknown>
@@ -71,4 +71,4 @@ Deno.serve(async (req) => {
   } catch { /* best-effort */ }
 
   return json({ ok: true })
-})
+}))

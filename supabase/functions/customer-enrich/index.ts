@@ -21,7 +21,7 @@
 
 import { extractText, getDocumentProxy } from 'npm:unpdf@0.12.1'
 import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, getCaller, json, requireCron } from '../_shared/auth.ts'
+import { corsResponse, getCaller, json, requireCron, withCors } from '../_shared/auth.ts'
 import { customerPrompt, extractFields, sliceText } from '../_shared/extract_llm.ts'
 
 const STOPWORDS = new Set([
@@ -194,7 +194,7 @@ async function runBatch(svc: SupabaseClient, o: BatchOpts) {
   return { queried, processed, lastId, filledTotal, customers: report }
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
 
   const apiKey = Deno.env.get('LLM_API_KEY')
@@ -470,4 +470,4 @@ Deno.serve(async (req) => {
     deadlineMs: Date.now() + 110_000,
   })
   return json({ apply: body.apply === true, ...r })
-})
+}))

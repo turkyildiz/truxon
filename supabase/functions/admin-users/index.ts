@@ -6,11 +6,11 @@
 //   PATCH  {id, full_name?, password?, role?, is_active?}
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, getCaller, json } from '../_shared/auth.ts'
+import { corsResponse, getCaller, json, withCors } from '../_shared/auth.ts'
 
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver', 'accountant', 'maintenance'])
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
 
   const caller = await getCaller(req)
@@ -146,4 +146,4 @@ Deno.serve(async (req) => {
   }
 
   return json({ error: 'Method not allowed' }, 405)
-})
+}))

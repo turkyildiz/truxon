@@ -15,7 +15,7 @@
 // box (default dispatch@aidalogistics.com). Dormant until those + Graph access exist.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { json, requireCron } from '../_shared/auth.ts'
+import { json, requireCron, withCors } from '../_shared/auth.ts'
 import { graph, graphToken } from '../_shared/msgraph.ts'
 import { callLlm, parseFields, sliceText } from '../_shared/extract_llm.ts'
 
@@ -40,7 +40,7 @@ Respond with ONLY a JSON object:
 }
 Use null when unknown. Do not invent details.`
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (!isCron(req)) return json({ error: 'cron only' }, 403)
   const svc = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   const body = await req.json().catch(() => ({})) as Record<string, unknown>
@@ -247,4 +247,4 @@ Deno.serve(async (req) => {
   }
 
   return json({ mailbox: MAILBOX, mode: 'shadow', listed: messages.length, observed, skipped })
-})
+}))

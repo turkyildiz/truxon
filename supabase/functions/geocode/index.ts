@@ -8,7 +8,7 @@
 // Trigger: cron (anon-bearer gate) or an admin/dispatcher call.
 
 import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, json, requireCron } from '../_shared/auth.ts'
+import { corsResponse, json, requireCron, withCors } from '../_shared/auth.ts'
 
 function isCron(req: Request): boolean {
   return requireCron(req)
@@ -92,7 +92,7 @@ function stampLoad(svc: SupabaseClient, loadId: number, pu: Geo | null, de: Geo 
   }) as unknown as Promise<{ error: any }>
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
 
   if (!isCron(req)) {
@@ -175,4 +175,4 @@ Deno.serve(async (req) => {
     .or('pickup_address.neq.,delivery_address.neq.')
 
   return json({ geocoded: done, skipped_transient: skipped, approx_google_calls: googleCalls, remaining: remaining ?? 0 })
-})
+}))

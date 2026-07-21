@@ -5,7 +5,7 @@
 // Trigger: cron (anon-bearer gate) or an admin "Sync now".
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { json, requireCron } from '../_shared/auth.ts'
+import { json, requireCron, withCors } from '../_shared/auth.ts'
 
 const BASE = 'https://api.drivehos.app/v2'
 
@@ -53,7 +53,7 @@ async function pageAll(path: string, limit = 200, maxPages = 50): Promise<any[]>
   return out
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (!isCron(req)) {
     const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
@@ -193,4 +193,4 @@ Deno.serve(async (req) => {
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 502)
   }
-})
+}))

@@ -11,7 +11,7 @@
 // Body: raw CSV (Content-Type text/csv) or JSON { csv: "<text>" }.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, getCaller, json } from '../_shared/auth.ts'
+import { corsResponse, getCaller, json, withCors } from '../_shared/auth.ts'
 
 // AtoB header → our field. Unmapped columns are ignored but preserved in raw.
 const FIELD: Record<string, string> = {
@@ -98,7 +98,7 @@ function toRow(header: string[], cols: string[]): Record<string, unknown> | null
   return out
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
@@ -138,4 +138,4 @@ Deno.serve(async (req) => {
   if (error) return json({ error: error.message }, 500)
 
   return json({ ok: true, parsed: rows.length, ...(data as object) })
-})
+}))

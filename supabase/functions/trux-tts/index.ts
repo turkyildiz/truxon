@@ -4,7 +4,7 @@
 // legal, built-in neural voice with a JARVIS-style delivery — NOT a clone of any
 // real or fictional performance. Without the key it 503s and the frontend falls
 // back to the free browser voice.
-import { corsResponse, getCaller, json, requireCron } from '../_shared/auth.ts'
+import { corsHeaders, corsResponse, getCaller, json, requireCron, withCors } from '../_shared/auth.ts'
 
 function isCronBearer(req: Request): boolean {
   return requireCron(req)
@@ -13,7 +13,7 @@ function isCronBearer(req: Request): boolean {
 const DEFAULT_VOICE = 'dtVZnErhiiosqofxDzSH' // ElevenLabs "Havoc" — gritty deep Southern narrator (Forest). Louder/faster tuning stays on the client.
 const DEFAULT_MODEL = 'eleven_turbo_v2_5'
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
@@ -86,6 +86,6 @@ Deno.serve(async (req) => {
   const audio = await el.arrayBuffer()
   return new Response(audio, {
     status: 200,
-    headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
+    headers: { ...corsHeaders(), 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' },
   })
-})
+}))

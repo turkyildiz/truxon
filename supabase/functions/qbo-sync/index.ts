@@ -12,7 +12,7 @@
 // Intuit OAuth notes: refresh tokens ROTATE on every refresh — the new one is
 // persisted before any API call so a crash can't strand the connection.
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
-import { getCaller, json, requireCron } from '../_shared/auth.ts'
+import { getCaller, json, requireCron, withCors } from '../_shared/auth.ts'
 
 const AUTH_URL = 'https://appcenter.intuit.com/connect/oauth2'
 const TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer'
@@ -21,6 +21,11 @@ const BACKFILL_FROM = '2026-01-01'
 
 function svc(): SupabaseClient {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+  return Array.from(new Uint8Array(d), (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 function fnUrl(): string {
@@ -300,7 +305,7 @@ async function pull(s: SupabaseClient): Promise<Response> {
   }
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   const url = new URL(req.url)
   const s = svc()
 
@@ -308,15 +313,21 @@ Deno.serve(async (req) => {
     const mode = url.searchParams.get('mode')
 
     if (mode === 'connect') {
-      // Browser navigation can't send headers — the app appends its JWT.
-      const jwt = url.searchParams.get('token') ?? ''
-      const anon = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-        global: { headers: { Authorization: `Bearer ${jwt}` } },
-      })
-      const { data: u } = await anon.auth.getUser(jwt)
-      if (!u?.user) return html('⛔ Sign in to Truxon first.', 401)
-      const { data: prof } = await s.from('profiles').select('role').eq('id', u.user.id).single()
-      if (prof?.role !== 'admin') return html('⛔ Admin only.', 403)
+      // Browser navigation can't send headers, so the app first mints a
+      // one-time ticket over a real Authorization header (POST connect_ticket
+      // below) and passes only that here — never a session JWT (GT-05).
+      const ticket = url.searchParams.get('ticket') ?? ''
+      const { data: conn } = await s.from('qbo_connection')
+        .select('connect_ticket_hash, connect_ticket_expires').eq('id', 1).maybeSingle()
+      const valid = ticket && conn?.connect_ticket_hash &&
+        (await sha256Hex(ticket)) === conn.connect_ticket_hash &&
+        conn.connect_ticket_expires && new Date(conn.connect_ticket_expires) > new Date()
+      // single-use: clear before acting, even on a failed compare's sibling
+      if (conn?.connect_ticket_hash) {
+        await s.from('qbo_connection')
+          .update({ connect_ticket_hash: null, connect_ticket_expires: null }).eq('id', 1)
+      }
+      if (!valid) return html('⛔ Connect link expired — press Connect in Truxon again.', 401)
 
       const state = crypto.randomUUID()
       // stash the CSRF state (connection row may not exist yet → placeholder row)
@@ -368,6 +379,30 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
   let body: { mode?: string; invoice_id?: number } = {}
   try { body = await req.json() } catch { /* empty */ }
+
+  if (body.mode === 'connect_ticket') {
+    // Admin mints a one-time ticket the browser can carry in the connect URL.
+    const caller = await getCaller(req)
+    if (caller instanceof Response) return caller
+    if (caller.role !== 'admin') return json({ error: 'Admin only' }, 403)
+    const raw = new Uint8Array(32)
+    crypto.getRandomValues(raw)
+    const ticket = Array.from(raw, (b) => b.toString(16).padStart(2, '0')).join('')
+    const fields = {
+      connect_ticket_hash: await sha256Hex(ticket),
+      connect_ticket_expires: new Date(Date.now() + 2 * 60 * 1000).toISOString(),
+    }
+    const { data: existing } = await s.from('qbo_connection').select('id').eq('id', 1).maybeSingle()
+    if (existing) await s.from('qbo_connection').update(fields).eq('id', 1)
+    else {
+      await s.from('qbo_connection').insert({
+        id: 1, realm_id: '', access_token: '', refresh_token: '',
+        access_expires_at: new Date(0).toISOString(), refresh_expires_at: new Date(0).toISOString(),
+        ...fields,
+      })
+    }
+    return json({ ticket })
+  }
 
   if (body.mode === 'pull') {
     // cron sends the public anon key. After the key rotation the env's
@@ -475,4 +510,4 @@ Deno.serve(async (req) => {
   }
 
   return json({ error: 'Unknown mode' }, 400)
-})
+}))

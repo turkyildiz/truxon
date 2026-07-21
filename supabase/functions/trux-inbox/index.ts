@@ -24,7 +24,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { extractText, getDocumentProxy } from 'npm:unpdf@0.12.1'
-import { getCaller, json, requireCron } from '../_shared/auth.ts'
+import { getCaller, json, requireCron, withCors } from '../_shared/auth.ts'
 import { graph, graphConfigured, graphToken, TRUX_MAILBOX as MAILBOX } from '../_shared/msgraph.ts'
 import { runTrux, type Sb } from '../_shared/truxcore.ts'
 import { extractWorkOrder } from '../_shared/extract_llm.ts'
@@ -123,7 +123,7 @@ async function pdfText(b64: string): Promise<string> {
   return text
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
   // S-05: the poller and its debug reads run under service_role — jobs must
   // present the CRON_SECRET header (an admin session also works for status).
@@ -492,4 +492,4 @@ Deno.serve(async (req) => {
   }
 
   return json({ polled: messages.length, results })
-})
+}))

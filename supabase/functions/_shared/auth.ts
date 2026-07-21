@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2'
+import { AsyncLocalStorage } from 'node:async_hooks'
 
 export interface Caller {
   client: SupabaseClient
@@ -6,20 +7,48 @@ export interface Caller {
   role: string
 }
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
+// GT-04 — browser calls are only legitimate from the SPA (plus local dev), so
+// reflect the request Origin only when it's on this list instead of `*`.
+// Non-browser callers (cron, curl, mobile) send no Origin and ignore CORS
+// entirely, so they are unaffected. CORS_EXTRA_ORIGINS (comma-separated edge
+// env) covers preview deploys without a code change.
+const ORIGIN_ALLOWLIST = new Set([
+  'https://truxon.com',
+  'https://www.truxon.com',
+  'http://localhost:5173',
+  ...(Deno.env.get('CORS_EXTRA_ORIGINS') ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+])
+
+// The request's Origin travels via AsyncLocalStorage so json()/corsResponse()
+// keep their signatures at every existing call site; concurrent requests in
+// one isolate each see their own value. Functions opt in by wrapping their
+// handler in withCors(); without it, the fallback is the production origin.
+const originStore = new AsyncLocalStorage<string>()
+
+export function withCors(
+  handler: (req: Request) => Response | Promise<Response>,
+): (req: Request) => Response | Promise<Response> {
+  return (req) => originStore.run(req.headers.get('Origin') ?? '', () => handler(req))
+}
+
+export function corsHeaders(): Record<string, string> {
+  const origin = originStore.getStore() ?? ''
+  return {
+    'Access-Control-Allow-Origin': ORIGIN_ALLOWLIST.has(origin) ? origin : 'https://truxon.com',
+    'Vary': 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
+  }
 }
 
 export function corsResponse(): Response {
-  return new Response(null, { status: 204, headers: CORS_HEADERS })
+  return new Response(null, { status: 204, headers: corsHeaders() })
 }
 
 export function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
   })
 }
 

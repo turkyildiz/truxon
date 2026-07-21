@@ -680,11 +680,14 @@ export async function qboStatus(): Promise<QboStatus> {
   return unwrap(await supabase.rpc('qbo_status')) as unknown as QboStatus
 }
 
-/** Connect URL opens the OAuth consent in a new tab; the fn validates the JWT. */
+/** Connect URL opens the OAuth consent in a new tab. The fn mints a one-time
+ * 2-minute ticket over the Authorization header so no session JWT ever rides
+ * in a URL (browser history / Referer / proxy logs). */
 export async function qboConnectUrl(): Promise<string> {
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token ?? ''
-  return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/qbo-sync?mode=connect&token=${encodeURIComponent(token)}`
+  const { data, error } = await supabase.functions.invoke('qbo-sync', { body: { mode: 'connect_ticket' } })
+  if (error) throw error
+  const ticket = (data as { ticket?: string })?.ticket ?? ''
+  return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/qbo-sync?mode=connect&ticket=${encodeURIComponent(ticket)}`
 }
 
 export async function triggerQboPull(): Promise<Record<string, number>> {

@@ -19,7 +19,7 @@
 // so a scheduled cron is harmless before go-live.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, getCaller, json } from '../_shared/auth.ts'
+import { corsResponse, getCaller, json, withCors } from '../_shared/auth.ts'
 
 const BASE = (Deno.env.get('PREPASS_API_BASE') ?? 'https://api.prepass.com').replace(/\/$/, '')
 const TOKEN_URL = Deno.env.get('PREPASS_TOKEN_URL') ?? `${BASE}/token/v1/token`
@@ -83,7 +83,7 @@ function mapTx(t: Record<string, unknown>): Record<string, unknown> {
   }
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method === 'OPTIONS') return corsResponse()
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
@@ -134,4 +134,4 @@ Deno.serve(async (req) => {
   if (error) return json({ error: error.message, fetched: rows.length }, 500)
 
   return json({ ok: true, fetched: rows.length, ...(result as object) })
-})
+}))
