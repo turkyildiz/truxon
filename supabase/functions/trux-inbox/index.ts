@@ -161,9 +161,10 @@ Deno.serve(withCors(async (req) => {
   // eat content — this shows what ACTUALLY sits in the mailbox. ──
   if (peek.mode === 'peek' && typeof peek.message_id === 'string') {
     const tok = await graphToken()
-    const m = await graph(tok,
-      `/users/${encodeURIComponent(MAILBOX)}/messages/${encodeURIComponent(peek.message_id)}?$select=subject,from,body`,
-      {}) as Record<string, any>
+    const res = await graph(tok,
+      `/users/${encodeURIComponent(MAILBOX)}/messages/${encodeURIComponent(peek.message_id)}?$select=subject,from,body`)
+    if (!res.ok) return json({ error: `graph ${res.status}`, detail: (await res.text()).slice(0, 300) }, 502)
+    const m = await res.json() as Record<string, any>
     return json({
       subject: m.subject ?? '',
       from: m.from?.emailAddress?.address ?? '',
