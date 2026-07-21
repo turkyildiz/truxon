@@ -19,10 +19,33 @@ The 3B is both faster and *more* accurate on this task, so it's the shipped
 model. The 7B stays on disk as a fallback. `parseFields` (extract_llm.ts)
 slices the first `{` … last `}`, so verbose output is fine.
 
-> The NAS has an Intel Iris Xe iGPU (`/dev/dri/renderD128`). Standard Ollama
-> can't use it (CUDA/ROCm only); Intel accel needs the IPEX-LLM SYCL build.
-> Not worth it for the 3B text model. If we ever move **vision** (minicpm-v)
-> local, revisit — that's where iGPU prefill would actually pay off.
+### CPU prefill is the bottleneck — length gate + thread tuning
+
+The CPU-only NAS processes a long prompt's tokens at only ~20 tok/s COLD (a
+~2500-token email ≈ 120s); short prompts finish in ~1.5s. Every prod doc is
+unique, so it's always the cold path. Two mitigations, both live:
+
+1. **Length gate** (`extract_llm.ts`): `callTextLlm` only routes to local when
+   the prompt is ≤ `LOCAL_LLM_MAX_CHARS` (default 1600); longer → cloud. Keeps
+   local fast, never times out the 150s edge gateway.
+2. **Thread-tuned model**: default Ollama under-used the cores (~20 tok/s). A
+   variant with `num_thread 8` roughly doubles prefill (~43 tok/s). Recreate it:
+
+   ```sh
+   printf 'FROM qwen2.5:3b\nPARAMETER num_thread 8\n' > /tmp/Modelfile.t8
+   docker cp /tmp/Modelfile.t8 truxon-ollama:/tmp/Modelfile.t8
+   docker exec truxon-ollama ollama create qwen2.5:3b-t8 -f /tmp/Modelfile.t8
+   supabase secrets set LOCAL_LLM_MODEL="qwen2.5:3b-t8"
+   ```
+   (A copy of the Modelfile is kept at `/volume1/docker/truxon-llm-proxy/Modelfile.t8`.)
+
+> **To unlock long-doc local classification** (raise `LOCAL_LLM_MAX_CHARS`): the
+> NAS has an Intel Iris Xe iGPU (`/dev/dri/renderD128`) — prefill is exactly
+> what a GPU accelerates. Standard Ollama can't use it (CUDA/ROCm only); Intel
+> accel needs the IPEX-LLM SYCL build (big image + `/dev/dri` passthrough).
+> Risky to swap unattended since `truxon-ollama` also serves live embeddings
+> (nomic-embed-text) and vision (minicpm-v). Owner decision. Same iGPU note
+> applies if vision ever moves fully local.
 
 ## Pieces
 
