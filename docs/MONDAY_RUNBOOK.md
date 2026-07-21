@@ -1,5 +1,8 @@
 # Monday runbook — Truxon companion + fleet
 
+> **HISTORICAL (week of 2026-07-14).** The current operational reference is
+> [OPERATIONS.md](OPERATIONS.md).
+
 Everything that needs **you** (deploys, devices, secrets) — in order. Code is
 already written, committed, and (for the frontend) auto-deployed. This is the
 "turn it all on" list.
