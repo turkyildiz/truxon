@@ -10,7 +10,7 @@
 
 import { extractText, getDocumentProxy } from 'npm:unpdf@0.12.1'
 import { corsResponse, getCaller, json, withCors } from '../_shared/auth.ts'
-import { customerPrompt, extractFields, sliceText, workOrderPrompt, type LlmContent } from '../_shared/extract_llm.ts'
+import { customerPrompt, extractFields, extractFieldsText, sliceText, workOrderPrompt, type LlmContent } from '../_shared/extract_llm.ts'
 
 function extractionPrompt(carrierName: string): string {
   return `You extract structured data from a trucking rate confirmation addressed to the carrier "${carrierName}".
@@ -114,7 +114,8 @@ Deno.serve(withCors(async (req) => {
       fields = await extractFields(apiKey, model, parts)
     } else {
       const model = Deno.env.get('LLM_MODEL') ?? 'meta-llama/llama-3.1-8b-instruct'
-      fields = await extractFields(apiKey, model, prompt + '\n\nDocument text:\n' + sliceText(text))
+      // Text path prefers the free NAS model; the vision branch above stays cloud.
+      fields = await extractFieldsText(apiKey, model, prompt + '\n\nDocument text:\n' + sliceText(text))
     }
     return json({ raw_text: text, fields, error: null })
   } catch (err) {

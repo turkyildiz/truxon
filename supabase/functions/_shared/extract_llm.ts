@@ -67,6 +67,7 @@ export async function callTextLlm(cloudKey: string, cloudModel: string, prompt: 
   const localKey = Deno.env.get('LOCAL_LLM_KEY')
   const localModel = Deno.env.get('LOCAL_LLM_MODEL')
   if (localUrl && localKey && localModel) {
+    const t0 = Date.now()
     try {
       // First call cold-loads the model (~20s); it stays warm after, so a
       // batch of docs pays the warm-up once. 90s covers the cold case.
@@ -82,13 +83,34 @@ export async function callTextLlm(cloudKey: string, cloudModel: string, prompt: 
       if (res.ok) {
         const data = await res.json()
         const out = data?.choices?.[0]?.message?.content
-        if (typeof out === 'string' && out.trim()) return out.trim()
+        if (typeof out === 'string' && out.trim()) {
+          // Observability: grep edge logs for `[localllm]` to see the hit rate.
+          console.log(`[localllm] hit model=${localModel} ms=${Date.now() - t0}`)
+          return out.trim()
+        }
       }
-    } catch {
-      // fall through to cloud
+      console.log(`[localllm] miss status=${res.status} ms=${Date.now() - t0} -> cloud`)
+    } catch (err) {
+      console.log(`[localllm] miss error=${String(err).slice(0, 80)} ms=${Date.now() - t0} -> cloud`)
     }
   }
   return callLlm(cloudKey, cloudModel, prompt)
+}
+
+/** Text-only field extraction that PREFERS the self-hosted NAS model (see
+ *  [callTextLlm]) and, like [extractFields], retries once with a sharper
+ *  instruction if the first reply isn't parseable JSON. Use for high-volume
+ *  text extraction (customer signatures, work orders, rate cons as text).
+ *  Vision extraction must keep using [extractFields] — the local text model
+ *  can't see images. */
+export async function extractFieldsText(cloudKey: string, cloudModel: string, prompt: string): Promise<Record<string, unknown>> {
+  try {
+    return parseFields(await callTextLlm(cloudKey, cloudModel, prompt))
+  } catch {
+    const stricter = prompt +
+      '\n\nIMPORTANT: Your ENTIRE response must be one valid JSON object. No prose, no tables, no explanations.'
+    return parseFields(await callTextLlm(cloudKey, cloudModel, stricter))
+  }
 }
 
 export function parseFields(content: string): Record<string, unknown> {
@@ -162,7 +184,8 @@ export async function extractWorkOrder(
     return extractFields(apiKey, model, parts)
   }
   const model = Deno.env.get('LLM_MODEL') ?? 'meta-llama/llama-3.1-8b-instruct'
-  return extractFields(apiKey, model, prompt + '\n\nDocument text:\n' + sliceText(input.text ?? ''))
+  // Text path prefers the free NAS model; vision above stays on cloud.
+  return extractFieldsText(apiKey, model, prompt + '\n\nDocument text:\n' + sliceText(input.text ?? ''))
 }
 
 /** Extract a broker/customer company profile from a trucking document (rate

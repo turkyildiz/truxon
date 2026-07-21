@@ -22,7 +22,7 @@
 import { extractText, getDocumentProxy } from 'npm:unpdf@0.12.1'
 import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { corsResponse, getCaller, json, requireCron, withCors } from '../_shared/auth.ts'
-import { customerPrompt, extractFields, sliceText } from '../_shared/extract_llm.ts'
+import { customerPrompt, extractFields, extractFieldsText, sliceText } from '../_shared/extract_llm.ts'
 
 const STOPWORDS = new Set([
   'inc', 'llc', 'ltd', 'co', 'corp', 'company', 'group', 'the', 'and', 'of',
@@ -146,7 +146,7 @@ async function runBatch(svc: SupabaseClient, o: BatchOpts) {
         : ''
 
       let fields: Record<string, unknown>
-      try { fields = await extractFields(o.apiKey, o.model, customerPrompt(o.carrier) + memory + knownBlock + '\n\nDocument text:\n' + sliceText(text)) }
+      try { fields = await extractFieldsText(o.apiKey, o.model, customerPrompt(o.carrier) + memory + knownBlock + '\n\nDocument text:\n' + sliceText(text)) }
       catch { skipped.push(`${d.filename}: extraction failed`); continue }
 
       // name-match guard — don't let a mis-filed doc poison this customer
