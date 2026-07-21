@@ -29,6 +29,36 @@ class CompanionApi {
     return await _sb.from('profiles').select().eq('id', uid).maybeSingle();
   }
 
+  /// Trucks a driver can inspect (DVIR).
+  Future<List<Map<String, dynamic>>> listTrucks() async {
+    final data = await _sb
+        .from('trucks')
+        .select('id, unit_number')
+        .neq('status', 'retired')
+        .order('unit_number');
+    return (data as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  /// Submit a pre/post-trip inspection; defects auto-file into maintenance.
+  Future<bool> submitDvir({
+    required int truckId,
+    required String inspectionType,
+    required Map<String, String> items,
+    num? odometer,
+    String defects = '',
+    bool safe = true,
+  }) async {
+    final res = await _sb.rpc('submit_dvir', params: {
+      'p_truck_id': truckId,
+      'p_inspection_type': inspectionType,
+      'p_items': items,
+      if (odometer != null) 'p_odometer': odometer,
+      'p_defects': defects,
+      'p_safe': safe,
+    });
+    return (res as Map)['defect_flagged'] == true;
+  }
+
   /// Current NPS quarter label, e.g. 2026-Q3.
   static String npsQuarter([DateTime? now]) {
     final d = now ?? DateTime.now();

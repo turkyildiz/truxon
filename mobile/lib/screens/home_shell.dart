@@ -8,6 +8,7 @@ import '../services/push.dart';
 import '../services/nps_service.dart';
 import '../services/tracking_service.dart';
 import '../services/update_service.dart';
+import 'dvir_screen.dart';
 import 'loads_screen.dart';
 import 'voice_screen.dart';
 import 'radio_screen.dart';
@@ -178,6 +179,17 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   Widget _loadsTab() {
     return Column(
       children: [
+        // Tablet day: pre/post-trip inspection one tap from the day's start.
+        ListTile(
+          dense: true,
+          leading: const Icon(Icons.fact_check_outlined, color: Colors.indigo),
+          title: Text(tr('dvirTitle')),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => DvirScreen(api: _api)),
+          ),
+        ),
+        const Divider(height: 1),
         if (_locationDenied)
           Material(
             color: Colors.red.withValues(alpha: 0.12),
