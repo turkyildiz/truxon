@@ -51,7 +51,9 @@ export default function Loads() {
     })
   const statusList = [...statuses].sort()
   const [awaitingOnly, setAwaitingOnly] = useState(false)
-  const [customerId, setCustomerId] = useState('')
+  // deep-link support: /loads?customer=<id> pre-filters (Customer detail links here)
+  const initialCustomer = new URLSearchParams(window.location.search).get('customer') ?? ''
+  const [customerId, setCustomerId] = useState(initialCustomer)
   const [driverId, setDriverId] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
