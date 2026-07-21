@@ -34,6 +34,21 @@ enum UpdateDecision {
   unverifiable,
 }
 
+/// Hosts an update APK may be downloaded from. The manifest lives on GitHub
+/// releases; its asset URLs redirect to *.githubusercontent.com, which the
+/// http client follows after this check — the allowlist gates the URL we were
+/// *told*, https-only, so a manifest pointing anywhere else is refused.
+/// Honest limit: the sha256 comes from the same manifest, so a fully
+/// compromised manifest host defeats both checks — only signing the manifest
+/// out-of-band would close that; this narrows the surface, it doesn't seal it.
+bool isAllowedApkUrl(String apkUrl) {
+  final uri = Uri.tryParse(apkUrl);
+  if (uri == null || uri.scheme != 'https') return false;
+  return uri.host == 'github.com' ||
+      uri.host == 'objects.githubusercontent.com' ||
+      uri.host.endsWith('.githubusercontent.com');
+}
+
 /// Pure decision half of the update check, split out of
 /// [UpdateService.checkAndPrompt] so it's unit-testable. Returns the parsed
 /// manifest fields alongside the decision (sha256 normalized to lowercase hex).
@@ -45,8 +60,9 @@ enum UpdateDecision {
   final UpdateDecision decision;
   if (latestCode <= currentCode || apkUrl.isEmpty) {
     decision = UpdateDecision.notApplicable;
-  } else if (sha256Hex.isEmpty) {
-    // No checksum in the manifest → we can't verify the APK, so don't offer it.
+  } else if (sha256Hex.isEmpty || !isAllowedApkUrl(apkUrl)) {
+    // No checksum, or the APK would come from a host we don't release on →
+    // we can't trust the download, so don't offer it.
     decision = UpdateDecision.unverifiable;
   } else {
     decision = UpdateDecision.install;

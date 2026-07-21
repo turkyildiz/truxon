@@ -27,12 +27,21 @@ done
 
 if [[ -n "$ENV_FILE" ]]; then
   yellow "Loading $ENV_FILE"
-  set -a
-  # shellcheck disable=SC1090
-  # support KEY=val and export KEY=val
-  # shellcheck disable=SC1091
-  source <(sed -E 's/^[[:space:]]*export[[:space:]]+//; /^[[:space:]]*#/d; /^[[:space:]]*$/d; s/^([[:alnum:]_]+)=(.*)$/export \1=\2/' "$ENV_FILE")
-  set +a
+  # Parse KEY=val / export KEY=val without shell evaluation — a value with
+  # $(…) or backticks stays a literal string instead of executing.
+  while IFS= read -r _line; do
+    _line="${_line#"${_line%%[![:space:]]*}"}"
+    case "$_line" in ''|\#*) continue ;; esac
+    _line="${_line#export }"
+    _key="${_line%%=*}"; _val="${_line#*=}"
+    [[ "$_key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    if [[ "$_val" == \"*\" && "$_val" == *\" && ${#_val} -ge 2 ]]; then
+      _val="${_val:1:${#_val}-2}"
+    elif [[ "$_val" == \'*\' && "$_val" == *\' && ${#_val} -ge 2 ]]; then
+      _val="${_val:1:${#_val}-2}"
+    fi
+    export "$_key=$_val"
+  done < "$ENV_FILE"
 fi
 
 # Map Vite/Next names → Supabase CLI names

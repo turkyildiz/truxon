@@ -15,6 +15,12 @@ void main() {
       expect(OfflineOutbox.decode(''), isEmpty);
     });
 
+    test('corrupt cache decodes to an empty list, never throws', () {
+      expect(OfflineOutbox.decode('not json {'), isEmpty);
+      expect(OfflineOutbox.decode('{"a":1}'), isEmpty); // map, not list
+      expect(OfflineOutbox.decode('[1,2,3]'), isEmpty); // list of non-maps
+    });
+
     test('roundtrip preserves items and order', () {
       final items = [item(1, 'in_transit'), item(2, 'delivered')];
       final out = OfflineOutbox.decode(OfflineOutbox.encode(items));

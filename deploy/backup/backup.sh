@@ -31,7 +31,21 @@ echo "[1/3] Dumping Supabase Postgres…"
 # postgres:17 container so pg_dump matches the server version; NAS has Docker.
 # (A pg_dump older than the server exits nonzero but can leave a tiny useless
 #  dump behind — pipefail above turns that into a loud failure.)
-docker run --rm postgres:17-alpine pg_dump "$SUPABASE_DB_URL" -Fc \
+# The URL (password included) must never appear on argv — argv is visible in
+# `ps` to every process on the NAS. Split it into libpq PG* env vars on the
+# host and hand those to the container; pg_dump's argv stays secret-free.
+urldecode() { local d="${1//+/ }"; printf '%b' "${d//%/\\x}"; }
+_rest="${SUPABASE_DB_URL#*://}"
+_userinfo="${_rest%%@*}"; _hostpart="${_rest#*@}"
+PGUSER="$(urldecode "${_userinfo%%:*}")"
+PGPASSWORD="$(urldecode "${_userinfo#*:}")"
+_hostport="${_hostpart%%/*}"
+PGDATABASE="${_hostpart#*/}"; PGDATABASE="${PGDATABASE%%\?*}"
+PGHOST="${_hostport%%:*}"; PGPORT="${_hostport##*:}"
+[[ "$PGPORT" == "$PGHOST" ]] && PGPORT=5432
+export PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE
+docker run --rm -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE \
+  postgres:17-alpine pg_dump -Fc \
   --schema=public --schema=storage --no-owner \
   | gpg --batch --yes --symmetric --cipher-algo AES256 --pinentry-mode loopback --passphrase-fd 3 3<<<"$BACKUP_PASSPHRASE" \
   > "$BACKUP_DIR/db_${STAMP}.dump.gpg"

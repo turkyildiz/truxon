@@ -4,7 +4,7 @@
  * Usage:
  *   node scripts/post-deploy-smoke.mjs
  * Requires frontend/.env.local with VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
- * and env ADMIN_EMAIL / ADMIN_PASSWORD (or argv).
+ * and env ADMIN_EMAIL / ADMIN_PASSWORD (env only — argv lands in shell history).
  */
 import { createClient } from '@supabase/supabase-js'
 import { readFileSync, existsSync } from 'node:fs'
@@ -25,10 +25,10 @@ const env = Object.fromEntries(
 )
 const url = env.VITE_SUPABASE_URL
 const anon = env.VITE_SUPABASE_ANON_KEY
-const email = process.argv[2] || process.env.ADMIN_EMAIL
-const password = process.argv[3] || process.env.ADMIN_PASSWORD
+const email = process.env.ADMIN_EMAIL
+const password = process.env.ADMIN_PASSWORD
 if (!url || !anon || !email || !password) {
-  console.error('Need URL/anon in .env.local and admin email/password args')
+  console.error('Need URL/anon in .env.local and ADMIN_EMAIL/ADMIN_PASSWORD in the environment')
   process.exit(2)
 }
 

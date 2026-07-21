@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'diag.dart';
 import 'session_store.dart';
 import 'tracking_service.dart';
 
@@ -165,8 +166,15 @@ class CompanionApi {
 class OfflineOutbox {
   static List<Map<String, dynamic>> decode(String? raw) {
     if (raw == null || raw.isEmpty) return [];
-    final list = jsonDecode(raw) as List;
-    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    try {
+      final list = jsonDecode(raw) as List;
+      return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (e) {
+      // Corrupt SharedPreferences must not brick the loads UI — drop the
+      // queue and start clean, same as the GPS queue path does.
+      Diag.log('outbox: corrupt cache dropped: $e');
+      return [];
+    }
   }
 
   static String encode(List<Map<String, dynamic>> items) => jsonEncode(items);

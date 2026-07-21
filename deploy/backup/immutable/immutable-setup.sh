@@ -27,7 +27,7 @@ else
   [ -e "${SRC}.old" ] && { echo "      ${SRC}.old already exists — resolve manually"; exit 1; }
   mv "$SRC" "${SRC}.old"
   btrfs subvolume create "$SRC"
-  chown turkyildiz:admin "$SRC"; chmod 777 "$SRC"
+  chown turkyildiz:admin "$SRC"; chmod 750 "$SRC"
   shopt -s dotglob nullglob
   mv "${SRC}.old"/* "$SRC"/ 2>/dev/null || true
   if rmdir "${SRC}.old" 2>/dev/null; then

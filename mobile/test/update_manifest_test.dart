@@ -16,28 +16,28 @@ void main() {
 
   test('strictly newer versionCode with url + sha256 → install', () {
     final m = evaluateUpdateManifest(
-        manifest(code: 4, url: 'https://x/app.apk', sha256: sha), 3);
+        manifest(code: 4, url: 'https://github.com/x/app.apk', sha256: sha), 3);
     expect(m.decision, UpdateDecision.install);
     expect(m.latestCode, 4);
-    expect(m.apkUrl, 'https://x/app.apk');
+    expect(m.apkUrl, 'https://github.com/x/app.apk');
     expect(m.sha256Hex, sha);
   });
 
   test('equal versionCode → notApplicable', () {
     final m = evaluateUpdateManifest(
-        manifest(code: 3, url: 'https://x/app.apk', sha256: sha), 3);
+        manifest(code: 3, url: 'https://github.com/x/app.apk', sha256: sha), 3);
     expect(m.decision, UpdateDecision.notApplicable);
   });
 
   test('older versionCode (downgrade) → notApplicable', () {
     final m = evaluateUpdateManifest(
-        manifest(code: 2, url: 'https://x/app.apk', sha256: sha), 3);
+        manifest(code: 2, url: 'https://github.com/x/app.apk', sha256: sha), 3);
     expect(m.decision, UpdateDecision.notApplicable);
   });
 
   test('missing versionCode → notApplicable (treated as 0)', () {
     final m = evaluateUpdateManifest(
-        manifest(url: 'https://x/app.apk', sha256: sha), 3);
+        manifest(url: 'https://github.com/x/app.apk', sha256: sha), 3);
     expect(m.decision, UpdateDecision.notApplicable);
   });
 
@@ -48,27 +48,48 @@ void main() {
 
   test('newer but missing sha256 → unverifiable, never install', () {
     final m =
-        evaluateUpdateManifest(manifest(code: 4, url: 'https://x/app.apk'), 3);
+        evaluateUpdateManifest(manifest(code: 4, url: 'https://github.com/x/app.apk'), 3);
     expect(m.decision, UpdateDecision.unverifiable);
   });
 
   test('newer but whitespace-only sha256 → unverifiable', () {
     final m = evaluateUpdateManifest(
-        manifest(code: 4, url: 'https://x/app.apk', sha256: '   '), 3);
+        manifest(code: 4, url: 'https://github.com/x/app.apk', sha256: '   '), 3);
     expect(m.decision, UpdateDecision.unverifiable);
   });
 
   test('sha256 is normalized to trimmed lowercase hex', () {
     final m = evaluateUpdateManifest(
-        manifest(code: 4, url: 'https://x/app.apk', sha256: '  ${sha.toUpperCase()} '), 3);
+        manifest(code: 4, url: 'https://github.com/x/app.apk', sha256: '  ${sha.toUpperCase()} '), 3);
     expect(m.decision, UpdateDecision.install);
     expect(m.sha256Hex, sha);
   });
 
   test('versionCode sent as a double still compares as an int', () {
     final m = evaluateUpdateManifest(
-        manifest(code: 4.0, url: 'https://x/app.apk', sha256: sha), 3);
+        manifest(code: 4.0, url: 'https://github.com/x/app.apk', sha256: sha), 3);
     expect(m.decision, UpdateDecision.install);
     expect(m.latestCode, 4);
+  });
+
+  group('apkUrl origin allowlist', () {
+    test('https github.com and githubusercontent hosts are allowed', () {
+      expect(isAllowedApkUrl('https://github.com/x/app.apk'), isTrue);
+      expect(isAllowedApkUrl('https://objects.githubusercontent.com/x.apk'), isTrue);
+      expect(isAllowedApkUrl('https://release-assets.githubusercontent.com/x.apk'), isTrue);
+    });
+
+    test('http, other hosts, and lookalike suffixes are refused', () {
+      expect(isAllowedApkUrl('http://github.com/x/app.apk'), isFalse);
+      expect(isAllowedApkUrl('https://evil.example.com/app.apk'), isFalse);
+      expect(isAllowedApkUrl('https://github.com.evil.example/app.apk'), isFalse);
+      expect(isAllowedApkUrl('not a url'), isFalse);
+    });
+
+    test('newer manifest pointing off-host → unverifiable, never install', () {
+      final m = evaluateUpdateManifest(
+          manifest(code: 4, url: 'https://evil.example.com/app.apk', sha256: sha), 3);
+      expect(m.decision, UpdateDecision.unverifiable);
+    });
   });
 }

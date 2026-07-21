@@ -1,5 +1,6 @@
 // ITS Dispatch → Truxon data import (entities + loads).
-// Usage: node import.mjs <admin_email> <admin_password> [--dry]
+// Usage: ADMIN_EMAIL=… ADMIN_PASSWORD=… node import.mjs [--dry]
+// Credentials come from env only — argv lands in shell history and `ps`.
 // Reads the xlsx exports + its_loads_full.json from this directory,
 // writes punchlist.json with everything that didn't map cleanly.
 import { createClient } from '@supabase/supabase-js'
@@ -12,8 +13,10 @@ const env = Object.fromEntries(
     .split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]),
 )
 const sb = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
-const [email, password, dryFlag] = process.argv.slice(2)
-const DRY = dryFlag === '--dry'
+const email = process.env.ADMIN_EMAIL
+const password = process.env.ADMIN_PASSWORD
+const DRY = process.argv.includes('--dry')
+if (!email || !password) { console.error('Set ADMIN_EMAIL and ADMIN_PASSWORD in the environment (not argv)'); process.exit(2) }
 const punch = []
 const note = (area, msg) => { punch.push({ area, msg }); console.log('PUNCH:', area, '—', msg) }
 
