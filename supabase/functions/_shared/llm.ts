@@ -52,12 +52,14 @@ export function pickProvider(): { provider: 'xai' | 'openai' | 'anthropic'; mode
 export async function completeChat(opts: {
   messages: ChatMessage[]
   tools?: ToolDef[]
+  /** 'any' FORCES a tool call (Anthropic tool_choice any / OpenAI required). */
+  toolChoice?: 'any'
 }): Promise<CompleteResult> {
   const p = pickProvider()
   if (p.provider === 'anthropic') {
-    return completeAnthropic(p.apiKey, p.model, opts.messages, opts.tools)
+    return completeAnthropic(p.apiKey, p.model, opts.messages, opts.tools, opts.toolChoice)
   }
-  return completeOpenAICompat(p.baseUrl!, p.apiKey, p.model, p.provider, opts.messages, opts.tools)
+  return completeOpenAICompat(p.baseUrl!, p.apiKey, p.model, p.provider, opts.messages, opts.tools, opts.toolChoice)
 }
 
 async function completeOpenAICompat(
@@ -67,6 +69,7 @@ async function completeOpenAICompat(
   provider: string,
   messages: ChatMessage[],
   tools?: ToolDef[],
+  toolChoice?: 'any',
 ): Promise<CompleteResult> {
   const body: Record<string, unknown> = {
     model,
@@ -81,7 +84,7 @@ async function completeOpenAICompat(
       type: 'function',
       function: { name: t.name, description: t.description, parameters: t.parameters },
     }))
-    body.tool_choice = 'auto'
+    body.tool_choice = toolChoice === 'any' ? 'required' : 'auto'
   }
 
   const res = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
@@ -124,6 +127,7 @@ async function completeAnthropic(
   model: string,
   messages: ChatMessage[],
   tools?: ToolDef[],
+  toolChoice?: 'any',
 ): Promise<CompleteResult> {
   const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n')
   const mapped = messages
@@ -155,6 +159,7 @@ async function completeAnthropic(
       description: t.description,
       input_schema: t.parameters,
     }))
+    if (toolChoice === 'any') body.tool_choice = { type: 'any' }
   }
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {

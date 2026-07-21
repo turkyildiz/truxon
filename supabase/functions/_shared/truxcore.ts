@@ -55,7 +55,7 @@ const ALL_TOOLS: Record<string, ToolDef> = {
     name: 'query_data',
     description: `Answer ANY analytical question by writing one read-only SQL SELECT (Postgres). It runs AS the signed-in user — row-level security decides what they can see. Max 200 rows; keep it to one statement, no semicolons.
 Schema: loads(id, load_number, reference_number, customer_id, driver_id, truck_id, trailer_id, status[pending|assigned|in_transit|delivered|completed|billed], pickup_address, pickup_time, delivery_address, delivery_time, rate, miles, empty_miles, equipment_type, invoice_id, created_at) · customers(id, company_name, phone, email, billing_address, payment_terms, is_active) · drivers(id, full_name, status, pay_per_mile, empty_miles_paid, pay_per_empty_mile, license_expiration, hire_date) · trucks/trailers(id, unit_number, status, plate_number, monthly_cost) · invoices(id, invoice_number, customer_id, invoice_date, due_date, total, status[draft|sent|paid|void], source[truxon|qbo], paid_at, sent_at) · invoice_payments(id, invoice_id, amount, method[check|ach|wire|card|factoring|other], reference, received_at) · maintenance_records(id, equipment_type, truck_id, trailer_id, service_type, status[scheduled|in_progress|completed|cancelled], is_planned, date_completed, scheduled_date, odometer, vendor_id, invoice_ref, description, cost) · maintenance_vendors(id, name, specialty, city, state, is_active) · pm_programs(id, name, applies_to[truck|trailer|all], service_type, interval_miles, interval_days, is_active) · load_stops(load_id, stop_type, seq, facility, address, stop_time) · fuel_transactions(id, transaction_time, status, merchant, merchant_state, amount, net_of_discount, gallons, price_per_gallon, fuel_type, driver_id, truck_id) · toll_transactions(id, post_date_time, exit_date_time, toll_agency_name, toll_agency_state, toll_charge, toll_category[Normal|Violation], truck_id) · safety_events(id, event_type[accident|inspection|violation|claim|citation], event_date, driver_id, truck_id, severity, preventable, out_of_service, csa_basic, claim_amount, status) · safety_csa(basic, percentile, alert) · trux_insights(category, severity, title, detail, status) · playbook_metrics(number, name, category, owner_role, status[live|needs_data|external|qualitative], source) · budgets(period_month, line, amount) · gl_monthly(month, account, grp[income|cogs|expense|other_income|other_expense], amount) [full P&L from the books, monthly, synced nightly from QuickBooks] · bs_snapshot(as_of, cash, ar, ap, current_assets, current_liabilities, equity).
-PREFER these pre-verified report functions over hand-written SQL for standard figures (SELECT * FROM fn(...)): company_scorecard(start,end) [~40 Owner's-Playbook metrics grouped financial/operations/revenue/maintenance/systems, PLUS a not_captured list of gaps] · pnl_summary(start,end) · weekly_report(date) · fuel_efficiency(start,end) [MPG + $/mile per driver, worst first] · fuel_by_truck(start,end) · fuel_ifta_summary(start,end) · toll_by_truck(start,end) · toll_by_agency(start,end) · ar_aging() [outstanding by customer, 30/60/90] · acct_summary() [KPI strip: A/R total, past-due $, DSO(90d), avg days-to-pay, unbilled loads $, MTD billed/collected] · acct_aging() [per-customer receivable buckets current/1-30/31-60/61-90/90+] · acct_unbilled_loads() [completed loads never invoiced — revenue leak with days unbilled] · acct_revenue_monthly(months) [billed vs collected by month] · acct_revenue_by_customer(days) [broker revenue, share % concentration, open/past-due, avg days-to-pay] · acct_margin_monthly(months) [revenue vs fuel+tolls+MX direct costs] · gl_pnl_monthly(months) [TRUE P&L from the books: gross/net margin %, TRUE operating ratio with ALL costs] · gl_expense_breakdown(months) [every expense account, % of revenue] · gl_breakeven_monthly(months) [actual RPM vs break-even RPM from all costs + all miles] · gl_cfo_snapshot() [cash on hand, days of cash, current ratio, working capital, DPO, interest coverage, overhead/tractor, total cost of risk] · safety_summary(start,end) [accidents/million-mi, OOS rate, HOS, claims] · budget_variance(start,end) [budget vs actual per P&L line] · maintenance_summary(start,end) [planned vs reactive spend, PM-compliance %, deadlined-tractor %, open work orders, by-service, top cost units] · maintenance_cpm(start,end) [fleet Maintenance CPM & Tire CPM] · maintenance_by_truck(start,end) [cost + CPM per unit] · maintenance_by_vendor(start,end) [outsourced-shop spend] · maintenance_due() [per-unit PM/inspection status: miles/days remaining, due_status overdue|due_soon|ok|never_serviced|unknown] · maintenance_alerts() [what needs attention now: PM/inspection due + plate expiry + stale work orders] · playbook_coverage() [how many of the 1000 Owner's-Playbook metrics are live vs needs_data vs external, by category] · playbook_metrics_list(status,owner,search) [browse the metric catalog]. · cashflow_forecast(weeks) [4-8wk cash in/out/net: open AR by predicted pay date + booked uninvoiced + recurring costs] · slow_pay_risk() [open invoices predicted to land >15d late from each broker's own pay history, with real OUTSTANDING amounts] · customer_pay_profile() [per-broker days-to-pay distribution] · revenue_forecast(weeks) [weekly revenue outlook, trailing avg + same-week-last-year] · customer_rate_profile(customer_id) [what this broker has paid $/mi, 180d] · fleet_cost_basis() [MPG, fuel price, pay/fixed/toll per mile, break-even RPM] · detention_events(days) [per-stop billable detention measured from ELD dwell at geocoded stops] · stop_dwell_summary(days) [avg dwell hours at shipper vs consignee] · pod_capture_rate(start,end) [% of delivered loads with a POD within 12h — owner standard] · sales_pipeline(start,end) [quotes received/won/lost/open, win rate] · fleet_ops_extras(start,end) [deadhead/dispatch, miles per driver-week, loads & miles per day] · gl_balance_ratios() [debt/equity, net debt, net-debt/EBITDA, ROE off the balance-sheet mirror] · insurance_snapshot() [premiums 12m from GL, claims, LOSS RATIO, insurance CPM, open claims] · idle_summary(days) [fleet + per-truck idle % derived from ELD breadcrumbs, est. idle gallons] · driver_turnover(start,end) [terminations, first-90-day losses, annualized % — tracked since 2026-07-20] · weekly_flash(week_offset) [the weekly owner one-pager: ops/cash/safety/sentinel/budget on the Mon-Sun week standard] · metric_trends(prefix) [WoW/MoM change + 13-week slope for every nightly-snapshotted metric series] · budget list note: budgets auto-seed monthly from trailing-3-month actuals (basis='auto'); the office can overwrite any line manually. For broad "how's the business" or scorecard questions, call company_scorecard first. Use raw SQL only for questions these don't cover.
+PREFER these pre-verified report functions over hand-written SQL for standard figures (SELECT * FROM fn(...)): company_scorecard(start,end) [~40 Owner's-Playbook metrics grouped financial/operations/revenue/maintenance/systems, PLUS a not_captured list of gaps] · pnl_summary(start,end) · weekly_report(date) · fuel_efficiency(start,end) [MPG + $/mile per driver, worst first] · fuel_by_truck(start,end) · fuel_ifta_summary(start,end) · toll_by_truck(start,end) · toll_by_agency(start,end) · ar_aging() [outstanding by customer, 30/60/90] · acct_summary() [KPI strip: A/R total, past-due $, DSO(90d), avg days-to-pay, unbilled loads $, MTD billed/collected] · acct_aging() [per-customer receivable buckets current/1-30/31-60/61-90/90+] · acct_unbilled_loads() [completed loads never invoiced — revenue leak with days unbilled] · acct_revenue_monthly(months) [billed vs collected by month] · acct_revenue_by_customer(days) [broker revenue, share % concentration, open/past-due, avg days-to-pay] · acct_margin_monthly(months) [revenue vs fuel+tolls+MX direct costs] · gl_pnl_monthly(months) [TRUE P&L from the books: gross/net margin %, TRUE operating ratio with ALL costs] · gl_expense_breakdown(months) [every expense account, % of revenue] · gl_breakeven_monthly(months) [actual RPM vs break-even RPM from all costs + all miles] · gl_cfo_snapshot() [cash on hand, days of cash, current ratio, working capital, DPO, interest coverage, overhead/tractor, total cost of risk] · safety_summary(start,end) [accidents/million-mi, OOS rate, HOS, claims, csa_basics_in_alert; per-BASIC CSA percentiles live in table safety_csa — raw SQL it] · budget_variance(start,end) [budget vs actual per P&L line] · maintenance_summary(start,end) [planned vs reactive spend, PM-compliance %, deadlined-tractor %, open work orders, by-service, top cost units] · maintenance_cpm(start,end) [fleet Maintenance CPM & Tire CPM] · maintenance_by_truck(start,end) [cost + CPM per unit] · maintenance_by_vendor(start,end) [outsourced-shop spend] · maintenance_due() [per-unit PM/inspection status: miles/days remaining, due_status overdue|due_soon|ok|never_serviced|unknown] · maintenance_alerts() [what needs attention now: PM/inspection due + plate expiry + stale work orders] · playbook_coverage() [how many of the 1000 Owner's-Playbook metrics are live vs needs_data vs external, by category] · playbook_metrics_list(status,owner,search) [browse the metric catalog]. · cashflow_forecast(weeks) [4-8wk cash in/out/net: open AR by predicted BOOK pay date + booked uninvoiced + recurring costs. HONESTY: brokers here average ~100 days-to-pay on the books, so little lands inside 4 weeks; actual CASH arrives earlier via factoring advances, which the books don't time — say so when the forecast looks empty] · slow_pay_risk() [open invoices predicted to land >15d late from each broker's own pay history, with real OUTSTANDING amounts] · customer_pay_profile() [per-broker days-to-pay distribution, WITH customer name — always show names, never bare customer IDs] · revenue_forecast(weeks) [weekly revenue outlook, trailing avg + same-week-last-year] · customer_rate_profile(customer_id) [what this broker has paid $/mi, 180d] · fleet_cost_basis() [MPG, fuel price, pay/fixed/toll per mile, break-even RPM] · detention_events(days) [per-stop billable detention measured from ELD dwell at geocoded stops] · stop_dwell_summary(days) [avg dwell hours at shipper vs consignee] · pod_capture_rate(start,end) [% of delivered loads with a POD within 12h — owner standard] · sales_pipeline(start,end) [quotes received/won/lost/open, win rate] · fleet_ops_extras(start,end) [deadhead/dispatch, miles per driver-week, loads & miles per day] · gl_balance_ratios() [debt/equity, net debt, net-debt/EBITDA, ROE off the balance-sheet mirror] · insurance_snapshot() [premiums 12m from GL, claims, LOSS RATIO, insurance CPM, open claims] · idle_summary(days) [fleet + per-truck idle % derived from ELD breadcrumbs, est. idle gallons] · driver_turnover(start,end) [terminations, first-90-day losses, annualized % — tracked since 2026-07-20] · weekly_flash(week_offset) [the weekly owner one-pager: ops/cash/safety/sentinel/budget on the Mon-Sun week standard] · metric_trends(prefix) [WoW/MoM change + 13-week slope for every nightly-snapshotted metric series] · budget list note: budgets auto-seed monthly from trailing-3-month actuals (basis='auto'); the office can overwrite any line manually. For broad "how's the business" or scorecard questions, call company_scorecard first. Use raw SQL only for questions these don't cover.
 Revenue convention: completed/billed loads, delivery_time as the date. Example: monthly revenue = select to_char(date_trunc('month', delivery_time),'YYYY-MM') m, sum(rate) rev, sum(miles) mi, count(*) loads from loads where status in ('completed','billed') group by 1 order by 1.
 RULES: rate-per-mile and similar averages must be WEIGHTED — sum(rate)/nullif(sum(miles),0) — never avg(rate/miles). Always select the supporting figures (counts, sums) alongside any ratio and show them in your answer so the user can verify. If a result looks implausible (e.g. rate/mile far outside $1.50-$6 for linehaul), double-check with a second query before answering.`,
     parameters: { type: 'object', properties: { sql: { type: 'string' } }, required: ['sql'] },
@@ -418,6 +418,8 @@ ${opts.channelNote ?? ''}
 ${roleGuidance(role)}
 General rules:
 - Use tools for facts; never invent numbers or IDs.
+- NEVER end a reply promising to pull data ("let me pull…", "I'll check…") — call the tool in the SAME turn and answer with the numbers. A promise without data is a wrong answer.
+- When a tool errors, say the tool failed and try a corrected call — do not tell the user the data is restricted or missing when it was your call that failed.
 ${mode === 'propose'
     ? '- Write tools are only ever PROPOSED — the user confirms them in the app.'
     : '- Write tools execute immediately; report exactly what you did. If anything is ambiguous (e.g. a name matching several people, no matching customer), do NOT guess — ask a clarifying question instead.'}
@@ -446,14 +448,20 @@ ${mode === 'propose'
   let lastProvider = ''
   let lastModel = ''
   const deadline = Date.now() + (opts.deadlineMs ?? 22_000)
-  const maxRounds = mode === 'auto' ? 5 : 3
+  const maxRounds = 5
+  let ranReadTool = false
+  let announceNudged = false
+  let needsCompose = false
+  let forceTools = false
 
   for (let round = 0; round < maxRounds && Date.now() < deadline; round++) {
     // Retry once: malformed tool calls (400) recover after a beat; 429s wait
     // exactly as long as the provider asks ("try again in 420ms" / "8.7s").
     let completion
+    const toolChoice = forceTools ? 'any' as const : undefined
+    forceTools = false
     try {
-      completion = await completeChat({ messages, tools })
+      completion = await completeChat({ messages, tools, toolChoice })
     } catch (e) {
       const msg = String(e)
       let wait = 1_200
@@ -464,7 +472,7 @@ ${mode === 'propose'
       }
       if (Date.now() + wait + 3_000 > deadline) throw e
       await new Promise((r) => setTimeout(r, wait))
-      completion = await completeChat({ messages, tools })
+      completion = await completeChat({ messages, tools, toolChoice })
     }
     lastProvider = completion.provider
     lastModel = completion.model
@@ -478,7 +486,21 @@ ${mode === 'propose'
         messages.push({ role: 'user', content: 'Your last response was empty. Answer the user now, or call the appropriate tool.' })
         continue
       }
+      // Model ANNOUNCED it would pull data instead of calling a tool ("Let me
+      // pull the P&L…") — a short promise with no numbers behind it. Nudge once.
+      if (
+        completion.content && !ranReadTool && !announceNudged && round < maxRounds - 1 &&
+        completion.content.length < 400 &&
+        /\b(let me|i'?ll|i will|going to|gonna)\b[^.!?]{0,80}\b(pull|run|check|look|grab|fetch|get|dig|review)\b/i.test(completion.content)
+      ) {
+        announceNudged = true
+        forceTools = true // next completion MUST call a tool (tool_choice: any)
+        messages.push({ role: 'assistant', content: completion.content })
+        messages.push({ role: 'user', content: 'Do not announce what you will pull — call the tool(s) right now, then answer with the actual data.' })
+        continue
+      }
       assistantText = completion.content || assistantText
+      needsCompose = false
       break
     }
 
@@ -500,6 +522,7 @@ ${mode === 'propose'
 
       if (!WRITE_TOOLS.has(tc.name)) {
         hadTool = true
+        ranReadTool = true
         try {
           const result = await readTool(userClient, tc.name, args)
           const snippet = JSON.stringify(result).slice(0, SNIPPET_LIMITS[tc.name] ?? 1200)
@@ -568,6 +591,7 @@ ${mode === 'propose'
 
     if (proposals.length) {
       assistantText = completion.content || 'I prepared actions for your confirmation:'
+      needsCompose = false
       break
     }
 
@@ -579,11 +603,26 @@ ${mode === 'propose'
           : 'Using the tool results above, answer the user in plain language (or propose the next write actions if that is what they asked for).',
       })
       assistantText = completion.content || assistantText
+      needsCompose = true
       continue
     }
 
     assistantText = completion.content || assistantText
     break
+  }
+
+  // The loop ran out of rounds/time with tool results gathered but no final
+  // answer composed — the reply would be the round-1 preamble ("Let me pull…")
+  // while the data sits discarded. One tools-off completion salvages it.
+  if (needsCompose) {
+    try {
+      messages.push({ role: 'user', content: 'Time is up — using the tool results above, write the final answer for the user now, in plain language with the actual numbers.' })
+      const final = await completeChat({ messages, tools: [] })
+      if (final.content) assistantText = final.content
+      try {
+        await svc.rpc('llm_reserve_spend', { p_provider: final.provider, p_cents: final.est_cents })
+      } catch { /* ignore */ }
+    } catch { /* keep whatever text we had */ }
   }
 
   if (proposals.length) {

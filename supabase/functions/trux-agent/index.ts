@@ -126,6 +126,9 @@ Deno.serve(async (req) => {
       sessionId: sessionId!,
       message,
       mode: 'propose',
+      // Report questions legitimately need several tool rounds; the in-app
+      // spinner can wait, the gateway allows 150s idle.
+      deadlineMs: 100_000,
     })
     return json({
       session_id: sessionId,
