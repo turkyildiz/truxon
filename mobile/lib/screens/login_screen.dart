@@ -54,23 +54,42 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 32),
                   TextField(
                     controller: _email,
-                    decoration: InputDecoration(labelText: tr('email'), border: const OutlineInputBorder()),
+                    decoration: InputDecoration(
+                      labelText: tr('email'),
+                      prefixIcon: const Icon(Icons.alternate_email),
+                    ),
                     keyboardType: TextInputType.emailAddress,
                     autocorrect: false,
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _password,
-                    decoration: InputDecoration(labelText: tr('password'), border: const OutlineInputBorder()),
+                    decoration: InputDecoration(
+                      labelText: tr('password'),
+                      prefixIcon: const Icon(Icons.lock_outline),
+                    ),
                     obscureText: true,
                     onSubmitted: (_) => _login(),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
-                    Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(_error!,
+                          style: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onErrorContainer)),
+                    ),
                   ],
                   const SizedBox(height: 20),
                   FilledButton(
+                    style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(54)),
                     onPressed: _busy ? null : _login,
                     child: Text(_busy ? tr('signingIn') : tr('signIn')),
                   ),

@@ -3,6 +3,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config.dart';
 import 'i18n.dart';
+import 'theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_shell.dart';
 import 'services/alarms.dart';
@@ -52,10 +53,9 @@ class TruxCompanionApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Forest Companion',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0F2744), brightness: Brightness.light),
-        useMaterial3: true,
-      ),
+      theme: truxTheme(Brightness.light),
+      darkTheme: truxTheme(Brightness.dark),
+      themeMode: ThemeMode.system, // night cab = dark app, automatically
       home: const _AuthGate(),
     );
   }

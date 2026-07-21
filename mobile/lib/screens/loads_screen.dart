@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/doc_scan.dart';
+import '../theme.dart';
 import 'map_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -26,34 +27,54 @@ class _LoadsScreenState extends State<LoadsScreen> {
   Widget _weekCard() {
     final w = _week;
     if (w == null || (w['loads'] as num? ?? 0) == 0) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
     Widget stat(String label, String value) => Expanded(
           child: Column(
             children: [
-              Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              Text(value,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 20,
+                      color: scheme.onPrimaryContainer)),
+              const SizedBox(height: 2),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onPrimaryContainer.withValues(alpha: 0.7))),
             ],
           ),
         );
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-        child: Column(
-          children: [
-            Text(tr('myWeekTitle'), style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                stat(tr('myWeekLoads'), '${w['loads']}'),
-                stat(tr('myWeekMiles'), '${(w['total_miles'] as num?)?.round() ?? 0}'),
-                stat(tr('myWeekPay'), '\$${(w['est_pay'] as num?)?.round() ?? 0}'),
-                if (w['on_time_pct'] != null) stat(tr('myWeekOnTime'), '${(w['on_time_pct'] as num).round()}%'),
-                if ((w['detention_hours'] as num? ?? 0) > 0)
-                  stat(tr('myWeekDetention'), '${w['detention_hours']}h'),
-              ],
-            ),
-          ],
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [scheme.primaryContainer, scheme.secondaryContainer],
         ),
+      ),
+      child: Column(
+        children: [
+          Text(tr('myWeekTitle'),
+              style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.3,
+                  color: scheme.onPrimaryContainer)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              stat(tr('myWeekLoads'), '${w['loads']}'),
+              stat(tr('myWeekMiles'), '${(w['total_miles'] as num?)?.round() ?? 0}'),
+              stat(tr('myWeekPay'), '\$${(w['est_pay'] as num?)?.round() ?? 0}'),
+              if (w['on_time_pct'] != null) stat(tr('myWeekOnTime'), '${(w['on_time_pct'] as num).round()}%'),
+              if ((w['detention_hours'] as num? ?? 0) > 0)
+                stat(tr('myWeekDetention'), '${w['detention_hours']}h'),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -255,26 +276,79 @@ class _LoadsScreenState extends State<LoadsScreen> {
           if (i == 0) return _weekCard();
           final load = _loads[i - 1];
           final next = _nextStatus(load.status);
+          final scheme = Theme.of(context).colorScheme;
+          Widget stop(IconData icon, Color color, String label, String addr) =>
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, size: 18, color: color),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(label,
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5,
+                                color: scheme.onSurfaceVariant)),
+                        Text(addr,
+                            style: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ),
+                ],
+              );
           return Card(
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
                       Expanded(
-                        child: Text(load.loadNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        child: Text(load.loadNumber,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 18)),
                       ),
-                      Chip(label: Text(load.status)),
+                      StatusPill(load.status),
                     ],
                   ),
-                  if (load.customerName != null) Text(load.customerName!),
-                  const SizedBox(height: 6),
-                  Text('${tr('puLabel')}: ${load.pickup}'),
-                  Text('${tr('delLabel')}: ${load.delivery}'),
-                  if (load.truckUnit != null) Text('${tr('truckLabel')}: ${load.truckUnit}'),
-                  const SizedBox(height: 8),
+                  if (load.customerName != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(load.customerName!,
+                          style: TextStyle(
+                              fontSize: 13, color: scheme.onSurfaceVariant)),
+                    ),
+                  const SizedBox(height: 12),
+                  stop(Icons.trip_origin, scheme.primary, tr('puLabel'),
+                      load.pickup),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8.5),
+                    child: SizedBox(
+                        height: 14,
+                        child: VerticalDivider(
+                            width: 1, color: scheme.outlineVariant)),
+                  ),
+                  stop(Icons.place, Colors.red.shade400, tr('delLabel'),
+                      load.delivery),
+                  if (load.truckUnit != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(children: [
+                        Icon(Icons.local_shipping_outlined,
+                            size: 16, color: scheme.onSurfaceVariant),
+                        const SizedBox(width: 6),
+                        Text('${tr('truckLabel')}: ${load.truckUnit}',
+                            style: TextStyle(
+                                fontSize: 13, color: scheme.onSurfaceVariant)),
+                      ]),
+                    ),
+                  const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
                     children: [
