@@ -61,6 +61,45 @@ class CompanionApi {
         .toList();
   }
 
+  // ── Office roles (admin/dispatcher/accountant) — mobile command views ──
+
+  /// Live fleet positions (dispatcher/admin/accountant). One row per truck in
+  /// motion: driver, unit, load, lat/lng, speed, last fix.
+  Future<List<Map<String, dynamic>>> fleetPositions() async {
+    final data = await _sb.rpc('fleet_positions_snapshot');
+    return ((data as List?) ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
+
+  /// Overdue-customer call queue (accountant/admin), priority-sorted, with
+  /// phone for tap-to-dial.
+  Future<List<Map<String, dynamic>>> collectionsQueue() async {
+    final data = await _sb.rpc('collections_queue');
+    return ((data as List?) ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
+
+  /// A/R KPI strip (accountant/admin): AR total, past-due, DSO, unbilled, MTD.
+  Future<Map<String, dynamic>?> acctSummary() async {
+    final data = await _sb.rpc('acct_summary');
+    return data == null ? null : Map<String, dynamic>.from(data as Map);
+  }
+
+  /// Sentinel insight feed (admin/dispatcher/accountant): open money/cash/ops/
+  /// compliance findings, most urgent first.
+  Future<List<Map<String, dynamic>>> insightsFeed() async {
+    final data = await _sb.rpc('trux_insights_feed', params: {'p_include_resolved': false});
+    return ((data as List?) ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
+
+  Future<void> acknowledgeInsight(int id) async {
+    await _sb.rpc('acknowledge_insight', params: {'p_id': id});
+  }
+
   /// Trucks a driver can inspect (DVIR).
   Future<List<Map<String, dynamic>>> listTrucks() async {
     final data = await _sb

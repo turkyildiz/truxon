@@ -16,6 +16,9 @@ import 'dvir_screen.dart';
 import 'loads_screen.dart';
 import 'voice_screen.dart';
 import 'radio_screen.dart';
+import 'dispatch_screen.dart';
+import 'collections_screen.dart';
+import 'command_screen.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -199,13 +202,37 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         : (_profile?['username'] as String? ?? 'User');
     final isDriver = role == 'driver';
 
-    final tabs = isDriver
-        ? <Widget>[_loadsTab(), VoiceScreen(api: _api), RadioScreen(username: name, api: _api), _aboutTab(role, name)]
+    // Role-adaptive shell: mobile = command + awareness + the shared radio;
+    // deep data entry stays on truxon.com. Everyone gets Forest + Radio + About;
+    // the first "home" tab is what THAT role needs when away from the desk.
+    final Widget roleHome;
+    final NavigationDestination roleDest;
+    switch (role) {
+      case 'driver':
+        roleHome = _loadsTab();
+        roleDest = NavigationDestination(icon: const Icon(Icons.local_shipping), label: tr('loads'));
+      case 'dispatcher':
+        roleHome = DispatchScreen(api: _api);
+        roleDest = NavigationDestination(icon: const Icon(Icons.dashboard_customize_outlined), label: tr('dispTab'));
+      case 'accountant':
+        roleHome = CollectionsScreen(api: _api);
+        roleDest = NavigationDestination(icon: const Icon(Icons.request_quote_outlined), label: tr('collTab'));
+      case 'admin':
+        roleHome = CommandScreen(api: _api);
+        roleDest = NavigationDestination(icon: const Icon(Icons.space_dashboard_outlined), label: tr('cmdTab'));
+      default:
+        roleHome = VoiceScreen(api: _api);
+        roleDest = NavigationDestination(icon: const Icon(Icons.mic_none), label: tr('trux'));
+    }
+    final hasRoleHome = role == 'driver' || role == 'dispatcher' || role == 'accountant' || role == 'admin';
+
+    final tabs = hasRoleHome
+        ? <Widget>[roleHome, VoiceScreen(api: _api), RadioScreen(username: name, api: _api), _aboutTab(role, name)]
         : <Widget>[VoiceScreen(api: _api), RadioScreen(username: name, api: _api), _aboutTab(role, name)];
 
-    final dests = isDriver
+    final dests = hasRoleHome
         ? [
-            NavigationDestination(icon: const Icon(Icons.local_shipping), label: tr('loads')),
+            roleDest,
             NavigationDestination(icon: const Icon(Icons.mic_none), label: tr('trux')),
             NavigationDestination(icon: const Icon(Icons.record_voice_over), label: tr('radio')),
             NavigationDestination(icon: const Icon(Icons.info_outline), label: tr('about')),

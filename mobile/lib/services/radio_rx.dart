@@ -112,8 +112,6 @@ class RadioRx {
         _channel = ch;
       }
 
-      Diag.log(
-          'radioRx: tick joined=$_joined chan=${_channel?.isJoined}/${_channel?.isClosed} sock=${_client?.isConnected}');
       if (_joined) {
         // Presence: announce (and RE-announce) the driver on the roster.
         // After an OTA the service restarts BEFORE the app has written the
