@@ -43,7 +43,7 @@ select ok(
 select is(
   (select count(*)::int from jsonb_array_elements_text(
      public.company_scorecard(now() - interval '7 days', now())->'not_captured')),
-  2, 'not_captured is down to the two honest gaps');
+  1, 'not_captured is down to the last honest gap (harsh braking)');
 
 select * from finish();
 rollback;
