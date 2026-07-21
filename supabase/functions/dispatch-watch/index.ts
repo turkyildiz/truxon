@@ -216,7 +216,12 @@ Deno.serve(withCors(async (req) => {
   const messages = ((await listRes.json()).value ?? []) as Record<string, any>[]
 
   let observed = 0, skipped = 0
+  let deadlineHit = false
+  // Return before the 150s edge-gateway idle timeout. Each unseen message costs
+  // one LLM call; the next cron run resumes (ledger dedup makes it incremental).
+  const t0 = Date.now()
   for (const m of messages) {
+    if (Date.now() - t0 > 110_000) { deadlineHit = true; break }
     // already logged? (cheap check before any LLM spend)
     const { data: seen } = await svc.from('trux_observations').select('id').eq('message_id', m.id).limit(1)
     if (seen?.length) { skipped++; continue }
@@ -246,5 +251,5 @@ Deno.serve(withCors(async (req) => {
     observed++
   }
 
-  return json({ mailbox: MAILBOX, mode: 'shadow', listed: messages.length, observed, skipped })
+  return json({ mailbox: MAILBOX, mode: 'shadow', listed: messages.length, observed, skipped, deadline_hit: deadlineHit })
 }))

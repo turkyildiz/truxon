@@ -61,12 +61,21 @@ export async function callLlm(apiKey: string, model: string, content: LlmContent
  *  to the cloud [callLlm] on any error. Use only for cheap high-volume text
  *  work (document classification, field extraction) — not the agent's
  *  reasoning, which stays on the strong cloud model. Vision is never routed
- *  here (the local text model can't see images). */
+ *  here (the local text model can't see images).
+ *
+ *  LENGTH GATE: the CPU-only NAS processes a long prompt's tokens at only
+ *  ~20 tok/s cold (a 2500-token email ≈ 120s), so long inputs would blow the
+ *  150s edge-gateway timeout. Short prompts finish in ~1-2s. So we only route
+ *  to the local model when the prompt is short enough to stay fast; longer
+ *  prompts go straight to the always-fast cloud. Raise LOCAL_LLM_MAX_CHARS if
+ *  the NAS gets GPU/prefill acceleration. */
+const LOCAL_MAX_CHARS = Number(Deno.env.get('LOCAL_LLM_MAX_CHARS') ?? '1600')
+
 export async function callTextLlm(cloudKey: string, cloudModel: string, prompt: string): Promise<string> {
   const localUrl = Deno.env.get('LOCAL_LLM_URL')
   const localKey = Deno.env.get('LOCAL_LLM_KEY')
   const localModel = Deno.env.get('LOCAL_LLM_MODEL')
-  if (localUrl && localKey && localModel) {
+  if (localUrl && localKey && localModel && prompt.length <= LOCAL_MAX_CHARS) {
     const t0 = Date.now()
     try {
       // First call cold-loads the model (~20s); it stays warm after, so a
@@ -93,6 +102,9 @@ export async function callTextLlm(cloudKey: string, cloudModel: string, prompt: 
     } catch (err) {
       console.log(`[localllm] miss error=${String(err).slice(0, 80)} ms=${Date.now() - t0} -> cloud`)
     }
+  } else if (localUrl && localKey && localModel) {
+    // Local is configured but this prompt is too long to be fast on CPU.
+    console.log(`[localllm] skip len=${prompt.length} > ${LOCAL_MAX_CHARS} -> cloud`)
   }
   return callLlm(cloudKey, cloudModel, prompt)
 }
