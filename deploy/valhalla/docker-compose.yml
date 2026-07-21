@@ -1,0 +1,18 @@
+# Valhalla truck routing on the NAS. First start builds the routing graph
+# from the OSM extract in ./data (hours — see README); after that it serves
+# on :8002 and restarts fast. Truck costing (height/weight/axle) is built in.
+services:
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:latest
+    container_name: truxon-valhalla
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./data:/custom_files
+    environment:
+      # build tiles from every .osm.pbf dropped into ./data
+      - use_tiles_ignore_pbf=False
+      - serve_tiles=True
+      - build_admins=True
+      - build_time_zones=True
