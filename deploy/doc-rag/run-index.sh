@@ -9,7 +9,7 @@ LOG="logs/index_$(date +%Y%m).log"
   echo "===== $(date "+%F %T") rag index start ====="
   flock -n /tmp/truxon-rag-index.lock docker run --rm --network host \
     -v /volume1/docker/truxon-rag:/app -w /app \
-    node:20-slim node index-docs.mjs
+    truxon-rag-node node index-docs.mjs
   echo "===== $(date "+%F %T") rag index end (rc=$?) ====="
 } >>"$LOG" 2>&1
 find logs -name "index_*.log" -mtime +90 -delete 2>/dev/null || true

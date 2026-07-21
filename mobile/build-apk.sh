@@ -10,9 +10,13 @@ set -euo pipefail
 
 SUPABASE_URL="${SUPABASE_URL:-https://okoeeyxxvzypjiumraxq.supabase.co}"
 SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-sb_publishable_Ak8T-1XgtjC00LXbiI9xDA_o5b_n7C-}"
+# Valhalla truck routing on the NAS via Tailscale Funnel (deploy/valhalla/).
+# Public endpoint; the app falls back to the bearing line while it's unreachable.
+VALHALLA_URL="${VALHALLA_URL:-https://aida-nas.tail2c5ca.ts.net}"
 
 DEFINES=(--dart-define=SUPABASE_URL="$SUPABASE_URL"
-         --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY")
+         --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+         --dart-define=VALHALLA_URL="$VALHALLA_URL")
 
 cd "$(dirname "$0")"
 case "${1:-release}" in
