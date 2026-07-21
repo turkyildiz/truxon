@@ -5,7 +5,11 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { json, requireCron, withCors } from '../_shared/auth.ts'
 
-const OVERPASS = 'https://overpass-api.de/api/interpreter'
+// Primary + fallback mirror — the main instance 504s when busy.
+const MIRRORS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+]
 const US_BBOX = '24.5,-125.0,49.5,-66.5' // continental US (s,w,n,e)
 const UA = 'truxon.com fleet app (dispatch@truxon.com)'
 
@@ -32,13 +36,17 @@ Deno.serve(withCors(async (req) => {
   for (const [kind, q] of Object.entries(QUERIES)) {
     if (only && kind !== only) continue
     try {
-      const r = await fetch(OVERPASS, {
-        method: 'POST',
-        headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `data=${encodeURIComponent(q)}`,
-        signal: AbortSignal.timeout(130_000),
-      })
-      if (!r.ok) { counts[kind] = -r.status; continue }
+      let r: Response | null = null
+      for (const mirror of MIRRORS) {
+        r = await fetch(mirror, {
+          method: 'POST',
+          headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `data=${encodeURIComponent(q)}`,
+          signal: AbortSignal.timeout(130_000),
+        }).catch(() => null)
+        if (r?.ok) break
+      }
+      if (!r?.ok) { counts[kind] = -(r?.status ?? 0); continue }
       const elements = (await r.json()).elements ?? []
       const rows = elements.map((e: {
         id: number; lat?: number; lon?: number
