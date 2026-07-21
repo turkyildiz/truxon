@@ -1730,3 +1730,23 @@ export async function shadowSummary(): Promise<ShadowSummary | null> {
   const data = unwrap(await supabase.rpc('shadow_summary'))
   return (data as unknown as ShadowSummary) ?? null
 }
+
+// ---------- Metric trends (nightly snapshots of scorecard values) ----------
+
+export interface MetricTrend {
+  metric_key: string
+  latest: number
+  latest_on: string
+  wow: number | null
+  wow_pct: number | null
+  mom: number | null
+  mom_pct: number | null
+  slope_13w: number | null
+  points: number
+}
+
+/** WoW/MoM/13-week-slope for every captured metric series. */
+export async function metricTrends(prefix?: string): Promise<MetricTrend[]> {
+  const data = unwrap(await supabase.rpc('metric_trends', { p_prefix: prefix || undefined }))
+  return (data as unknown as MetricTrend[]) ?? []
+}

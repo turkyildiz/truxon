@@ -1722,6 +1722,24 @@ export type Database = {
         }
         Relationships: []
       }
+      metric_snapshots: {
+        Row: {
+          captured_on: string
+          metric_key: string
+          value: number
+        }
+        Insert: {
+          captured_on?: string
+          metric_key: string
+          value: number
+        }
+        Update: {
+          captured_on?: string
+          metric_key?: string
+          value?: number
+        }
+        Relationships: []
+      }
       playbook_metrics: {
         Row: {
           category: string
@@ -3162,6 +3180,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      capture_metric_snapshots: { Args: never; Returns: number }
       carrier_safety_latest: { Args: never; Returns: Json }
       cashflow_forecast: {
         Args: { p_weeks?: number }
@@ -3630,6 +3649,27 @@ export type Database = {
       merge_customers: {
         Args: { p_dupe: number; p_keep: number }
         Returns: Json
+      }
+      metric_flatten: {
+        Args: { p_json: Json; p_prefix: string }
+        Returns: {
+          metric_key: string
+          value: number
+        }[]
+      }
+      metric_trends: {
+        Args: { p_prefix?: string }
+        Returns: {
+          latest: number
+          latest_on: string
+          metric_key: string
+          mom: number
+          mom_pct: number
+          points: number
+          slope_13w: number
+          wow: number
+          wow_pct: number
+        }[]
       }
       my_driver_id: { Args: never; Returns: number }
       my_role: {

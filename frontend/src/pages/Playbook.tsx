@@ -1,13 +1,39 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { Card, LoadError, Select } from '../components/ui'
-import { playbookCoverage, playbookMetrics, type PlaybookMetric } from '../data'
+import { Card, LoadError, Select, money } from '../components/ui'
+import { metricTrends, playbookCoverage, playbookMetrics, type MetricTrend, type PlaybookMetric } from '../data'
 
 const STATUS_META: Record<string, { label: string; cls: string; dot: string }> = {
   live: { label: 'Live', cls: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
   needs_data: { label: 'Needs data', cls: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
   external: { label: 'External feed', cls: 'text-sky-700 dark:text-sky-300', dot: 'bg-sky-500' },
   qualitative: { label: 'Judgment', cls: 'text-muted', dot: 'bg-slate-400' },
+}
+
+// The headline series worth glancing at; everything else stays queryable.
+const TREND_KEYS: { key: string; label: string; kind: 'money' | 'num' }[] = [
+  { key: 'scorecard7.financial.revenue', label: 'Revenue (7d)', kind: 'money' },
+  { key: 'scorecard7.financial.net', label: 'Net (7d)', kind: 'money' },
+  { key: 'costbasis.avg_rpm', label: 'Avg $/mile', kind: 'num' },
+  { key: 'costbasis.breakeven_rpm', label: 'Break-even $/mile', kind: 'num' },
+  { key: 'costbasis.mpg', label: 'Fleet MPG', kind: 'num' },
+  { key: 'scorecard7.operations.loads', label: 'Loads (7d)', kind: 'num' },
+  { key: 'ops7.miles_per_day', label: 'Miles/day', kind: 'num' },
+  { key: 'scorecard7.detention.hours', label: 'Detention hrs (7d)', kind: 'num' },
+  { key: 'scorecard30.financial.ar_outstanding', label: 'AR outstanding', kind: 'money' },
+  { key: 'ar.over_45', label: 'AR > 45 days', kind: 'money' },
+  { key: 'scorecard30.sales.open_pipeline', label: 'Open pipeline (30d)', kind: 'num' },
+]
+
+function Delta({ v, pct }: { v: number | null; pct: number | null }) {
+  if (v == null) return <span className="text-xs text-muted">—</span>
+  const up = v > 0
+  const flat = v === 0
+  return (
+    <span className={`text-xs font-medium ${flat ? 'text-muted' : up ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+      {flat ? '→' : up ? '▲' : '▼'} {pct != null ? `${Math.abs(pct).toFixed(1)}%` : Math.abs(v).toFixed(1)}
+    </span>
+  )
 }
 
 function StatusPill({ status }: { status: string }) {
@@ -22,6 +48,7 @@ function StatusPill({ status }: { status: string }) {
 
 export default function Playbook() {
   const covQ = useQuery({ queryKey: ['playbook-coverage'], queryFn: playbookCoverage, retry: false })
+  const trendQ = useQuery({ queryKey: ['metric-trends'], queryFn: () => metricTrends(), retry: false })
   const [status, setStatus] = useState('')
   const [owner, setOwner] = useState('')
   const [search, setSearch] = useState('')
@@ -92,6 +119,38 @@ export default function Playbook() {
           </div>
         </Card>
       )}
+
+      {!trendQ.isError && (trendQ.data?.length ?? 0) > 0 && (() => {
+        const byKey = new Map((trendQ.data ?? []).map((t: MetricTrend) => [t.metric_key, t]))
+        const rows = TREND_KEYS.map((k) => ({ ...k, t: byKey.get(k.key) })).filter((r) => r.t)
+        if (!rows.length) return null
+        const anyHistory = rows.some((r) => r.t!.wow != null)
+        return (
+          <Card title="Trends">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {rows.map((r) => (
+                <div key={r.key} className="rounded-xl border border-line p-3">
+                  <div className="text-xs text-muted">{r.label}</div>
+                  <div className="mt-0.5 text-lg font-bold text-body">
+                    {r.kind === 'money' ? money(r.t!.latest) : Number(r.t!.latest).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="mt-1 flex items-center gap-3">
+                    <span className="text-[10px] uppercase tracking-wide text-muted">WoW</span>
+                    <Delta v={r.t!.wow} pct={r.t!.wow_pct} />
+                    <span className="text-[10px] uppercase tracking-wide text-muted">MoM</span>
+                    <Delta v={r.t!.mom} pct={r.t!.mom_pct} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {!anyHistory && (
+              <p className="mt-3 text-xs text-muted">
+                Series capture started tonight — week-over-week deltas appear as nightly snapshots accumulate.
+              </p>
+            )}
+          </Card>
+        )
+      })()}
 
       <Card title="Metrics">
         <div className="mb-3 flex flex-wrap items-center gap-2">
