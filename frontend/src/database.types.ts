@@ -1535,6 +1535,7 @@ export type Database = {
           decided_at: string | null
           decided_by: string | null
           detail: string
+          evidence: Json | null
           id: number
           load_id: number
           minutes: number | null
@@ -1548,6 +1549,7 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           detail?: string
+          evidence?: Json | null
           id?: never
           load_id: number
           minutes?: number | null
@@ -1561,6 +1563,7 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           detail?: string
+          evidence?: Json | null
           id?: never
           load_id?: number
           minutes?: number | null

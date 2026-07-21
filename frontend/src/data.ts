@@ -1835,6 +1835,17 @@ export interface LoadAccessorial {
   minutes: number | null
   detail: string
   status: 'proposed' | 'approved' | 'rejected' | 'invoiced'
+  evidence: {
+    appointment: string | null
+    arrival: string
+    departure: string
+    dwell_min: number
+    free_min: number
+    detention_min: number
+    stop_state: string | null
+    captured_at: string
+    source: string
+  } | null
 }
 
 /** All detention accessorials, newest first (RLS: office roles). */

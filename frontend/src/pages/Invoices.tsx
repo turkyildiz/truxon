@@ -795,6 +795,31 @@ function DetentionTab() {
           Approved detention is added automatically to the load's invoice when it is billed.
         </p>
       )}
+      {(accQ.data ?? []).some((a) => a.atype === 'detention' && a.evidence) && (
+        <div className="mt-6">
+          <h3 className="mb-2 text-sm font-semibold">📎 Evidence on file</h3>
+          <p className="mb-2 text-xs text-muted">
+            ELD proof is banked on each charge the moment it's proposed — it outlives the 2-day GPS
+            retention, so a broker dispute months later still has its exhibit.
+          </p>
+          <Table headers={['Load', 'Stop', 'Arrived', 'Left', 'Dwell', 'Billable', 'Amount', 'Status']}>
+            {(accQ.data ?? [])
+              .filter((a) => a.atype === 'detention' && a.evidence)
+              .map((a) => (
+                <tr key={a.id} className="hover:bg-surface-2">
+                  <td className="px-3 py-2.5 text-muted">#{a.load_id}</td>
+                  <td className="px-3 py-2.5 capitalize">{a.stop_type}</td>
+                  <td className="px-3 py-2.5 text-muted">{formatDate(a.evidence!.arrival)}</td>
+                  <td className="px-3 py-2.5 text-muted">{formatDate(a.evidence!.departure)}</td>
+                  <td className="px-3 py-2.5">{hrs(a.evidence!.dwell_min)}</td>
+                  <td className="px-3 py-2.5 font-semibold text-amber-700 dark:text-amber-300">{hrs(a.evidence!.detention_min)}</td>
+                  <td className="px-3 py-2.5 font-semibold">{money(Number(a.amount))}</td>
+                  <td className="px-3 py-2.5"><Badge status={a.status} /></td>
+                </tr>
+              ))}
+          </Table>
+        </div>
+      )}
     </>
   )
 }
