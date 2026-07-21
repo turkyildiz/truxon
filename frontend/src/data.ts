@@ -630,6 +630,19 @@ export async function loadActuals(days = 60): Promise<LoadActual[]> {
   return unwrap(await supabase.rpc('load_actuals', { p_days: days })) as unknown as LoadActual[]
 }
 
+export interface IftaQuarterRow {
+  jurisdiction: string
+  miles: number
+  share_pct: number
+  fuel_transactions: number
+  gallons: number
+  fuel_spend: number
+}
+
+export async function iftaQuarter(quarter?: string): Promise<IftaQuarterRow[]> {
+  return unwrap(await supabase.rpc('ifta_quarter', quarter ? { p_quarter: quarter } : {})) as unknown as IftaQuarterRow[]
+}
+
 export interface CustomerExposure {
   open_ar: number
   unbilled: number

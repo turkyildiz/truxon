@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { Badge, Button, Card, Field, formatDateTime, Input, LoadError, money, StatCard, Table } from '../components/ui'
 import { useAuth } from '../auth'
-import { fuelByTruck, fuelIftaSummary, importFuelCsv, listFuelTransactions } from '../data'
+import { fuelByTruck, fuelIftaSummary, iftaQuarter, importFuelCsv, listFuelTransactions } from '../data'
 import { errorMessage } from '../supabase'
 import type { FuelImportResult } from '../types'
 
@@ -14,6 +14,59 @@ function isoDate(d: Date): string {
 function monthStart(): string {
   const d = new Date()
   return isoDate(new Date(d.getFullYear(), d.getMonth(), 1))
+}
+
+function quarterLabel(offset = 0): string {
+  const d = new Date()
+  let q = Math.floor(d.getMonth() / 3) + 1 - offset
+  let y = d.getFullYear()
+  while (q < 1) { q += 4; y -= 1 }
+  return `${y}-Q${q}`
+}
+
+/** The filing view: GPS-attributed MILES per jurisdiction + fuel bought there. */
+function IftaQuarterCard() {
+  const [quarter, setQuarter] = useState(quarterLabel(0))
+  const q = useQuery({ queryKey: ['ifta-quarter', quarter], queryFn: () => iftaQuarter(quarter), retry: false })
+  if (q.isError) return null
+  const rows = q.data ?? []
+  const totalMiles = rows.reduce((s, r) => s + Number(r.miles), 0)
+  return (
+    <Card title="🗺️ IFTA quarter — filing view (GPS miles by jurisdiction)">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs text-muted">
+          Miles from banked ELD breadcrumbs attributed by state polygon; gallons/spend are purchases in that state.
+          {totalMiles > 0 && ` Total ${Math.round(totalMiles).toLocaleString()} mi.`}
+        </span>
+        <div className="flex gap-1">
+          {[quarterLabel(1), quarterLabel(0)].map((lbl) => (
+            <button
+              key={lbl}
+              onClick={() => setQuarter(lbl)}
+              className={`rounded-lg px-2 py-1 text-xs font-medium ${quarter === lbl ? 'bg-surface text-body shadow' : 'text-muted hover:text-body'}`}
+            >
+              {lbl}
+            </button>
+          ))}
+        </div>
+      </div>
+      {rows.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted">No attributed miles in {quarter} yet — the GPS bank started 2026-07-19.</p>
+      ) : (
+        <Table headers={['Jurisdiction', 'Miles', 'Share', 'Gallons bought', 'Fuel spend']}>
+          {rows.map((r) => (
+            <tr key={r.jurisdiction} className="hover:bg-surface-2">
+              <td className="px-3 py-2.5 font-medium">{r.jurisdiction || 'unattributed'}</td>
+              <td className="px-3 py-2.5">{Math.round(Number(r.miles)).toLocaleString()}</td>
+              <td className="px-3 py-2.5 text-muted">{Number(r.share_pct).toFixed(1)}%</td>
+              <td className="px-3 py-2.5">{Number(r.gallons) > 0 ? Number(r.gallons).toLocaleString(undefined, { maximumFractionDigits: 1 }) : '—'}</td>
+              <td className="px-3 py-2.5">{Number(r.fuel_spend) > 0 ? money(Number(r.fuel_spend)) : '—'}</td>
+            </tr>
+          ))}
+        </Table>
+      )}
+    </Card>
+  )
 }
 
 export default function Fuel() {
@@ -132,6 +185,8 @@ export default function Fuel() {
           </Table>
         )}
       </Card>
+
+      <IftaQuarterCard />
 
       <Card title="IFTA by Jurisdiction">
         {iftaQ.isError ? (
