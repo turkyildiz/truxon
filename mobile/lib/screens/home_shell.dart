@@ -133,7 +133,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   /// this off inside the app. `ok` is honest: only a full "Allow all the time"
   /// grant clears the red banner (see TruxTrackingService.setTracking).
   Future<void> _startTracking() async {
-    final ok = await _tracking.setTracking(true, context: context);
+    bool ok = false;
+    try {
+      ok = await _tracking.setTracking(true, context: context);
+    } catch (e) {
+      Diag.log('tracking: start failed: $e'); // degraded, never fatal
+    }
     try {
       await _api.setDuty(true);
     } catch (_) {/* duty flag is best-effort */}
@@ -236,37 +241,54 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 
   Widget _loadsTab() {
-    return Column(
+    final scheme = Theme.of(context).colorScheme;
+    final content = Column(
       children: [
         // Tablet day: pre/post-trip inspection one tap from the day's start.
-        ListTile(
-          dense: true,
-          leading: const Icon(Icons.fact_check_outlined, color: Colors.indigo),
-          title: Text(tr('dvirTitle')),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => DvirScreen(api: _api)),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+          child: Card(
+            child: ListTile(
+              leading: Icon(Icons.fact_check_outlined, color: scheme.primary),
+              title: Text(tr('dvirTitle'),
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => DvirScreen(api: _api)),
+              ),
+            ),
           ),
         ),
-        const Divider(height: 1),
         if (_locationDenied)
-          Material(
-            color: Colors.red.withValues(alpha: 0.12),
-            child: ListTile(
-              leading: const Icon(Icons.location_off, color: Colors.red),
-              title: Text(tr('locationRequired')),
-              subtitle: Text(tr('enableAllowAllTime')),
-              trailing: FilledButton(
-                onPressed: _startTracking,
-                child: Text(tr('enable')),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Material(
+              color: scheme.errorContainer,
+              borderRadius: BorderRadius.circular(16),
+              child: ListTile(
+                leading: Icon(Icons.location_off, color: scheme.error),
+                title: Text(tr('locationRequired'),
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(tr('enableAllowAllTime')),
+                trailing: FilledButton(
+                  onPressed: _startTracking,
+                  child: Text(tr('enable')),
+                ),
               ),
             ),
           )
         else
-          ListTile(
-            leading: const Icon(Icons.gps_fixed, color: Colors.green),
-            title: Text(tr('sharingLocation')),
-            subtitle: Text(tr('alwaysOn')),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 10, 24, 2),
+            child: Row(
+              children: [
+                Icon(Icons.gps_fixed, size: 16, color: Colors.green.shade600),
+                const SizedBox(width: 8),
+                Text('${tr('sharingLocation')} — ${tr('alwaysOn')}',
+                    style: TextStyle(
+                        fontSize: 12, color: scheme.onSurfaceVariant)),
+              ],
+            ),
           ),
         // Tracker is queuing fixes because its token went stale — the resume
         // handler / _onTrackingData push a fresh one, so this self-heals.
@@ -279,9 +301,15 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               dense: true,
             ),
           ),
-        const Divider(height: 1),
         Expanded(child: LoadsScreen(api: _api, onTrackingHint: _onTrackingHint)),
       ],
+    );
+    // Tablets are wide; a reading-width column beats edge-to-edge banners.
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 920),
+        child: content,
+      ),
     );
   }
 

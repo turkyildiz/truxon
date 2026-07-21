@@ -303,17 +303,34 @@ class TruxTrackingService {
   /// prompt. It's a Settings toggle, so we explain the step (when [context]
   /// is available) and redirect to app settings instead.
   Future<LocationPermission> ensurePermissions({BuildContext? context}) async {
-    if (!await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
-      await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+    // Every prompt is best-effort: any of these throws PlatformException when
+    // its dialog is dismissed or when two prompts race (emulator-verified),
+    // and a denied permission must degrade to the banner, never an error
+    // screen.
+    try {
+      if (!await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
+        await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+      }
+    } catch (e) {
+      Diag.log('perm: battery opt: $e');
     }
-    final notif = await FlutterForegroundTask.checkNotificationPermission();
-    if (notif != NotificationPermission.granted) {
-      await FlutterForegroundTask.requestNotificationPermission();
+    try {
+      final notif = await FlutterForegroundTask.checkNotificationPermission();
+      if (notif != NotificationPermission.granted) {
+        await FlutterForegroundTask.requestNotificationPermission();
+      }
+    } catch (e) {
+      Diag.log('perm: notification: $e');
     }
 
     var perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied) {
-      perm = await Geolocator.requestPermission();
+      try {
+        perm = await Geolocator.requestPermission();
+      } catch (e) {
+        Diag.log('perm: location request: $e');
+        perm = await Geolocator.checkPermission();
+      }
     }
     if (perm == LocationPermission.whileInUse && !_askedForAlways) {
       _askedForAlways = true;
