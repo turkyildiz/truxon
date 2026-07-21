@@ -110,6 +110,7 @@ class CompanionApi {
     String docType = 'pod',
     String? filename,
     String contentType = 'image/jpeg',
+    String? ocrText,
   }) async {
     final safeName = (filename == null || filename.isEmpty) ? 'photo.jpg' : filename;
     final unique = DateTime.now().microsecondsSinceEpoch;
@@ -126,6 +127,7 @@ class CompanionApi {
       'p_content_type': contentType,
       'p_size_bytes': bytes.length,
       'p_doc_type': docType,
+      if (ocrText != null && ocrText.isNotEmpty) 'p_ocr_text': ocrText,
     });
     return Map<String, dynamic>.from(data as Map);
   }

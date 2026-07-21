@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import '../services/doc_scan.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../i18n.dart';
@@ -129,7 +129,6 @@ class _LoadsScreenState extends State<LoadsScreen> {
     return status;
   }
 
-  final _picker = ImagePicker();
   int? _uploadingFor;
 
   /// Feature 3 — snap a delivery receipt / BOL / POD and attach it to the load.
@@ -160,20 +159,17 @@ class _LoadsScreenState extends State<LoadsScreen> {
     );
     if (docType == null) return;
     try {
-      final shot = await _picker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 70,
-        maxWidth: 2200,
-      );
-      if (shot == null) return;
+      // Edge-detected scan with on-device OCR; camera fallback inside.
+      final scan = await DocScan.capture();
+      if (scan == null) return;
       setState(() => _uploadingFor = load.id);
-      final bytes = await shot.readAsBytes();
       await widget.api.uploadReceipt(
         load.id,
-        bytes,
+        scan.bytes,
         docType: docType,
-        filename: shot.name,
-        contentType: shot.mimeType ?? 'image/jpeg',
+        filename: scan.name,
+        contentType: 'image/jpeg',
+        ocrText: scan.ocrText,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
