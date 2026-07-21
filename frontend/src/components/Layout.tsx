@@ -78,6 +78,7 @@ const NAV_GROUPS: { title: string | null; items: NavItem[] }[] = [
   ] },
   { title: 'Operations', items: [
     { key: 'track', to: '/track', label: 'Track & Trace', icon: '📍' },
+    { key: 'radio', to: '/radio', label: 'Radio', icon: '📻' },
     { key: 'loads', to: '/loads', label: 'Loads', icon: '📦' },
     { key: 'dispatch', to: '/dispatch', label: 'Dispatch', icon: '🚚' },
     { key: 'shadow', to: '/shadow', label: 'Forest Shadow', icon: '🕶️' },

@@ -129,6 +129,11 @@ Deno.serve(withCors(async (req) => {
       // Report questions legitimately need several tool rounds; the in-app
       // spinner can wait, the gateway allows 150s idle.
       deadlineMs: 100_000,
+      // Ask-Forest over the fleet radio: the reply is spoken aloud to every
+      // truck, so it must sound like a radio call, not a report.
+      channelNote: body.radio === true
+        ? 'RADIO MODE: your reply will be READ ALOUD over the fleet push-to-talk radio to all drivers. Answer in 1-3 short spoken sentences, plain conversational words — no markdown, no tables, no lists, round the numbers.'
+        : undefined,
     })
     return json({
       session_id: sessionId,

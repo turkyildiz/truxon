@@ -135,8 +135,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     final isDriver = role == 'driver';
 
     final tabs = isDriver
-        ? <Widget>[_loadsTab(), VoiceScreen(api: _api), RadioScreen(username: name), _aboutTab(role, name)]
-        : <Widget>[VoiceScreen(api: _api), RadioScreen(username: name), _aboutTab(role, name)];
+        ? <Widget>[_loadsTab(), VoiceScreen(api: _api), RadioScreen(username: name, api: _api), _aboutTab(role, name)]
+        : <Widget>[VoiceScreen(api: _api), RadioScreen(username: name, api: _api), _aboutTab(role, name)];
 
     final dests = isDriver
         ? [

@@ -1,5 +1,13 @@
 # Trux Companion — tablet provisioning checklist
 
+> **ONE-APP RADIO (2026-07-21):** the app now has native push-to-talk built
+> in — voice rides Truxon's own authenticated connection (Radio tab, hold to
+> talk), and dispatch answers from truxon.com → 📻 Radio. Once one tablet
+> passes a field smoke test on the native radio, steps 1 (Tailscale) and
+> 2 (Mumla) below become UNNECESSARY for new tablets: provisioning collapses
+> to install-one-app → log in → grant permissions. The Mumla path stays as
+> the in-app fallback link until then.
+
 Do this once per truck tablet (Samsung / Android). ~10 min each. The goal:
 the app runs **always-on in the background**, shares location 24/7, and never
 needs a thumb drive again after this.

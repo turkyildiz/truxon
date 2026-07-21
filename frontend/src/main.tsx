@@ -29,6 +29,7 @@ const Trailers = lazy(() => import('./pages/Equipment').then((m) => ({ default: 
 const Maintenance = lazy(() => import('./pages/Maintenance'))
 const Reports = lazy(() => import('./pages/Reports'))
 const BoardPack = lazy(() => import('./pages/BoardPack'))
+const Radio = lazy(() => import('./pages/Radio'))
 const Invoices = lazy(() => import('./pages/Invoices'))
 const Fuel = lazy(() => import('./pages/Fuel'))
 const Tolls = lazy(() => import('./pages/Tolls'))
@@ -88,6 +89,7 @@ createRoot(document.getElementById('root')!).render(
               {/* legacy path — Trux was renamed Forest (2026-07-20) */}
               <Route path="/trux" element={<Navigate to="/forest" replace />} />
               <Route path="/track" element={<FleetMap />} />
+              <Route path="/radio" element={<Radio />} />
               <Route path="/loads" element={<Loads />} />
               <Route path="/loads/:id" element={<LoadDetail />} />
               <Route path="/dispatch" element={<Dispatch />} />
