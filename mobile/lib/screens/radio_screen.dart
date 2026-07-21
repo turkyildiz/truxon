@@ -142,11 +142,15 @@ class _RadioScreenState extends State<RadioScreen> {
                         color: Colors.green, fontWeight: FontWeight.w600),
                   ),
                 ),
-              // The button: hold to talk, release to listen.
-              GestureDetector(
-                onTapDown: online ? (_) => _radio.startTalking() : null,
-                onTapUp: (_) => _radio.stopTalking(),
-                onTapCancel: () => _radio.stopTalking(),
+              // The button: hold to talk, release to listen. Raw pointer
+              // events, NOT a tap gesture — a tap CANCELS when the finger
+              // drifts past the touch slop (~4mm), which cut real
+              // transmissions off after a couple of seconds in the field.
+              // A pointer only "ends" when the finger truly lifts.
+              Listener(
+                onPointerDown: online ? (_) => _radio.startTalking() : null,
+                onPointerUp: (_) => _radio.stopTalking(),
+                onPointerCancel: (_) => _radio.stopTalking(),
                 child: Container(
                   width: 190,
                   height: 190,
@@ -184,10 +188,11 @@ class _RadioScreenState extends State<RadioScreen> {
               // Ask Forest: hold, speak the question; the answer is broadcast
               // to the whole fleet as a 🌲 Forest transmission.
               if (_forest != null)
-                GestureDetector(
-                  onTapDown: online && !_forestBusy ? (_) => _askStart() : null,
-                  onTapUp: (_) => _askFinish(),
-                  onTapCancel: _askFinish,
+                // Same raw-pointer treatment as the talk button (drift-proof).
+                Listener(
+                  onPointerDown: online && !_forestBusy ? (_) => _askStart() : null,
+                  onPointerUp: (_) => _askFinish(),
+                  onPointerCancel: (_) => _askFinish(),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                     decoration: BoxDecoration(
