@@ -67,7 +67,15 @@ function stripQuotedReply(text: string): string {
     const m = re.exec(text)
     if (m && m.index > 0 && m.index < cut) cut = m.index
   }
-  return text.slice(0, cut).trim() || text.trim()
+  const kept = text.slice(0, cut).trim()
+  // A FORWARD with a one-line note is almost entirely "quoted" content — the
+  // payload the sender wants us to read lives BELOW the From: line. If the
+  // cut leaves near-nothing of a much longer email, keep the whole thing
+  // (cost: the model sees some signatures; benefit: forwards actually work).
+  if (kept.length < 200 && text.trim().length > kept.length * 2 + 200) {
+    return text.trim()
+  }
+  return kept || text.trim()
 }
 
 function stripHtml(html: string): string {
