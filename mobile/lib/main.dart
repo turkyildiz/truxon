@@ -24,6 +24,10 @@ Future<void> main() async {
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey, // publishableKey alias when available
+    // Token refreshing is OWNED by AuthRefresher (single shared path with a
+    // cross-isolate lock) so the background service can refresh too without
+    // ever racing the SDK's rotation. Do not re-enable this.
+    authOptions: const FlutterAuthClientOptions(autoRefreshToken: false),
   );
 
   // Hand the current access token to the background GPS isolate, and keep it

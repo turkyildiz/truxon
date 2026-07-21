@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,16 +37,23 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _queuedFixes = 0;
   bool _uploadAuthStale = false;
 
+  // Keep-fresh cadence: well inside AuthRefresher.refreshSkew (10 min) so the
+  // UI-side session never quietly expires now that the SDK auto-refresh is off.
+  Timer? _keepFresh;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     FlutterForegroundTask.addTaskDataCallback(_onTrackingData);
+    _keepFresh = Timer.periodic(
+        const Duration(minutes: 3), (_) => _api.pushFreshTokenToTracker());
     _bootstrap();
   }
 
   @override
   void dispose() {
+    _keepFresh?.cancel();
     FlutterForegroundTask.removeTaskDataCallback(_onTrackingData);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();

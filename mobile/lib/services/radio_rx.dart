@@ -13,6 +13,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'
         RealtimeSubscribeStatus;
 
 import '../config.dart';
+import 'auth_refresher.dart';
 import 'diag.dart';
 import 'radio_codec.dart';
 import 'session_store.dart';
@@ -53,7 +54,11 @@ class RadioRx {
   /// while healthy, and quietly waits out the gaps.
   Future<void> tick() async {
     try {
-      final token = await SessionStore.accessToken();
+      // Single-path refresh: with the app closed this isolate becomes the
+      // refresher (the prefs lock in AuthRefresher makes that safe), so the
+      // radio and GPS run indefinitely, not just until the token expires.
+      final token =
+          await AuthRefresher.ensureFresh() ?? await SessionStore.accessToken();
       if (token == null || token.isEmpty) {
         await dispose(); // signed out — radio off with everything else
         return;

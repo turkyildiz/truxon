@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'auth_refresher.dart';
 import 'diag.dart';
 import 'session_store.dart';
 import 'tracking_service.dart';
@@ -231,21 +232,35 @@ class CompanionApi {
     });
   }
 
-  /// Hand the current access token to the background GPS isolate, refreshing
-  /// it first if it went stale while the app was backgrounded. UI isolate
-  /// only — the tracker deliberately never refreshes tokens itself (see
-  /// [SessionStore] for why). Called on app resume and whenever the tracker
-  /// reports auth failures, so queued fixes flush on the next tick.
+  /// Keep the session fresh THROUGH THE SINGLE SHARED PATH ([AuthRefresher] —
+  /// never auth.refreshSession() directly, that's a second refresh-token
+  /// spender and races the background service into a logout), then make the
+  /// live client adopt whatever is now persisted. Called on resume, on the
+  /// keep-fresh timer, and whenever the tracker reports auth failures.
   Future<void> pushFreshTokenToTracker() async {
-    var session = _sb.auth.currentSession;
-    if (session == null) return;
-    if (session.isExpired) {
+    final fresh = await AuthRefresher.ensureFresh();
+    if (fresh == null) return; // signed out (or unrecoverable) — nothing to push
+    if (fresh != _sb.auth.currentSession?.accessToken) {
+      // The refresher (possibly in the service isolate) rotated the session;
+      // adopt the persisted copy so this client's requests + realtime use it.
+      // Only adopt a LIVE session — recovering an expired one would trigger
+      // gotrue's own internal refresh outside the lock.
       try {
-        await _sb.auth.refreshSession();
-      } catch (_) {/* offline — the next resume/report tries again */}
-      session = _sb.auth.currentSession;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.reload();
+        final raw = prefs.getString(AuthRefresher.persistKey);
+        if (raw != null) {
+          final sess = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+          final exp = (sess['expires_at'] as num?)?.toInt() ?? 0;
+          final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+          if (exp - now > 60) await _sb.auth.recoverSession(raw);
+        }
+      } catch (e) {
+        Diag.log('auth: adopt failed: $e');
+      }
     }
-    await SessionStore.saveAccessToken(session?.accessToken);
+    await SessionStore.saveAccessToken(
+        _sb.auth.currentSession?.accessToken ?? fresh);
   }
 
   /// Sign out MUST also kill the GPS foreground service and wipe the offline
