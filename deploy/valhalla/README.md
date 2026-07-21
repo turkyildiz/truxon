@@ -29,8 +29,11 @@ OTA update. No app-code change needed — the client shipped ready.
 OSM data ages gently; re-run setup.sh quarterly (it re-downloads and the
 container rebuilds tiles). Add to the NAS crontab when convenient.
 
-## Still blocked on
+## Status
 
-NAS SSH access (UGOS) — the standing owner-owed item. Everything in this
-directory is ready to run the day that lands. The doc-rag worker's
-CRON_SECRET handoff rides the same visit.
+DEPLOYED 2026-07-21. Lives at `/volume1/docker/truxon-valhalla/` on the NAS
+(midwest 10-state graph). Funnel approved by owner; public endpoint:
+
+    https://aida-nas.tail2c5ca.ts.net
+
+That is the exact VALHALLA_URL value for publish-release.sh.
