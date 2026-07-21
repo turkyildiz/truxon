@@ -1,0 +1,13 @@
+# Token-gated Ollama proxy. Host network so 127.0.0.1:11434 (Ollama) and the
+# Tailscale container both reach it. Funnel maps public :8443 -> 127.0.0.1:11435.
+services:
+  llm-proxy:
+    image: node:20-slim
+    container_name: truxon-llm-proxy
+    restart: unless-stopped
+    network_mode: host
+    working_dir: /app
+    volumes:
+      - /volume1/docker/truxon-llm-proxy:/app
+    env_file: /volume1/docker/truxon-llm-proxy/proxy.env
+    command: node proxy.mjs

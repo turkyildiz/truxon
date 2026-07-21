@@ -56,6 +56,41 @@ export async function callLlm(apiKey: string, model: string, content: LlmContent
   }
 }
 
+/** Text-only completions that PREFER the self-hosted NAS model (free, no rate
+ *  limit, data stays in-building) when LOCAL_LLM_* is configured, falling back
+ *  to the cloud [callLlm] on any error. Use only for cheap high-volume text
+ *  work (document classification, field extraction) — not the agent's
+ *  reasoning, which stays on the strong cloud model. Vision is never routed
+ *  here (the local text model can't see images). */
+export async function callTextLlm(cloudKey: string, cloudModel: string, prompt: string): Promise<string> {
+  const localUrl = Deno.env.get('LOCAL_LLM_URL')
+  const localKey = Deno.env.get('LOCAL_LLM_KEY')
+  const localModel = Deno.env.get('LOCAL_LLM_MODEL')
+  if (localUrl && localKey && localModel) {
+    try {
+      // First call cold-loads the model (~20s); it stays warm after, so a
+      // batch of docs pays the warm-up once. 90s covers the cold case.
+      const res = await fetch(`${localUrl.replace(/\/$/, '')}/chat/completions`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: localModel, temperature: 0,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+        signal: AbortSignal.timeout(90_000),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const out = data?.choices?.[0]?.message?.content
+        if (typeof out === 'string' && out.trim()) return out.trim()
+      }
+    } catch {
+      // fall through to cloud
+    }
+  }
+  return callLlm(cloudKey, cloudModel, prompt)
+}
+
 export function parseFields(content: string): Record<string, unknown> {
   let c = content
   if (c.startsWith('```')) c = c.replace(/^```(json)?/, '').replace(/```$/, '').trim()

@@ -4,7 +4,7 @@
 // Reused by the email door; the attachment is DATA, never instructions.
 
 import { extractText, getDocumentProxy, renderPageAsImage } from 'npm:unpdf@0.12.1'
-import { callLlm, parseFields, toBase64 } from './extract_llm.ts'
+import { callLlm, callTextLlm, parseFields, toBase64 } from './extract_llm.ts'
 // deno-lint-ignore no-explicit-any
 type Sb = any
 
@@ -60,7 +60,7 @@ async function analyzeDocument(
     if (isPdf) {
       const text = await pdfText(att.bytes)
       if (text.length > 40) {
-        return parseFields(await callLlm(apiKey, textModel, prompt + meta + `\n\nDocument text:\n${text.slice(0, 8000)}`))
+        return parseFields(await callTextLlm(apiKey, textModel, prompt + meta + `\n\nDocument text:\n${text.slice(0, 8000)}`))
       }
       // scanned PDF: render page 1 and use vision
       const img = await pdfFirstPageImage(att.bytes)
@@ -72,7 +72,7 @@ async function analyzeDocument(
         return parseFields(await callLlm(apiKey, visionModel, parts))
       }
       // last resort: work from the filename + email context alone
-      return parseFields(await callLlm(apiKey, textModel,
+      return parseFields(await callTextLlm(apiKey, textModel,
         prompt + `\n\n(The attachment could not be read — use ONLY this context, and set confidence low.)` + meta))
     }
   } catch { return null }
