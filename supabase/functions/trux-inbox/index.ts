@@ -156,6 +156,21 @@ Deno.serve(withCors(async (req) => {
     return json({ recent_log: log ?? [], recent_equipment_docs: withUnit })
   }
 
+  // ── peek: raw message body by graph id (debug read; same gate as status).
+  // Exists because body processing (quote-stripping, conversation reuse) can
+  // eat content — this shows what ACTUALLY sits in the mailbox. ──
+  if (peek.mode === 'peek' && typeof peek.message_id === 'string') {
+    const tok = await graphToken()
+    const m = await graph(tok,
+      `/users/${encodeURIComponent(MAILBOX)}/messages/${encodeURIComponent(peek.message_id)}?$select=subject,from,body`,
+      {}) as Record<string, any>
+    return json({
+      subject: m.subject ?? '',
+      from: m.from?.emailAddress?.address ?? '',
+      body: stripHtml(String(m.body?.content ?? '')).slice(0, 20000),
+    })
+  }
+
   // Atomic throttle: only one real poll per 30s regardless of invocations.
   const { data: claimed } = await svc
     .from('trux_inbox_state')
