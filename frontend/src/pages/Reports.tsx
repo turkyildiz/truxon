@@ -1,8 +1,45 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { weeklyReport } from '../data'
+import { weeklyFlash, weeklyReport } from '../data'
 import type { WeeklyRow } from '../types'
+
+function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
+  return (
+    <div>
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted">{label}</div>
+      <div className={`text-lg font-bold ${accent ?? 'text-body'}`}>{value}</div>
+    </div>
+  )
+}
+
+/** The playbook's weekly ops/cash/safety flash, one strip above the report. */
+function OwnerFlash({ weekOffset }: { weekOffset: number }) {
+  const q = useQuery({ queryKey: ['weekly-flash', weekOffset], queryFn: () => weeklyFlash(weekOffset), retry: false })
+  const f = q.data
+  if (q.isError || !f) return null
+  const num = (v: number | null | undefined, digits = 0) =>
+    v == null ? '—' : Number(v).toLocaleString(undefined, { maximumFractionDigits: digits })
+  const safetyEvents = (f.safety?.accidents_in_window ?? 0) as number
+  return (
+    <Card title={`⚡ Owner Flash — ${f.week.label}`}>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 lg:grid-cols-8">
+        <FlashStat label="Revenue" value={f.ops.revenue != null ? money(f.ops.revenue) : '—'} accent="text-brand" />
+        <FlashStat label="Net" value={f.ops.net != null ? money(f.ops.net) : '—'} />
+        <FlashStat label="Loads" value={num(f.ops.loads)} />
+        <FlashStat label="On-time" value={f.ops.on_time_pct != null ? `${f.ops.on_time_pct}%` : '—'} />
+        <FlashStat label="Collected" value={money(f.cash.collected_this_week)} accent="text-emerald-600 dark:text-emerald-400" />
+        <FlashStat label="AR open" value={money(f.cash.ar_outstanding)} />
+        <FlashStat label="Detention hrs" value={num(f.ops.detention_hours, 1)} />
+        <FlashStat
+          label="Alerts"
+          value={`${f.sentinel.open}${f.sentinel.critical ? ` (${f.sentinel.critical}⚠)` : ''}`}
+          accent={f.sentinel.critical ? 'text-rose-600 dark:text-rose-400' : safetyEvents ? 'text-amber-600' : undefined}
+        />
+      </div>
+    </Card>
+  )
+}
 
 function shiftWeek(dateStr: string, weeks: number): string {
   const d = new Date(dateStr + 'T00:00:00')
@@ -88,6 +125,7 @@ export default function Reports() {
         <p className="py-8 text-center text-muted">Loading…</p>
       ) : (
         <>
+          <OwnerFlash weekOffset={Math.round((new Date(weekOf + 'T00:00:00').getTime() - new Date(todayISO() + 'T00:00:00').getTime()) / (7 * 86400000))} />
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <Card>
               <div className="text-xs font-semibold uppercase text-muted">Loads Completed</div>

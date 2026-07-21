@@ -4081,6 +4081,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      weekly_flash: { Args: { p_week_offset?: number }; Returns: Json }
       weekly_report: { Args: { p_week_of?: string }; Returns: Json }
     }
     Enums: {

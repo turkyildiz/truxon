@@ -1779,3 +1779,24 @@ export async function decideAccessorial(id: number, approve: boolean): Promise<v
 export async function proposeDetentionAccessorials(): Promise<number> {
   return (unwrap(await supabase.rpc('propose_detention_accessorials')) as unknown as number) ?? 0
 }
+
+// ---------- Weekly Owner Flash ----------
+
+export interface WeeklyFlash {
+  week: { label: string; start: string; end: string; number: number; year: number }
+  ops: {
+    loads: number | null; total_miles: number | null; empty_miles: number | null
+    on_time_pct: number | null; revenue: number | null; net: number | null
+    detention_hours: number | null; detention_billable: number | null
+  }
+  cash: { collected_this_week: number; invoiced_this_week: number; ar_outstanding: number }
+  safety: Record<string, number | null> | null
+  sentinel: { open: number; critical: number }
+  budget: { line: string; budget: number; actual: number; variance: number; variance_pct: number | null }[] | null
+}
+
+/** The playbook's weekly ops/cash/safety flash, on the Mon–Sun week standard. */
+export async function weeklyFlash(weekOffset = 0): Promise<WeeklyFlash | null> {
+  const data = unwrap(await supabase.rpc('weekly_flash', { p_week_offset: weekOffset }))
+  return (data as unknown as WeeklyFlash) ?? null
+}
