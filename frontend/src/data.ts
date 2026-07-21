@@ -1800,3 +1800,30 @@ export async function weeklyFlash(weekOffset = 0): Promise<WeeklyFlash | null> {
   const data = unwrap(await supabase.rpc('weekly_flash', { p_week_offset: weekOffset }))
   return (data as unknown as WeeklyFlash) ?? null
 }
+
+// ---------- Lane intelligence ----------
+
+export interface LaneRow {
+  lane: string
+  loads: number
+  revenue: number
+  total_miles: number
+  rpm: number | null
+  est_margin: number | null
+  margin_pct: number | null
+  deadhead_pct: number | null
+  below_breakeven: boolean | null
+  last_run: string
+}
+
+export interface LaneSummary {
+  window_days: number
+  all_in_rpm_basis: number
+  lanes: LaneRow[]
+}
+
+/** Every state→state lane ranked by economics at the GL all-in cost per mile. */
+export async function laneSummary(days = 180): Promise<LaneSummary | null> {
+  const data = unwrap(await supabase.rpc('lane_summary', { p_days: days }))
+  return (data as unknown as LaneSummary) ?? null
+}

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { weeklyFlash, weeklyReport } from '../data'
+import { laneSummary, weeklyFlash, weeklyReport } from '../data'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -37,6 +37,55 @@ function OwnerFlash({ weekOffset }: { weekOffset: number }) {
           accent={f.sentinel.critical ? 'text-rose-600 dark:text-rose-400' : safetyEvents ? 'text-amber-600' : undefined}
         />
       </div>
+    </Card>
+  )
+}
+
+/** Every state→state lane, ranked by revenue, margined at the GL all-in $/mi. */
+function LanesCard() {
+  const [days, setDays] = useState(180)
+  const q = useQuery({ queryKey: ['lane-summary', days], queryFn: () => laneSummary(days), retry: false })
+  const s = q.data
+  if (q.isError || (s && s.lanes.length === 0)) return null
+  return (
+    <Card title={`🛣️ Lanes — last ${days} days`}>
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs text-muted">
+          Margin at the books&rsquo; all-in cost of ${Number(s?.all_in_rpm_basis ?? 0).toFixed(2)}/mi (fuel, pay, overhead — everything).
+        </span>
+        <div className="flex gap-1">
+          {[90, 180, 365].map((d) => (
+            <Button key={d} variant={d === days ? 'primary' : 'secondary'} onClick={() => setDays(d)}>{d}d</Button>
+          ))}
+        </div>
+      </div>
+      {!s ? (
+        <p className="py-4 text-center text-sm text-muted">Loading…</p>
+      ) : (
+        <Table headers={['Lane', 'Loads', 'Revenue', '$/mi', 'Margin', 'Margin %', 'Deadhead %', 'Last run']}>
+          {s.lanes.map((l) => (
+            <tr key={l.lane} className={l.below_breakeven ? 'bg-rose-50 dark:bg-rose-950/30' : undefined}>
+              <td className="px-3 py-2 font-medium">
+                {l.lane}
+                {l.below_breakeven && (
+                  <span className="ml-2 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-900/50 dark:text-rose-300">
+                    below break-even
+                  </span>
+                )}
+              </td>
+              <td className="px-3 py-2">{l.loads}</td>
+              <td className="px-3 py-2">{money(l.revenue)}</td>
+              <td className="px-3 py-2">{l.rpm != null ? `$${Number(l.rpm).toFixed(2)}` : '—'}</td>
+              <td className={`px-3 py-2 font-semibold ${Number(l.est_margin) < 0 ? 'text-rose-600 dark:text-rose-400' : ''}`}>
+                {l.est_margin != null ? money(l.est_margin) : '—'}
+              </td>
+              <td className="px-3 py-2">{l.margin_pct != null ? `${l.margin_pct}%` : '—'}</td>
+              <td className="px-3 py-2">{l.deadhead_pct != null ? `${l.deadhead_pct}%` : '—'}</td>
+              <td className="px-3 py-2 text-muted">{new Date(l.last_run + 'T00:00:00').toLocaleDateString()}</td>
+            </tr>
+          ))}
+        </Table>
+      )}
     </Card>
   )
 }
@@ -165,6 +214,7 @@ export default function Reports() {
           </div>
           <ReportTable title="By Truck" rows={data.by_truck} />
           <ReportTable title="By Driver" rows={data.by_driver} isDriver />
+          <LanesCard />
         </>
       )}
     </div>

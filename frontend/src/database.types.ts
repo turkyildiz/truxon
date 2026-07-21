@@ -738,6 +738,7 @@ export type Database = {
           phone: string
           state: string
           status: Database["public"]["Enums"]["driver_status"]
+          terminated_at: string | null
           updated_at: string
           user_id: string | null
         }
@@ -759,6 +760,7 @@ export type Database = {
           phone?: string
           state?: string
           status?: Database["public"]["Enums"]["driver_status"]
+          terminated_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -780,6 +782,7 @@ export type Database = {
           phone?: string
           state?: string
           status?: Database["public"]["Enums"]["driver_status"]
+          terminated_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -3357,6 +3360,7 @@ export type Database = {
         Args: never
         Returns: {
           avg_days: number
+          customer: string
           customer_id: number
           paid_count: number
         }[]
@@ -3450,6 +3454,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      driver_turnover: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
       }
       duplicate_customer_groups: {
         Args: never
@@ -3587,6 +3595,7 @@ export type Database = {
         Args: { p_dest_state: string; p_origin_state: string }
         Returns: Json
       }
+      lane_summary: { Args: { p_days?: number }; Returns: Json }
       list_invoice_payments: {
         Args: { p_invoice_id: number }
         Returns: {
@@ -3846,6 +3855,10 @@ export type Database = {
         Returns: Json
       }
       sales_pipeline: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
+      }
+      segment_economics: {
         Args: { p_end: string; p_start: string }
         Returns: Json
       }
