@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { driverNpsSummary, driverScorecard, laneSummary, loadActuals, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { customerKeepFire, driverNpsSummary, driverScorecard, laneSummary, loadActuals, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -73,6 +73,42 @@ function DriverCards({ weekOffset }: { weekOffset: number }) {
 }
 
 /** Every state→state lane, ranked by revenue, margined at the GL all-in $/mi. */
+const REC_STYLE: Record<string, string> = {
+  grow: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  keep: 'bg-surface-2 text-muted',
+  'fix-price': 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  fire: 'bg-red-500/15 text-red-700 dark:text-red-300',
+}
+
+function KeepFireCard() {
+  const q = useQuery({ queryKey: ['keep-fire'], queryFn: () => customerKeepFire(365), retry: false })
+  const rows = q.data ?? []
+  if (q.isError || rows.length === 0) return null
+  const interesting = rows.filter((r) => r.recommendation !== 'keep' || Number(r.revenue) > 10000)
+  return (
+    <Card title="⚖️ Keep or fire — the quarterly customer call (12 months)">
+      <Table headers={['Customer', 'Revenue', 'Margin', 'Pays in', 'Call', 'Why']}>
+        {interesting.map((r) => (
+          <tr key={r.customer_id} className="hover:bg-surface-2">
+            <td className="px-3 py-2.5 font-medium">{r.company_name}</td>
+            <td className="px-3 py-2.5">{money(Number(r.revenue))}</td>
+            <td className={`px-3 py-2.5 ${Number(r.margin) < 0 ? 'text-red-600 dark:text-red-300' : ''}`}>
+              {money(Number(r.margin))}{r.margin_pct != null && ` (${r.margin_pct}%)`}
+            </td>
+            <td className="px-3 py-2.5 text-muted">{r.avg_days_to_pay != null ? `${Math.round(Number(r.avg_days_to_pay))}d` : '—'}</td>
+            <td className="px-3 py-2.5">
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${REC_STYLE[r.recommendation]}`}>
+                {r.recommendation}
+              </span>
+            </td>
+            <td className="px-3 py-2.5 text-xs text-muted">{r.reason || '—'}</td>
+          </tr>
+        ))}
+      </Table>
+    </Card>
+  )
+}
+
 function ActualsCard() {
   const q = useQuery({ queryKey: ['load-actuals'], queryFn: () => loadActuals(30), retry: false })
   const rows = q.data ?? []
@@ -352,6 +388,7 @@ export default function Reports() {
           <LanesCard />
           <StressCard />
           <ActualsCard />
+          <KeepFireCard />
           <NpsCard />
         </>
       )}

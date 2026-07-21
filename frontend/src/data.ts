@@ -630,6 +630,24 @@ export async function loadActuals(days = 60): Promise<LoadActual[]> {
   return unwrap(await supabase.rpc('load_actuals', { p_days: days })) as unknown as LoadActual[]
 }
 
+export interface KeepFireRow {
+  customer_id: number
+  company_name: string
+  revenue: number
+  loads: number
+  margin: number
+  margin_pct: number | null
+  avg_days_to_pay: number | null
+  detention_hours: number
+  revenue_share_pct: number | null
+  recommendation: 'grow' | 'keep' | 'fix-price' | 'fire'
+  reason: string
+}
+
+export async function customerKeepFire(days = 365): Promise<KeepFireRow[]> {
+  return unwrap(await supabase.rpc('customer_keep_fire', { p_days: days })) as unknown as KeepFireRow[]
+}
+
 export interface NpsQuarter {
   quarter: string
   responses: number

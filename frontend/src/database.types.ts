@@ -3521,6 +3521,22 @@ export type Database = {
       }
       create_work_order_draft: { Args: { p: Json }; Returns: number }
       current_odometer: { Args: { p_truck_id: number }; Returns: number }
+      customer_keep_fire: {
+        Args: { p_days?: number }
+        Returns: {
+          avg_days_to_pay: number
+          company_name: string
+          customer_id: number
+          detention_hours: number
+          loads: number
+          margin: number
+          margin_pct: number
+          reason: string
+          recommendation: string
+          revenue: number
+          revenue_share_pct: number
+        }[]
+      }
       customer_pay_profile: {
         Args: never
         Returns: {
