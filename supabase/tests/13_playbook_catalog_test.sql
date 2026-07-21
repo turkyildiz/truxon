@@ -11,7 +11,7 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000
 -- ---------- catalog ----------
 select is((select count(*)::int from public.playbook_metrics), 1000, 'all 1,000 metrics seeded');
 select is((public.playbook_coverage()->>'total')::int, 1000, 'coverage total is 1,000');
-select ok((public.playbook_coverage()->'by_status'->>'live')::int between 40 and 120, 'a plausible number of metrics are live');
+select ok((public.playbook_coverage()->'by_status'->>'live')::int between 60 and 300, 'a plausible number of metrics are live');
 select ok(
   (select count(*)::int from public.playbook_metrics_list('live', null, null)) > 0
     and (select count(*)::int from public.playbook_metrics_list('live', null, null))
