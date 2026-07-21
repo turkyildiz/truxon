@@ -647,6 +647,26 @@ export async function nextLoadSuggestions(loadId: number): Promise<NextLoadSugge
   return unwrap(await supabase.rpc('next_load_suggestions', { p_load_id: loadId })) as unknown as NextLoadSuggestion[]
 }
 
+export interface WeatherWarning {
+  event: string
+  severity: string
+  headline: string
+  area: string
+  created_at: string
+  truck_id: number
+}
+
+/** Severe-weather warnings pushed to trucks in the last 24h. */
+export async function recentWeatherWarnings(): Promise<WeatherWarning[]> {
+  const since = new Date(Date.now() - 24 * 3600_000).toISOString()
+  return (unwrap(await supabase
+    .from('weather_alerts')
+    .select('event, severity, headline, area, created_at, truck_id')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(20)) as unknown as WeatherWarning[]) ?? []
+}
+
 export interface IftaQuarterRow {
   jurisdiction: string
   miles: number

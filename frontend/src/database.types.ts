@@ -589,6 +589,7 @@ export type Database = {
           filename: string
           id: number
           indexed_at: string | null
+          ocr_text: string | null
           size_bytes: number
           storage_path: string
           uploaded_at: string
@@ -602,6 +603,7 @@ export type Database = {
           filename: string
           id?: never
           indexed_at?: string | null
+          ocr_text?: string | null
           size_bytes?: number
           storage_path: string
           uploaded_at?: string
@@ -615,6 +617,7 @@ export type Database = {
           filename?: string
           id?: never
           indexed_at?: string | null
+          ocr_text?: string | null
           size_bytes?: number
           storage_path?: string
           uploaded_at?: string
@@ -875,6 +878,57 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dvir: {
+        Row: {
+          created_at: string
+          defects: string
+          driver_id: number
+          id: number
+          inspection_type: string
+          items: Json
+          odometer: number | null
+          safe_to_operate: boolean
+          truck_id: number
+        }
+        Insert: {
+          created_at?: string
+          defects?: string
+          driver_id: number
+          id?: never
+          inspection_type: string
+          items: Json
+          odometer?: number | null
+          safe_to_operate?: boolean
+          truck_id: number
+        }
+        Update: {
+          created_at?: string
+          defects?: string
+          driver_id?: number
+          id?: never
+          inspection_type?: string
+          items?: Json
+          odometer?: number | null
+          safe_to_operate?: boolean
+          truck_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dvir_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dvir_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
             referencedColumns: ["id"]
           },
         ]
@@ -1905,6 +1959,33 @@ export type Database = {
           phone?: string
           specialty?: string
           state?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      map_pois: {
+        Row: {
+          kind: string
+          lat: number
+          lon: number
+          name: string
+          osm_id: number
+          updated_at: string
+        }
+        Insert: {
+          kind: string
+          lat: number
+          lon: number
+          name?: string
+          osm_id: number
+          updated_at?: string
+        }
+        Update: {
+          kind?: string
+          lat?: number
+          lon?: number
+          name?: string
+          osm_id?: number
           updated_at?: string
         }
         Relationships: []
@@ -3246,6 +3327,56 @@ export type Database = {
         }
         Relationships: []
       }
+      weather_alerts: {
+        Row: {
+          alert_id: string
+          area: string
+          created_at: string
+          driver_user_id: string | null
+          event: string
+          expires_at: string | null
+          headline: string
+          id: number
+          pushed: boolean
+          severity: string
+          truck_id: number
+        }
+        Insert: {
+          alert_id: string
+          area?: string
+          created_at?: string
+          driver_user_id?: string | null
+          event: string
+          expires_at?: string | null
+          headline?: string
+          id?: never
+          pushed?: boolean
+          severity: string
+          truck_id: number
+        }
+        Update: {
+          alert_id?: string
+          area?: string
+          created_at?: string
+          driver_user_id?: string | null
+          event?: string
+          expires_at?: string | null
+          headline?: string
+          id?: never
+          pushed?: boolean
+          severity?: string
+          truck_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weather_alerts_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -3659,6 +3790,7 @@ export type Database = {
           p_doc_type?: string
           p_filename: string
           p_load_id: number
+          p_ocr_text?: string
           p_size_bytes?: number
           p_storage_path: string
         }
@@ -3715,6 +3847,18 @@ export type Database = {
         Returns: {
           members: Json
           norm_key: string
+        }[]
+      }
+      dvir_summary: {
+        Args: { p_days?: number }
+        Returns: {
+          defect: boolean
+          defects: string
+          driver: string
+          inspection_type: string
+          safe: boolean
+          submitted_at: string
+          truck: string
         }[]
       }
       eld_fleet_live: { Args: never; Returns: Json }
@@ -4095,6 +4239,21 @@ export type Database = {
         Args: { p_end: string; p_hours?: number; p_start: string }
         Returns: Json
       }
+      pois_in_bbox: {
+        Args: {
+          p_kinds?: string[]
+          p_max_lat: number
+          p_max_lon: number
+          p_min_lat: number
+          p_min_lon: number
+        }
+        Returns: {
+          kind: string
+          lat: number
+          lon: number
+          name: string
+        }[]
+      }
       propose_detention_accessorials: {
         Args: { p_days?: number }
         Returns: number
@@ -4260,6 +4419,17 @@ export type Database = {
         Returns: Json
       }
       stress_test: { Args: never; Returns: Json }
+      submit_dvir: {
+        Args: {
+          p_defects?: string
+          p_inspection_type: string
+          p_items: Json
+          p_odometer?: number
+          p_safe?: boolean
+          p_truck_id: number
+        }
+        Returns: Json
+      }
       toll_by_agency: {
         Args: { p_end: string; p_start: string }
         Returns: {
@@ -4378,6 +4548,10 @@ export type Database = {
       }
       upsert_drive_embeddings: {
         Args: { p_chunks: Json; p_drive_file_id: number }
+        Returns: number
+      }
+      upsert_map_pois: {
+        Args: { p_kind: string; p_rows: Json }
         Returns: number
       }
       void_invoice: { Args: { p_invoice_id: number }; Returns: undefined }

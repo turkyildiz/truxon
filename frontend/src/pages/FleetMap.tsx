@@ -10,7 +10,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { driverTrail, fleetLive, type FleetPin } from '../data'
+import { driverTrail, fleetLive, recentWeatherWarnings, type FleetPin } from '../data'
 import { Card, PageHeader } from '../components/ui'
 
 function hosLabel(sec: number | null | undefined): string {
@@ -329,6 +329,30 @@ export default function FleetMap() {
           </>
         )}
       </Card>
+      <WarnedTrucks />
     </>
+  )
+}
+
+/** Which trucks got pushed which NWS warnings — the accountability ledger
+ * behind the weather-watch cron (last 24h). */
+function WarnedTrucks() {
+  const q = useQuery({ queryKey: ['weather-warnings'], queryFn: recentWeatherWarnings, refetchInterval: 300_000, retry: false })
+  const rows = q.data ?? []
+  if (q.isError || rows.length === 0) return null
+  return (
+    <Card title="⛈ Weather warnings pushed to trucks (24h)">
+      <ul className="space-y-1 text-sm">
+        {rows.map((w, i) => (
+          <li key={i}>
+            <span className={`font-semibold ${w.severity === 'Extreme' ? 'text-red-600 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}`}>
+              {w.event}
+            </span>{' '}
+            → truck #{w.truck_id} · {new Date(w.created_at).toLocaleTimeString()} ·{' '}
+            <span className="text-muted">{w.headline || w.area}</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
   )
 }
