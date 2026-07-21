@@ -125,6 +125,7 @@ export type Database = {
       budgets: {
         Row: {
           amount: number
+          basis: string
           id: number
           line: string
           period_month: string
@@ -132,6 +133,7 @@ export type Database = {
         }
         Insert: {
           amount?: number
+          basis?: string
           id?: never
           line: string
           period_month: string
@@ -139,6 +141,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          basis?: string
           id?: never
           line?: string
           period_month?: string
@@ -1399,6 +1402,63 @@ export type Database = {
           request_count?: number
         }
         Relationships: []
+      }
+      load_accessorials: {
+        Row: {
+          amount: number
+          atype: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          detail: string
+          id: number
+          load_id: number
+          minutes: number | null
+          status: string
+          stop_type: string | null
+        }
+        Insert: {
+          amount: number
+          atype?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          detail?: string
+          id?: never
+          load_id: number
+          minutes?: number | null
+          status?: string
+          stop_type?: string | null
+        }
+        Update: {
+          amount?: number
+          atype?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          detail?: string
+          id?: never
+          load_id?: number
+          minutes?: number | null
+          status?: string
+          stop_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "load_accessorials_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "load_accessorials_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "loads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       load_stops: {
         Row: {
@@ -3303,6 +3363,10 @@ export type Database = {
       }
       customer_rate_profile: { Args: { p_customer_id: number }; Returns: Json }
       dashboard_summary: { Args: never; Returns: Json }
+      decide_accessorial: {
+        Args: { p_approve: boolean; p_id: number }
+        Returns: undefined
+      }
       delete_customer: { Args: { p_id: number }; Returns: undefined }
       delete_invoice_payment: {
         Args: { p_payment_id: number }
@@ -3400,6 +3464,7 @@ export type Database = {
         Args: { p_entity_type?: string; p_query: string }
         Returns: number
       }
+      ensure_auto_budget: { Args: { p_month?: string }; Returns: number }
       equipment_conflicts: {
         Args: never
         Returns: {
@@ -3468,6 +3533,7 @@ export type Database = {
           transactions: number
         }[]
       }
+      gl_balance_ratios: { Args: never; Returns: Json }
       gl_breakeven_monthly: {
         Args: { p_months?: number }
         Returns: {
@@ -3508,9 +3574,11 @@ export type Database = {
       }
       gl_upsert_monthly: { Args: { p_rows: Json }; Returns: number }
       global_search: { Args: { q: string }; Returns: Json }
+      idle_summary: { Args: { p_days?: number }; Returns: Json }
       import_fuel_transactions: { Args: { p_rows: Json }; Returns: Json }
       import_toll_transactions: { Args: { p_rows: Json }; Returns: Json }
       ingest_vehicle_positions: { Args: { p_points: Json }; Returns: Json }
+      insurance_snapshot: { Args: never; Returns: Json }
       invoice_balance: {
         Args: { i: Database["public"]["Tables"]["invoices"]["Row"] }
         Returns: number
@@ -3717,6 +3785,10 @@ export type Database = {
       pod_capture_rate: {
         Args: { p_end: string; p_hours?: number; p_start: string }
         Returns: Json
+      }
+      propose_detention_accessorials: {
+        Args: { p_days?: number }
+        Returns: number
       }
       qbo_mark_voided: { Args: { p_qbo_ids: Json }; Returns: number }
       qbo_status: { Args: never; Returns: Json }

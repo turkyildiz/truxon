@@ -1750,3 +1750,32 @@ export async function metricTrends(prefix?: string): Promise<MetricTrend[]> {
   const data = unwrap(await supabase.rpc('metric_trends', { p_prefix: prefix || undefined }))
   return (data as unknown as MetricTrend[]) ?? []
 }
+
+// ---------- Accessorials (detention → billing) ----------
+
+export interface LoadAccessorial {
+  id: number
+  load_id: number
+  atype: string
+  stop_type: string | null
+  amount: number
+  minutes: number | null
+  detail: string
+  status: 'proposed' | 'approved' | 'rejected' | 'invoiced'
+}
+
+/** All detention accessorials, newest first (RLS: office roles). */
+export async function listAccessorials(): Promise<LoadAccessorial[]> {
+  return (unwrap(await supabase.from('load_accessorials')
+    .select('*').order('created_at', { ascending: false }).limit(200)) as unknown as LoadAccessorial[]) ?? []
+}
+
+/** Approve or reject a proposed accessorial; approved ones ride the next invoice. */
+export async function decideAccessorial(id: number, approve: boolean): Promise<void> {
+  unwrap(await supabase.rpc('decide_accessorial', { p_id: id, p_approve: approve }))
+}
+
+/** Re-scan detention events into proposed accessorials (also runs daily). */
+export async function proposeDetentionAccessorials(): Promise<number> {
+  return (unwrap(await supabase.rpc('propose_detention_accessorials')) as unknown as number) ?? 0
+}

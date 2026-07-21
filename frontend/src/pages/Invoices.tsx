@@ -11,7 +11,8 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Too
 import { Badge, Button, Card, Field, formatDate, LoadError, Modal, money, Select, Table } from '../components/ui'
 import {
   acctAging, acctMarginMonthly, acctRevenueByCustomer, acctRevenueMonthly, acctSummary, acctUnbilledLoads,
-  cashflowForecast, createInvoice, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
+  cashflowForecast, createInvoice, decideAccessorial, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
+  listAccessorials, proposeDetentionAccessorials,
   glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
   qboConnectUrl, qboStatus, recordInvoicePayment, revenueForecast, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
 } from '../data'
@@ -593,10 +594,25 @@ function UnbilledTab({ onBill }: { onBill: (customerId: number) => void }) {
 
 // ── Detention (Northstar: ELD dwell vs free time) ────────────────────────────
 function DetentionTab() {
+  const qc = useQueryClient()
   const q = useQuery({ queryKey: ['detention'], queryFn: () => detentionEvents(45), retry: false })
+  const accQ = useQuery({ queryKey: ['accessorials'], queryFn: listAccessorials, retry: false })
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['accessorials'] })
+    qc.invalidateQueries({ queryKey: ['detention'] })
+  }
+  const decide = useMutation({
+    mutationFn: ({ id, approve }: { id: number; approve: boolean }) => decideAccessorial(id, approve),
+    onSuccess: refresh,
+  })
+  const rescan = useMutation({ mutationFn: proposeDetentionAccessorials, onSuccess: refresh })
   if (q.isLoading) return <p className="py-8 text-center text-muted">Measuring dwell from ELD breadcrumbs…</p>
   if (q.isError) return <LoadError error={q.error} onRetry={() => q.refetch()} />
   const rows = q.data ?? []
+  const accByKey = new Map(
+    (accQ.data ?? []).filter((a) => a.atype === 'detention')
+      .map((a) => [`${a.load_id}:${a.stop_type}`, a]),
+  )
   const total = rows.reduce((s, r) => s + Number(r.est_pay), 0)
   const hrs = (m: number) => `${Math.floor(m / 60)}h ${m % 60}m`
   return (
@@ -607,24 +623,55 @@ function DetentionTab() {
           : <>⏱️ <strong>{money(total)}</strong> in billable detention across {rows.length} stop{rows.length === 1 ? '' : 's'} (last 45 days) — measured from actual GPS dwell past 2h free time. Bill it back before the broker forgets.</>}
       </p>
       {rows.length > 0 && (
-        <Table headers={['Load #', 'Customer', 'Stop', 'State', 'Arrived', 'Left', 'Dwell', 'Over free', 'Est. owed']}>
-          {rows.map((r) => (
-            <tr key={`${r.load_id}:${r.stop_type}`} className="hover:bg-surface-2">
-              <td className="px-3 py-2.5 font-medium text-brand">{r.load_number}</td>
-              <td className="px-3 py-2.5">{r.customer}</td>
-              <td className="px-3 py-2.5 capitalize">{r.stop_type}</td>
-              <td className="px-3 py-2.5 text-muted">{r.stop_state ?? '—'}</td>
-              <td className="px-3 py-2.5 text-muted">{formatDate(r.arrival)}</td>
-              <td className="px-3 py-2.5 text-muted">{formatDate(r.departure)}</td>
-              <td className="px-3 py-2.5">{hrs(r.dwell_min)}</td>
-              <td className="px-3 py-2.5 font-semibold text-amber-700 dark:text-amber-300">{hrs(r.detention_min)}</td>
-              <td className="px-3 py-2.5 font-semibold">{money(Number(r.est_pay))}</td>
-            </tr>
-          ))}
+        <Table headers={['Load #', 'Customer', 'Stop', 'State', 'Arrived', 'Left', 'Dwell', 'Over free', 'Est. owed', 'Bill']}>
+          {rows.map((r) => {
+            const acc = accByKey.get(`${r.load_id}:${r.stop_type}`)
+            return (
+              <tr key={`${r.load_id}:${r.stop_type}`} className="hover:bg-surface-2">
+                <td className="px-3 py-2.5 font-medium text-brand">{r.load_number}</td>
+                <td className="px-3 py-2.5">{r.customer}</td>
+                <td className="px-3 py-2.5 capitalize">{r.stop_type}</td>
+                <td className="px-3 py-2.5 text-muted">{r.stop_state ?? '—'}</td>
+                <td className="px-3 py-2.5 text-muted">{formatDate(r.arrival)}</td>
+                <td className="px-3 py-2.5 text-muted">{formatDate(r.departure)}</td>
+                <td className="px-3 py-2.5">{hrs(r.dwell_min)}</td>
+                <td className="px-3 py-2.5 font-semibold text-amber-700 dark:text-amber-300">{hrs(r.detention_min)}</td>
+                <td className="px-3 py-2.5 font-semibold">{money(Number(r.est_pay))}</td>
+                <td className="px-3 py-2.5">
+                  {!acc ? (
+                    <button className="text-xs text-muted hover:underline" disabled={rescan.isPending}
+                      onClick={() => rescan.mutate()}>
+                      {rescan.isPending ? 'Scanning…' : 'Re-scan'}
+                    </button>
+                  ) : acc.status === 'proposed' ? (
+                    <span className="flex gap-1.5">
+                      <button
+                        className="rounded-lg bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                        disabled={decide.isPending}
+                        onClick={() => decide.mutate({ id: acc.id, approve: true })}>
+                        ✓ Bill it
+                      </button>
+                      <button
+                        className="rounded-lg border border-line px-2 py-1 text-xs text-muted hover:text-body disabled:opacity-50"
+                        disabled={decide.isPending}
+                        onClick={() => decide.mutate({ id: acc.id, approve: false })}>
+                        Skip
+                      </button>
+                    </span>
+                  ) : (
+                    <Badge status={acc.status} />
+                  )}
+                </td>
+              </tr>
+            )
+          })}
         </Table>
       )}
       {rows.length > 0 && (
-        <p className="mt-2 text-xs text-muted">Estimate at $50/hr after 2h free time; confirm each broker's rate confirmation terms before billing.</p>
+        <p className="mt-2 text-xs text-muted">
+          Estimate at $50/hr after 2h free time; confirm the broker's rate-con terms before approving.
+          Approved detention is added automatically to the load's invoice when it is billed.
+        </p>
       )}
     </>
   )
