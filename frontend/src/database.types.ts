@@ -4002,6 +4002,14 @@ export type Database = {
         Args: { p_end: string; p_start: string }
         Returns: Json
       }
+      scenario_runway: {
+        Args: {
+          p_fuel_pct?: number
+          p_insurance_pct?: number
+          p_revenue_pct?: number
+        }
+        Returns: Json
+      }
       segment_economics: {
         Args: { p_end: string; p_start: string }
         Returns: Json
@@ -4094,6 +4102,7 @@ export type Database = {
         Args: { p_days?: number; p_radius_mi?: number }
         Returns: Json
       }
+      stress_test: { Args: never; Returns: Json }
       toll_by_agency: {
         Args: { p_end: string; p_start: string }
         Returns: {

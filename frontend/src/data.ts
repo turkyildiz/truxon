@@ -593,6 +593,26 @@ export async function acctSummary(): Promise<AcctSummary> {
   return unwrap(await supabase.rpc('acct_summary')) as unknown as AcctSummary
 }
 
+export interface ScenarioResult {
+  baseline: { monthly_revenue: number; monthly_fuel: number; monthly_insurance: number; monthly_other_costs: number; monthly_net: number; cash: number }
+  shock: { revenue_pct: number; fuel_pct: number; insurance_pct: number }
+  shocked: { monthly_revenue: number; monthly_fuel: number; monthly_insurance: number; monthly_net: number }
+  runway_months: number | null
+  survives: boolean
+  assumptions: string
+}
+export interface StressPack {
+  baseline: ScenarioResult
+  revenue_down_25: ScenarioResult
+  fuel_up_40: ScenarioResult
+  insurance_up_30: ScenarioResult
+  perfect_storm: ScenarioResult
+}
+
+export async function stressTest(): Promise<StressPack> {
+  return unwrap(await supabase.rpc('stress_test')) as unknown as StressPack
+}
+
 export async function acctAging(): Promise<AgingRow[]> {
   return unwrap(await supabase.rpc('acct_aging')) as unknown as AgingRow[]
 }

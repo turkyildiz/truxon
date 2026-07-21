@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { driverScorecard, laneSummary, weeklyFlash, weeklyReport } from '../data'
+import { driverScorecard, laneSummary, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -73,6 +73,43 @@ function DriverCards({ weekOffset }: { weekOffset: number }) {
 }
 
 /** Every state→state lane, ranked by revenue, margined at the GL all-in $/mi. */
+function StressCard() {
+  const q = useQuery({ queryKey: ['stress-test'], queryFn: stressTest, retry: false })
+  const p = q.data
+  if (q.isError || !p) return null
+  const rows: { label: string; s: ScenarioResult }[] = [
+    { label: 'Revenue −25%', s: p.revenue_down_25 },
+    { label: 'Diesel +40%', s: p.fuel_up_40 },
+    { label: 'Insurance +30%', s: p.insurance_up_30 },
+    { label: 'Perfect storm (all three)', s: p.perfect_storm },
+  ]
+  const b = p.baseline.baseline
+  return (
+    <Card title="🌪️ Stress test — could we survive it?">
+      <p className="mb-2 text-xs text-muted">
+        Baseline from the books (3-month avg): {money(b.monthly_revenue)}/mo revenue, {money(b.monthly_net)}/mo net,{' '}
+        {money(b.cash)} cash. Fuel scales with volume and price; other costs held fixed.
+      </p>
+      <Table headers={['Scenario', 'Monthly net', 'Runway', 'Verdict']}>
+        {rows.map(({ label, s }) => (
+          <tr key={label} className="hover:bg-surface-2">
+            <td className="px-3 py-2.5 font-medium">{label}</td>
+            <td className={`px-3 py-2.5 ${s.shocked.monthly_net < 0 ? 'text-red-600 dark:text-red-300' : ''}`}>
+              {money(s.shocked.monthly_net)}
+            </td>
+            <td className="px-3 py-2.5">{s.runway_months == null ? '∞ (still profitable)' : `${s.runway_months} months`}</td>
+            <td className="px-3 py-2.5">
+              {s.survives
+                ? <span className="text-emerald-700 dark:text-emerald-300">✓ survives</span>
+                : <span className="font-semibold text-red-600 dark:text-red-300">✗ under 6 months</span>}
+            </td>
+          </tr>
+        ))}
+      </Table>
+    </Card>
+  )
+}
+
 function LanesCard() {
   const [days, setDays] = useState(180)
   const q = useQuery({ queryKey: ['lane-summary', days], queryFn: () => laneSummary(days), retry: false })
@@ -247,6 +284,7 @@ export default function Reports() {
           <ReportTable title="By Driver" rows={data.by_driver} isDriver />
           <DriverCards weekOffset={Math.max(0, Math.round((new Date(todayISO() + 'T00:00:00').getTime() - new Date(weekOf + 'T00:00:00').getTime()) / (7 * 86400000)))} />
           <LanesCard />
+          <StressCard />
         </>
       )}
     </div>
