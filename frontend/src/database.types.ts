@@ -2147,6 +2147,7 @@ export type Database = {
           origin_zip: string
           phone: string
           pickup_date: string | null
+          source_observation_id: number | null
           status: string
         }
         Insert: {
@@ -2165,6 +2166,7 @@ export type Database = {
           origin_zip?: string
           phone?: string
           pickup_date?: string | null
+          source_observation_id?: number | null
           status?: string
         }
         Update: {
@@ -2183,6 +2185,7 @@ export type Database = {
           origin_zip?: string
           phone?: string
           pickup_date?: string | null
+          source_observation_id?: number | null
           status?: string
         }
         Relationships: []
@@ -2497,6 +2500,56 @@ export type Database = {
           year?: number | null
         }
         Relationships: []
+      }
+      truck_weekly_features: {
+        Row: {
+          breakdown_next_4w: boolean | null
+          captured_at: string
+          miles: number
+          mpg: number | null
+          odometer: number | null
+          planned_cost: number
+          reactive_cost: number
+          reactive_count: number
+          truck_age_years: number | null
+          truck_id: number
+          week_start: string
+        }
+        Insert: {
+          breakdown_next_4w?: boolean | null
+          captured_at?: string
+          miles?: number
+          mpg?: number | null
+          odometer?: number | null
+          planned_cost?: number
+          reactive_cost?: number
+          reactive_count?: number
+          truck_age_years?: number | null
+          truck_id: number
+          week_start: string
+        }
+        Update: {
+          breakdown_next_4w?: boolean | null
+          captured_at?: string
+          miles?: number
+          mpg?: number | null
+          odometer?: number | null
+          planned_cost?: number
+          reactive_cost?: number
+          reactive_count?: number
+          truck_age_years?: number | null
+          truck_id?: number
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "truck_weekly_features_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       trucks: {
         Row: {
@@ -3392,6 +3445,7 @@ export type Database = {
         }
       }
       capture_metric_snapshots: { Args: never; Returns: number }
+      capture_truck_features: { Args: never; Returns: number }
       carrier_safety_latest: { Args: never; Returns: Json }
       cashflow_forecast: {
         Args: { p_weeks?: number }
@@ -3521,6 +3575,7 @@ export type Database = {
       }
       create_work_order_draft: { Args: { p: Json }; Returns: number }
       current_odometer: { Args: { p_truck_id: number }; Returns: number }
+      customer_exposure: { Args: { p_customer_id: number }; Returns: Json }
       customer_keep_fire: {
         Args: { p_days?: number }
         Returns: {
@@ -3976,11 +4031,13 @@ export type Database = {
           wow_pct: number
         }[]
       }
+      mine_quote_observations: { Args: never; Returns: number }
       my_driver_id: { Args: never; Returns: number }
       my_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      my_week_scorecard: { Args: { p_week_offset?: number }; Returns: Json }
       next_invoice_number: { Args: never; Returns: string }
       next_load_number: { Args: never; Returns: string }
       normalize_company_name: { Args: { p: string }; Returns: string }

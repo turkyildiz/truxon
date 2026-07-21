@@ -3,7 +3,7 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Button, Card, Field, Input, money, Select, Textarea } from '../components/ui'
-import { calculateDistance, createCustomer, createLoad, customerRateProfile, estimateLoadMargin, extractPdf, fleetCostBasis, laneRateForRoute, type ExtractedStop } from '../data'
+import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, estimateLoadMargin, extractPdf, fleetCostBasis, laneRateForRoute, type ExtractedStop } from '../data'
 import { errorMessage } from '../supabase'
 import { ReferenceDataBanner, useReferenceData } from '../useReferenceData'
 import FleetMap from './FleetMap'
@@ -207,6 +207,15 @@ export default function Dispatch() {
     retry: false,
   })
   const brokerAvgRpm = brokerRates && brokerRates.load_count > 0 ? brokerRates.avg_rpm ?? null : null
+
+  // Exposure guard: how much of our money this customer is already floating.
+  const { data: exposure } = useQuery({
+    queryKey: ['customer-exposure', custId],
+    queryFn: () => customerExposure(custId),
+    enabled: custId > 0,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  })
   const loadRpm = rate > 0 && miles > 0 ? rate / miles : null
 
   // Northstar: what this lane (origin→destination state) has historically paid.
@@ -269,6 +278,15 @@ export default function Dispatch() {
                   ))}
                 </Select>
               </Field>
+              {exposure?.over_limit && (
+                <p className="mt-1.5 rounded-lg bg-red-500/10 p-2 text-sm text-red-700 dark:text-red-300">
+                  ⚠️ Exposure {money(Number(exposure.exposure))} exceeds this customer's{' '}
+                  {money(Number(exposure.limit))} limit ({money(Number(exposure.open_ar))} open AR +{' '}
+                  {money(Number(exposure.unbilled))} unbilled + {money(Number(exposure.open_loads))} in motion
+                  {exposure.avg_days_to_pay != null && `; pays in ~${Math.round(Number(exposure.avg_days_to_pay))}d`}).
+                  Booking more extends them further.
+                </p>
+              )}
               {pendingCustomer && (
                 <p className="mt-1.5 rounded-lg bg-amber-500/10 p-2 text-sm text-amber-700 dark:text-amber-300">
                   "{pendingCustomer}" isn't in your customer list —{' '}

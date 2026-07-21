@@ -630,6 +630,21 @@ export async function loadActuals(days = 60): Promise<LoadActual[]> {
   return unwrap(await supabase.rpc('load_actuals', { p_days: days })) as unknown as LoadActual[]
 }
 
+export interface CustomerExposure {
+  open_ar: number
+  unbilled: number
+  open_loads: number
+  exposure: number
+  limit: number
+  avg_days_to_pay: number | null
+  over_limit: boolean
+  rule: string
+}
+
+export async function customerExposure(customerId: number): Promise<CustomerExposure> {
+  return unwrap(await supabase.rpc('customer_exposure', { p_customer_id: customerId })) as unknown as CustomerExposure
+}
+
 export interface KeepFireRow {
   customer_id: number
   company_name: string
