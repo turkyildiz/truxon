@@ -85,6 +85,30 @@ Deno.serve(async (req) => {
     })
   }
 
+  // idle probe: what does the breadcrumb status field actually carry, and is
+  // speed-zero time distinguishable from engine-off? Read-only; informs
+  // whether idle % is honestly derivable from this feed.
+  if (body.mode === 'idle_probe') {
+    const since = new Date(Date.now() - 7 * 86400_000).toISOString()
+    const { data: rows } = await svc.from('eld_location_history')
+      .select('status, speed').gt('ts', since).limit(20000)
+    const byStatus = new Map<string, { n: number; zero: number; sum: number }>()
+    for (const r of (rows ?? []) as { status: string | null; speed: number | null }[]) {
+      const k = r.status ?? '(null)'
+      const b = byStatus.get(k) ?? { n: 0, zero: 0, sum: 0 }
+      b.n++; if (!r.speed) b.zero++; b.sum += Number(r.speed ?? 0)
+      byStatus.set(k, b)
+    }
+    const { data: rawSample } = await svc.from('eld_vehicles').select('raw').not('raw', 'is', null).limit(1)
+    return json({
+      sampled: rows?.length ?? 0, since,
+      statuses: Object.fromEntries([...byStatus].map(([k, b]) =>
+        [k, { rows: b.n, speed_zero: b.zero, avg_speed: b.n ? +(b.sum / b.n).toFixed(1) : 0 }])),
+      roster_raw_keys: rawSample?.[0]?.raw ? Object.keys(rawSample[0].raw as Record<string, unknown>) : [],
+      roster_raw_sample: rawSample?.[0]?.raw ?? null,
+    })
+  }
+
   try {
     // ── rosters ──
     const vehicles = await pageAll('vehicles')
