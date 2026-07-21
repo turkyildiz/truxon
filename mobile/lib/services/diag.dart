@@ -29,6 +29,10 @@ class Diag {
 
   /// Append one timestamped line. Best-effort by design.
   static Future<void> log(String message) async {
+    // Also surface in logcat so emulator/adb debugging sees the field log
+    // live (release builds included).
+    // ignore: avoid_print
+    print('[diag] $message');
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.reload(); // pick up lines the other isolate wrote

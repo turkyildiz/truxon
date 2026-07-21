@@ -133,8 +133,15 @@ class _TrackingHandler extends TaskHandler {
 
   Future<void> _sample() async {
     try {
+      // timeLimit bounds a dead-GPS spot (dock, tunnel, emulator): without
+      // it getCurrentPosition can hang forever, and since onStart awaits the
+      // first sample, the repeat timer never started — freezing BOTH the GPS
+      // queue flush and the radio ticks until a service restart.
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 30),
+        ),
       );
       _queue.add({
         'lat': pos.latitude,

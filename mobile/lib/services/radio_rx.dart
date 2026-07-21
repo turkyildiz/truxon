@@ -47,6 +47,7 @@ class RadioRx {
   bool _audioReady = false;
   bool _joined = false;
   String _me = '';
+  String _trackedAs = ''; // presence name we last announced on the channel
   String? _lastToken;
 
   /// Called from the service tick (~every GPS interval) and once at start.
@@ -97,12 +98,10 @@ class RadioRx {
           if (s == RealtimeSubscribeStatus.subscribed) {
             _joined = true;
             Diag.log('radioRx: on air (background)');
-            // Presence: the driver shows online on everyone's roster even
-            // with the app closed.
-            if (_me.isNotEmpty) ch.track({'user': _me});
           } else if (s == RealtimeSubscribeStatus.channelError ||
               s == RealtimeSubscribeStatus.closed) {
             _joined = false;
+            _trackedAs = '';
             Diag.log('radioRx: channel $s ${err ?? ''}');
             // Drop the channel so the next tick rebuilds it clean (a stale
             // token error otherwise wedges the rejoin timer forever).
@@ -113,7 +112,25 @@ class RadioRx {
         _channel = ch;
       }
 
+      Diag.log(
+          'radioRx: tick joined=$_joined chan=${_channel?.isJoined}/${_channel?.isClosed} sock=${_client?.isConnected}');
       if (_joined) {
+        // Presence: announce (and RE-announce) the driver on the roster.
+        // After an OTA the service restarts BEFORE the app has written the
+        // username pref — a one-shot track at subscribe left the tablet
+        // invisible to the whole fleet until the next service restart.
+        if (_me.isEmpty) {
+          Diag.log('radioRx: no username yet — not on roster');
+        }
+        if (_me.isNotEmpty && _me != _trackedAs) {
+          try {
+            await _channel?.track({'user': _me});
+            _trackedAs = _me;
+            Diag.log('radioRx: on roster as $_me');
+          } catch (e) {
+            Diag.log('radioRx: presence track failed: $e');
+          }
+        }
         await prefs.setInt(kAlive, DateTime.now().millisecondsSinceEpoch);
       }
     } catch (e) {
@@ -122,7 +139,14 @@ class RadioRx {
   }
 
   void _onPtt(Map<String, dynamic> payload) {
-    final msg = unpackPtt(payload);
+    // The standalone RealtimeClient delivers the whole broadcast envelope
+    // {type, event, payload:{u,q,c}} where the SDK-configured socket delivers
+    // the inner payload directly — accept both shapes.
+    var p = payload;
+    if (p['u'] == null && p['payload'] is Map) {
+      p = Map<String, dynamic>.from(p['payload'] as Map);
+    }
+    final msg = unpackPtt(p);
     if (msg == null || msg.user == _me) return; // own mic echo
     final dec = _decoder;
     if (dec == null) return;
