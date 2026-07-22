@@ -63,6 +63,20 @@ Reset the specific account's password from the dashboard → Authentication.
   (audited) to clear it.
 - Write what happened into the security-posture memory.
 
+## Ransomware / destructive attack (JadePuffer/ENCFORGE class)
+Trigger: a `🧨 Blocked a destructive operation` or `🍯 Decoy credential replayed`
+finding, or mass data changes. See `docs/THREAT_JADEPUFFER.md` for the full map.
+1. **Lockdown now:** `select public.set_lockdown(true, 'ransomware suspected');` then the
+   full read-only freeze (§2 above).
+2. **Confirm the guard held:** the DB ransomware guard blocks DROP/TRUNCATE on business
+   tables; the attempt is in `security_audit` (`destructive_ddl_blocked`). Verify the
+   chain: `select public.security_audit_verify();`
+3. **Assume secrets are burned:** rotate the service key, DB password, and B2 key (§4).
+4. **Recover if any data was altered:** restore from the NAS backup
+   (`/volume1/docker/truxon-backup/backups`, GPG-AES256) or Backblaze B2. These are
+   pull-based/offsite and out of a cloud attacker's reach.
+5. **Block the IOCs:** `sudo sh deploy/security/ioc-block.sh` on the NAS.
+
 ## Honeypots & canaries — do not trip them yourself
 - Never `select` from `public.api_keys` / `public.bank_accounts` (decoys).
 - Never sign in as `ap-archive@aidalogistics.com` (canary — permanently inactive).

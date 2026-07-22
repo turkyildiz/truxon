@@ -66,7 +66,9 @@ select ok((select count(*) from (
              select kind,item from app_private.security_posture()
              except select kind,item from app_private.security_baseline) d) > 0,
   'a new anon grant shows up as drift vs baseline');
+set local app.allow_drops = 'on';   -- ransomware guard blocks public-table drops
 drop table public._drift_probe;
+set local app.allow_drops = 'off';
 
 -- ---- break-glass ----
 select public.set_lockdown(true, 'test');
