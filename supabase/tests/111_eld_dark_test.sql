@@ -9,9 +9,9 @@ update public.profiles set role = 'admin' where id = '00000000-0000-4000-8000-00
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-000000000112"}', true);
 
 insert into public.trucks (unit_number, created_at) values
-  ('DRK-1', now() - interval '90 days'),   -- dark for months → critical
+  ('DRK-1', now() - interval '6 days'),    -- freshly IMPORTED record, dark ELD → must still fire
   ('DRK-2', now() - interval '90 days'),   -- fresh ELD → quiet
-  ('DRK-3', now() - interval '2 days');    -- new truck → grace period
+  ('DRK-3', now() - interval '2 days');    -- new truck, no ELD ever → grace
 
 insert into public.eld_vehicles (vehicle_id, number, active, truck_id) values
   ('44444444-4444-4444-8444-444444444401', 'DRK-1', true, (select id from public.trucks where unit_number='DRK-1')),
@@ -26,7 +26,7 @@ select ok(exists (
   select 1 from public.trux_insights
    where dedup_key = 'eld_dark:' || (select id from public.trucks where unit_number='DRK-1')
      and severity = 'critical' and status <> 'resolved'),
-  'six-months-dark ELD fires critical');
+  'six-months-dark ELD fires critical even on a freshly imported truck record');
 select ok(not exists (
   select 1 from public.trux_insights
    where dedup_key = 'eld_dark:' || (select id from public.trucks where unit_number='DRK-2')),
