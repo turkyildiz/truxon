@@ -78,11 +78,20 @@ export async function getCaller(req: Request): Promise<Caller | Response> {
 export function requireCron(req: Request): boolean {
   const secret = Deno.env.get('CRON_SECRET') ?? ''
   const got = req.headers.get('x-cron-key') ?? ''
-  if (!secret || got.length !== secret.length) { maybeHoneytoken(got); return false }
-  let diff = 0
-  for (let i = 0; i < secret.length; i++) diff |= secret.charCodeAt(i) ^ got.charCodeAt(i)
-  if (diff !== 0) { maybeHoneytoken(got); return false }
+  if (!timingSafeEqualStr(got, secret)) { maybeHoneytoken(got); return false }
   return true
+}
+
+/** Constant-time string compare for shared secrets — one helper so every
+ * privileged door (fuel-import, toll-sync, notify, watchdog) matches the
+ * hardened requireCron instead of a leaky `===` (review LOW). Length is not
+ * itself secret here, but we still fold it in without early-return timing. */
+export function timingSafeEqualStr(a: string, b: string): boolean {
+  if (!a || !b) return false
+  let diff = a.length ^ b.length
+  const n = Math.max(a.length, b.length)
+  for (let i = 0; i < n; i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0)
+  return diff === 0
 }
 
 /** Salting: a REJECTED privileged secret might be one of the decoy keys the

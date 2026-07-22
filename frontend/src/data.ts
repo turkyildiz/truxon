@@ -247,7 +247,10 @@ function equipmentApi(table: 'trucks' | 'trailers') {
   return {
     async list(q?: string): Promise<Equipment[]> {
       let query = supabase.from(table).select('*').order('unit_number')
-      if (q) query = query.ilike('unit_number', `%${q}%`)
+      // Route through the sanitizer like every other search box so stray
+      // %/_ wildcards can't leak into the .ilike pattern (review LOW).
+      const s = q ? sanitizeSearchTerm(q) : ''
+      if (s) query = query.ilike('unit_number', `%${s}%`)
       return unwrap(await query)
     },
     async create(payload: Row): Promise<Equipment> {
@@ -2042,6 +2045,15 @@ export interface LoadAccessorial {
 export async function listAccessorials(): Promise<LoadAccessorial[]> {
   return (unwrap(await supabase.from('load_accessorials')
     .select('*').order('created_at', { ascending: false }).limit(200)) as unknown as LoadAccessorial[]) ?? []
+}
+
+/** Approved accessorials for a set of loads — mirrors exactly what
+ * create_invoice folds in (load_id ∈ ids, status='approved'), so the
+ * "Generate Invoice" preview total matches the invoice the server bills (M-1). */
+export async function approvedAccessorialsForLoads(loadIds: number[]): Promise<LoadAccessorial[]> {
+  if (loadIds.length === 0) return []
+  return (unwrap(await supabase.from('load_accessorials')
+    .select('*').in('load_id', loadIds).eq('status', 'approved')) as unknown as LoadAccessorial[]) ?? []
 }
 
 /** Approve or reject a proposed accessorial; approved ones ride the next invoice. */

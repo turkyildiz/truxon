@@ -11,7 +11,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Too
 import { Badge, Button, Card, compareValues, Field, formatDate, LoadError, Modal, money, Select, type SortState, Table, toggleSort } from '../components/ui'
 import {
   acctAging, acctMarginMonthly, acctRevenueByCustomer, acctRevenueMonthly, acctSummary, acctUnbilledLoads,
-  addCollectionNote, cashflowForecast, collectionsQueue, type CollectionRow,
+  addCollectionNote, approvedAccessorialsForLoads, cashflowForecast, collectionsQueue, type CollectionRow,
   factoringOverview, unmarkInvoiceFactored,
   createInvoice, decideAccessorial, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
   listAccessorials, proposeDetentionAccessorials,
@@ -133,6 +133,14 @@ export default function Invoices() {
     queryFn: () => listLoads({ status: 'completed', customer_id: customerId }),
     enabled: creating && !!customerId,
   })
+  // Approved accessorials (detention etc.) that create_invoice will fold into the
+  // total — fetched for every billable load so the preview can add the ones on
+  // selected loads and match the server to the penny (M-1).
+  const { data: approvedAcc = [] } = useQuery({
+    queryKey: ['accessorials', 'approved', billableLoads.map((l) => l.id).sort().join(',')],
+    queryFn: () => approvedAccessorialsForLoads(billableLoads.map((l) => l.id)),
+    enabled: creating && billableLoads.length > 0,
+  })
 
   const create = useMutation({
     mutationFn: () => createInvoice(Number(customerId), [...selected]),
@@ -242,7 +250,10 @@ export default function Invoices() {
       : f === 'pastdue' ? isPastDue(inv)
       : inv.status === f).length
 
-  const total = billableLoads.filter((l) => selected.has(l.id)).reduce((sum, l) => sum + Number(l.rate), 0)
+  const loadsSubtotal = billableLoads.filter((l) => selected.has(l.id)).reduce((sum, l) => sum + Number(l.rate), 0)
+  const selectedAcc = approvedAcc.filter((a) => selected.has(a.load_id))
+  const accSubtotal = selectedAcc.reduce((sum, a) => sum + Number(a.amount), 0)
+  const total = loadsSubtotal + accSubtotal
   const s = summaryQ.data
 
   return (
@@ -429,9 +440,20 @@ export default function Invoices() {
             )
           )}
           {selected.size > 0 && (
-            <p className="text-right text-sm">
-              {selected.size} loads · <span className="font-bold">{money(total)}</span>
-            </p>
+            <div className="space-y-1 text-right text-sm">
+              <div className="text-muted">{selected.size} {selected.size === 1 ? 'load' : 'loads'} · {money(loadsSubtotal)}</div>
+              {selectedAcc.length > 0 && (
+                <>
+                  {selectedAcc.map((a) => (
+                    <div key={a.id} className="text-muted">
+                      + {a.atype === 'detention' ? 'Detention' : a.atype} · {money(Number(a.amount))}
+                    </div>
+                  ))}
+                  <div className="text-xs text-muted">{selectedAcc.length} approved {selectedAcc.length === 1 ? 'accessorial' : 'accessorials'} ride this invoice</div>
+                </>
+              )}
+              <div>Total · <span className="font-bold">{money(total)}</span></div>
+            </div>
           )}
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={closeCreate}>Cancel</Button>

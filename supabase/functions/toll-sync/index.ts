@@ -19,7 +19,7 @@
 // so a scheduled cron is harmless before go-live.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, getCaller, json, withCors } from '../_shared/auth.ts'
+import { corsResponse, getCaller, json, timingSafeEqualStr, withCors } from '../_shared/auth.ts'
 
 const BASE = (Deno.env.get('PREPASS_API_BASE') ?? 'https://api.prepass.com').replace(/\/$/, '')
 const TOKEN_URL = Deno.env.get('PREPASS_TOKEN_URL') ?? `${BASE}/token/v1/token`
@@ -90,7 +90,7 @@ Deno.serve(withCors(async (req) => {
   // Gate: shared key or admin JWT.
   const key = req.headers.get('X-Toll-Key')
   const expected = Deno.env.get('TOLL_SYNC_KEY')
-  if (!(expected && key && key === expected)) {
+  if (!(expected && key && timingSafeEqualStr(key, expected))) {
     const caller = await getCaller(req)
     if (caller instanceof Response) return caller
     if (caller.role !== 'admin') return json({ error: 'Admin or toll key required' }, 403)

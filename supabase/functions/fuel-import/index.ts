@@ -11,7 +11,7 @@
 // Body: raw CSV (Content-Type text/csv) or JSON { csv: "<text>" }.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, getCaller, json, withCors } from '../_shared/auth.ts'
+import { corsResponse, getCaller, json, timingSafeEqualStr, withCors } from '../_shared/auth.ts'
 
 // AtoB header → our field. Unmapped columns are ignored but preserved in raw.
 const FIELD: Record<string, string> = {
@@ -105,7 +105,7 @@ Deno.serve(withCors(async (req) => {
   // --- auth: shared key (NAS fetcher) or admin JWT (manual import) ---
   const keyHeader = req.headers.get('X-Fuel-Key')
   const expectedKey = Deno.env.get('FUEL_IMPORT_KEY')
-  let authorized = !!(expectedKey && keyHeader && keyHeader === expectedKey)
+  let authorized = !!(expectedKey && keyHeader && timingSafeEqualStr(keyHeader, expectedKey))
   if (!authorized) {
     const caller = await getCaller(req)
     if (caller instanceof Response) return caller

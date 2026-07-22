@@ -31,7 +31,7 @@
 // GET ?approve=<token>       prefetch-safe confirmation page for the email link
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { getCaller, json, requireCron, withCors } from '../_shared/auth.ts'
+import { getCaller, json, requireCron, timingSafeEqualStr, withCors } from '../_shared/auth.ts'
 import { graph, graphConfigured, graphToken, sendMailAsTrux, TRUX_MAILBOX } from '../_shared/msgraph.ts'
 import { type Remediation, remediationFor, type Svc } from '../_shared/remediations.ts'
 
@@ -401,7 +401,7 @@ Deno.serve(withCors(async (req) => {
   // --- report mode (workstation responder emails a resolution through us) ---
   if (body.report) {
     const expected = Deno.env.get('WATCHDOG_REPORT_KEY')
-    if (!expected || body.key !== expected) return json({ error: 'Forbidden' }, 403)
+    if (!expected || typeof body.key !== 'string' || !timingSafeEqualStr(body.key, expected)) return json({ error: 'Forbidden' }, 403)
     try {
       const tok = await graphToken()
       const report = body.report as { subject?: string; body?: string }
@@ -415,7 +415,7 @@ Deno.serve(withCors(async (req) => {
   // --- heartbeat mode (NAS backup job etc.) ---
   if (body.heartbeat) {
     const expected = Deno.env.get('WATCHDOG_REPORT_KEY')
-    if (!expected || body.key !== expected) return json({ error: 'Forbidden' }, 403)
+    if (!expected || typeof body.key !== 'string' || !timingSafeEqualStr(body.key, expected)) return json({ error: 'Forbidden' }, 403)
     await svc.from('watchdog_heartbeats').upsert({
       source: String(body.heartbeat), last_seen: new Date().toISOString(), detail: String(body.detail ?? ''),
     })

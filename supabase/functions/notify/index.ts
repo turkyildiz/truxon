@@ -17,7 +17,7 @@
 //   NOTIFY_WEBHOOK_SECRET — required for send/notify_load without service role
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, getCaller, json, withCors } from '../_shared/auth.ts'
+import { corsResponse, getCaller, json, timingSafeEqualStr, withCors } from '../_shared/auth.ts'
 
 type Platform = 'ios' | 'android'
 
@@ -31,15 +31,15 @@ function adminClient() {
 function isServiceRole(req: Request): boolean {
   const auth = req.headers.get('Authorization') ?? ''
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  return !!key && auth === `Bearer ${key}`
+  return !!key && timingSafeEqualStr(auth, `Bearer ${key}`)
 }
 
 function webhookOk(req: Request, body: Record<string, unknown>): boolean {
   const secret = Deno.env.get('NOTIFY_WEBHOOK_SECRET')
   if (!secret) return false
   const hdr = req.headers.get('x-notify-secret') ?? req.headers.get('x-webhook-secret')
-  if (hdr === secret) return true
-  return body.webhook_secret === secret
+  if (hdr && timingSafeEqualStr(hdr, secret)) return true
+  return typeof body.webhook_secret === 'string' && timingSafeEqualStr(body.webhook_secret, secret)
 }
 
 async function getFcmAccessToken(): Promise<string | null> {
