@@ -10,6 +10,7 @@ The durable home for everything we've built and agreed: Claude's memory, the wor
 > **Live memory:** the `Memory/` folder IS Claude Code's memory (`~/.claude/projects/-home-ilker-DEV/memory` is a symlink here). Every session's memory write lands in this vault automatically. See [[README]] for how the plumbing works.
 
 ## 🧭 Start here
+- [[Truxon]] — **the whole system in one note** (stack, Forest, every module, security, Northstar)
 - [[working-agreement]] — how Claude and the owner work together (autonomy, push discipline, verification, honesty)
 - [[engineering-conventions]] — the technical patterns & gotchas that keep changes safe
 - [[Memory/MEMORY|Memory index]] — the auto-loaded index of every memory note
