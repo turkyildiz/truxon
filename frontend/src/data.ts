@@ -2157,3 +2157,35 @@ export async function customerProfile(customerId: number): Promise<CustomerProfi
   const data = unwrap(await supabase.rpc('customer_profile', { p_customer_id: customerId }))
   return (data as unknown as CustomerProfile) ?? null
 }
+
+// ---- Security console ------------------------------------------------------
+export interface SecurityConsole {
+  lockdown: boolean
+  audit_chain: { intact: boolean; checked: number; broken_at_id?: number }
+  guard_armed: boolean
+  honeytokens: number
+  canary_present: boolean
+  baseline_items: number
+  audit_events_total: number
+  critical_open: number
+  open_findings: { id: number; severity: string; title: string; last_seen: string }[]
+  recent_audit: {
+    id: number; at: string; event_type: string; severity: string
+    actor_email: string | null; actor_role: string | null; session_role: string | null
+    ip: string | null; detail: Record<string, unknown>
+  }[]
+}
+
+export async function securityConsole(): Promise<SecurityConsole> {
+  return unwrap(await supabase.rpc('security_console')) as unknown as SecurityConsole
+}
+
+/** Engage/lift the break-glass lockdown (freezes role/account changes). */
+export async function setLockdown(on: boolean, reason: string): Promise<void> {
+  unwrap(await supabase.rpc('set_lockdown', { p_on: on, p_reason: reason }))
+}
+
+/** Accept the current permission posture as the new drift baseline. */
+export async function blessSecurityBaseline(): Promise<{ newly_added: number; removed: number }> {
+  return unwrap(await supabase.rpc('bless_security_baseline')) as unknown as { newly_added: number; removed: number }
+}

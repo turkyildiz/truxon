@@ -104,6 +104,7 @@ const NAV_GROUPS: { title: string | null; items: NavItem[] }[] = [
   ] },
   { title: 'Admin', items: [
     { key: 'users', to: '/users', label: 'Users', icon: '👤' },
+    { key: 'security', to: '/security', label: 'Security', icon: '🛡️' },
     { key: 'settings', to: '/settings', label: 'Settings', icon: '⚙️' },
   ] },
 ]

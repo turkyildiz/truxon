@@ -1486,6 +1486,7 @@ export type Database = {
         Row: {
           created_at: string
           customer_id: number
+          denim_job_id: string | null
           due_date: string | null
           factor_name: string | null
           factored_at: string | null
@@ -1507,6 +1508,7 @@ export type Database = {
         Insert: {
           created_at?: string
           customer_id: number
+          denim_job_id?: string | null
           due_date?: string | null
           factor_name?: string | null
           factored_at?: string | null
@@ -1528,6 +1530,7 @@ export type Database = {
         Update: {
           created_at?: string
           customer_id?: number
+          denim_job_id?: string | null
           due_date?: string | null
           factor_name?: string | null
           factored_at?: string | null
@@ -3435,9 +3438,54 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      api_keys: {
+        Row: {
+          api_key: string | null
+          created_at: string | null
+          environment: string | null
+          id: number | null
+          last_used_at: string | null
+          service: string | null
+        }
+        Relationships: []
+      }
+      bank_accounts: {
+        Row: {
+          account_name: string | null
+          account_number: string | null
+          account_type: string | null
+          active: boolean | null
+          bank_name: string | null
+          id: number | null
+          routing_number: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      _hp_api_keys: {
+        Args: never
+        Returns: {
+          api_key: string
+          created_at: string
+          environment: string
+          id: number
+          last_used_at: string
+          service: string
+        }[]
+      }
+      _hp_bank_accounts: {
+        Args: never
+        Returns: {
+          account_name: string
+          account_number: string
+          account_type: string
+          active: boolean
+          bank_name: string
+          id: number
+          routing_number: string
+        }[]
+      }
       acct_aging: {
         Args: never
         Returns: {
@@ -3577,6 +3625,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      bless_security_baseline: { Args: never; Returns: Json }
       bs_upsert: { Args: { p: Json }; Returns: undefined }
       budget_variance: {
         Args: { p_end: string; p_start: string }
@@ -3738,6 +3787,7 @@ export type Database = {
         Returns: {
           created_at: string
           customer_id: number
+          denim_job_id: string | null
           due_date: string | null
           factor_name: string | null
           factored_at: string | null
@@ -4054,6 +4104,7 @@ export type Database = {
       }
       gl_upsert_monthly: { Args: { p_rows: Json }; Returns: number }
       global_search: { Args: { q: string }; Returns: Json }
+      honeytoken_seen: { Args: { p_hash: string }; Returns: boolean }
       idle_summary: { Args: { p_days?: number }; Returns: Json }
       ifta_attribute_states: { Args: { p_day?: string }; Returns: number }
       ifta_miles_status: { Args: never; Returns: Json }
@@ -4432,6 +4483,9 @@ export type Database = {
         }
         Returns: Json
       }
+      security_audit_recent: { Args: { p_limit?: number }; Returns: Json }
+      security_audit_verify: { Args: never; Returns: Json }
+      security_console: { Args: never; Returns: Json }
       segment_economics: {
         Args: { p_end: string; p_start: string }
         Returns: Json
@@ -4476,6 +4530,7 @@ export type Database = {
         Returns: {
           created_at: string
           customer_id: number
+          denim_job_id: string | null
           due_date: string | null
           factor_name: string | null
           factored_at: string | null
@@ -4504,6 +4559,10 @@ export type Database = {
       set_load_paperwork: {
         Args: { p_awaiting: boolean; p_id: number }
         Returns: undefined
+      }
+      set_lockdown: {
+        Args: { p_on: boolean; p_reason?: string }
+        Returns: Json
       }
       shadow_summary: { Args: never; Returns: Json }
       slow_pay_risk: {
@@ -4539,6 +4598,7 @@ export type Database = {
         }
         Returns: Json
       }
+      system_status: { Args: never; Returns: Json }
       toll_by_agency: {
         Args: { p_end: string; p_start: string }
         Returns: {
