@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Fragment, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { Badge, Button, Card, Field, formatDate, LoadError, Modal, money, Select, Table } from '../components/ui'
+import { Badge, Button, Card, compareValues, Field, formatDate, LoadError, Modal, money, Select, type SortState, Table, toggleSort } from '../components/ui'
 import {
   acctAging, acctMarginMonthly, acctRevenueByCustomer, acctRevenueMonthly, acctSummary, acctUnbilledLoads,
   addCollectionNote, cashflowForecast, collectionsQueue, type CollectionRow,
@@ -207,6 +207,33 @@ export default function Invoices() {
     })
   }, [invoices, filter, search])
 
+  // Click-to-sort on the list columns (default: newest first).
+  const [sort, setSort] = useState<SortState>({ key: 'invoice_date', dir: 'desc' })
+  const sorted = useMemo(() => {
+    const val = (inv: Invoice): unknown => {
+      switch (sort.key) {
+        case 'number': return inv.source === 'qbo' ? inv.qbo_doc_number : inv.invoice_number
+        case 'customer': return inv.customer_name
+        case 'invoice_date': return inv.invoice_date ? new Date(inv.invoice_date).getTime() : null
+        case 'due_date': return inv.due_date ? new Date(inv.due_date).getTime() : null
+        case 'total': return Number(inv.total)
+        case 'status': return inv.status
+        default: return null
+      }
+    }
+    const dir = sort.dir === 'asc' ? 1 : -1
+    // blanks/nulls stay last in BOTH directions (reversing would surface them)
+    return [...filtered].sort((a, b) => {
+      const av = val(a), bv = val(b)
+      const aNil = av == null || av === ''
+      const bNil = bv == null || bv === ''
+      if (aNil && bNil) return 0
+      if (aNil) return 1
+      if (bNil) return -1
+      return dir * compareValues(av, bv)
+    })
+  }, [filtered, sort])
+
   const filteredTotal = filtered.reduce((s, i) => s + Number(i.total), 0)
   const filterCount = (f: Filter) =>
     invoices.filter((inv) =>
@@ -288,8 +315,20 @@ export default function Invoices() {
             <p className="py-8 text-center text-muted">Nothing here — try another filter.</p>
           ) : (
             <>
-              <Table headers={['Invoice #', 'Customer', 'Date', 'Due', 'Total', 'Status', '']}>
-                {filtered.map((inv) => (
+              <Table
+                headers={[
+                  { label: 'Invoice #', key: 'number' },
+                  { label: 'Customer', key: 'customer' },
+                  { label: 'Date', key: 'invoice_date' },
+                  { label: 'Due', key: 'due_date' },
+                  { label: 'Total', key: 'total' },
+                  { label: 'Status', key: 'status' },
+                  '',
+                ]}
+                sort={sort}
+                onSort={(k) => setSort((p) => toggleSort(p, k))}
+              >
+                {sorted.map((inv) => (
                   <tr key={inv.id} className="hover:bg-surface-2">
                     <td className="px-3 py-3 font-medium text-brand">
                       {inv.source === 'qbo' ? `#${inv.qbo_doc_number}` : inv.invoice_number}
@@ -536,10 +575,31 @@ function FactoringTab() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['factoring'] }); qc.invalidateQueries({ queryKey: ['acct-summary'] }) },
   })
 
+  const [sort, setSort] = useState<SortState>({ key: 'reserve_pending', dir: 'desc' })
+
   if (q.isLoading) return <p className="py-8 text-center text-muted">Loading…</p>
   if (q.isError) return <LoadError error={q.error} onRetry={() => q.refetch()} />
   const s = q.data!.summary
-  const rows = q.data!.invoices
+  const dir = sort.dir === 'asc' ? 1 : -1
+  const rows = [...q.data!.invoices].sort((a, b) => {
+    const pick = (r: typeof a): unknown => {
+      switch (sort.key) {
+        case 'number': return r.invoice_number
+        case 'customer': return r.customer
+        case 'total': return Number(r.total)
+        case 'advanced': return Number(r.advanced)
+        case 'reserve_pending': return Number(r.reserve_pending)
+        case 'factored_at': return r.factored_at ? new Date(r.factored_at).getTime() : null
+        case 'status': return r.reserve_released
+        default: return null
+      }
+    }
+    const av = pick(a), bv = pick(b)
+    if (av == null && bv == null) return 0
+    if (av == null) return 1
+    if (bv == null) return -1
+    return dir * compareValues(av, bv)
+  })
 
   return (
     <div className="space-y-4">
@@ -560,7 +620,20 @@ function FactoringTab() {
       {rows.length === 0 ? (
         <p className="py-8 text-center text-muted">No factored invoices. Mark an invoice factored from Receivables.</p>
       ) : (
-        <Table headers={['Invoice', 'Broker', 'Total', 'Advanced', 'Reserve pending', 'Factored', 'Status', '']}>
+        <Table
+          headers={[
+            { label: 'Invoice', key: 'number' },
+            { label: 'Broker', key: 'customer' },
+            { label: 'Total', key: 'total' },
+            { label: 'Advanced', key: 'advanced' },
+            { label: 'Reserve pending', key: 'reserve_pending' },
+            { label: 'Factored', key: 'factored_at' },
+            { label: 'Status', key: 'status' },
+            '',
+          ]}
+          sort={sort}
+          onSort={(k) => setSort((p) => toggleSort(p, k))}
+        >
           {rows.map((r) => (
             <tr key={r.id} className="hover:bg-surface-2">
               <td className="px-3 py-2.5 font-medium">{r.invoice_number}</td>

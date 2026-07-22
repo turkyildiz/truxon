@@ -197,23 +197,80 @@ export function Badge({ status }: { status: string }) {
   )
 }
 
-export function Table({ headers, children }: { headers: string[]; children: ReactNode }) {
+/** A table header: a plain string (unsortable, as before) or `{ label, key }`
+ * to make it click-to-sort. Pass `sort`/`onSort` when any header has a key. */
+export type TableHeader = string | { label: string; key: string }
+export interface SortState { key: string; dir: 'asc' | 'desc' }
+
+export function Table({
+  headers,
+  children,
+  sort,
+  onSort,
+}: {
+  headers: TableHeader[]
+  children: ReactNode
+  sort?: SortState
+  onSort?: (key: string) => void
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm text-body">
         <thead>
           <tr className="border-b border-line text-left">
-            {headers.map((h) => (
-              <th key={h} className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted">
-                {h}
-              </th>
-            ))}
+            {headers.map((h, i) => {
+              const label = typeof h === 'string' ? h : h.label
+              const key = typeof h === 'string' ? null : h.key
+              const active = key != null && sort?.key === key
+              return (
+                <th
+                  key={`${label}-${i}`}
+                  aria-sort={active ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : undefined}
+                  className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted"
+                >
+                  {key && onSort ? (
+                    <button
+                      onClick={() => onSort(key)}
+                      className={`inline-flex items-center gap-1 uppercase tracking-wide hover:text-body ${active ? 'text-body' : ''}`}
+                      title="Sort"
+                    >
+                      {label}
+                      <span className={active ? '' : 'opacity-30'}>
+                        {active ? (sort!.dir === 'asc' ? '▲' : '▼') : '↕'}
+                      </span>
+                    </button>
+                  ) : (
+                    label
+                  )}
+                </th>
+              )
+            })}
           </tr>
         </thead>
         <tbody className="divide-y divide-line">{children}</tbody>
       </table>
     </div>
   )
+}
+
+/** Standard sort-state toggler: clicking a new column sorts ascending;
+ * clicking the same column again flips direction (no unsorted third state). */
+export function toggleSort(prev: SortState | null, key: string): SortState {
+  if (prev?.key === key) return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+  return { key, dir: 'asc' }
+}
+
+/** Compare helper for client-side sorts: numbers numerically, dates by time,
+ * strings with natural/numeric-aware collation, null/undefined always last. */
+export function compareValues(a: unknown, b: unknown): number {
+  const aNil = a == null || a === ''
+  const bNil = b == null || b === ''
+  if (aNil && bNil) return 0
+  if (aNil) return 1
+  if (bNil) return -1
+  if (typeof a === 'number' && typeof b === 'number') return a - b
+  if (typeof a === 'boolean' && typeof b === 'boolean') return Number(a) - Number(b)
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' })
 }
 
 /** Rendered in place of a list/detail body when its query failed — a failed
