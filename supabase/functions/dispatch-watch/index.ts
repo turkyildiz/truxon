@@ -18,6 +18,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { json, mintAdminSession, requireCron, withCors } from '../_shared/auth.ts'
 import { graph, graphToken } from '../_shared/msgraph.ts'
 import { callTextLlm, parseFields, sliceText } from '../_shared/extract_llm.ts'
+import { validateCarrierNumbers } from '../_shared/fmcsa.ts'
 
 const MAILBOX = Deno.env.get('DISPATCH_MAILBOX') ?? 'dispatch@aidalogistics.com'
 
@@ -198,8 +199,10 @@ Deno.serve(withCors(async (req) => {
         if (v && v.toLowerCase() !== 'null') clean[k] = v
       }
       if (!Object.keys(clean).length) continue
+      // FMCSA gate — no-op unless a future field set includes MC/USDOT
+      const vetted = await validateCarrierNumbers(clean, c.company_name, { webKey: Deno.env.get('FMCSA_WEBKEY') || '' })
       const { data: n } = await svc.rpc('apply_customer_enrichment', {
-        p_customer_id: c.id, p_fields: clean, p_source_document_id: null, p_model: `dispatch-mine/${model}`,
+        p_customer_id: c.id, p_fields: vetted.fields, p_source_document_id: null, p_model: `dispatch-mine/${model}`,
       })
       if (n && Number(n) > 0) {
         enriched++; stats.customers_filled++; stats.fields_filled += Number(n)

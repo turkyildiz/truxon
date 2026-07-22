@@ -13,6 +13,7 @@
 // persisted before any API call so a crash can't strand the connection.
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { getCaller, json, requireCron, withCors } from '../_shared/auth.ts'
+import { validateCarrierNumbers } from '../_shared/fmcsa.ts'
 
 const AUTH_URL = 'https://appcenter.intuit.com/connect/oauth2'
 const TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer'
@@ -224,8 +225,10 @@ async function syncCustomers(s: SupabaseClient, at: { token: string; realm: stri
         billing_address: billing || null,
         notes: qc.Notes ?? null,
       }
+      // FMCSA gate — no-op unless a future field set includes MC/USDOT
+      const vetted = await validateCarrierNumbers(fields, cust.company_name, { webKey: Deno.env.get('FMCSA_WEBKEY') || '' })
       const { data: n } = await s.rpc('apply_customer_enrichment', {
-        p_customer_id: cust.id, p_fields: fields, p_source_document_id: null, p_model: 'qbo:Customer',
+        p_customer_id: cust.id, p_fields: vetted.fields, p_source_document_id: null, p_model: 'qbo:Customer',
       })
       const f = Number(n) || 0
       if (f > 0) { touched++; filledTotal += f; if (filledCustomers.length < 60) filledCustomers.push({ id: cust.id, company_name: cust.company_name, filled: f }) }

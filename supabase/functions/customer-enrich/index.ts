@@ -23,6 +23,11 @@ import { extractText, getDocumentProxy } from 'npm:unpdf@0.12.1'
 import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { corsResponse, getCaller, json, requireCron, withCors } from '../_shared/auth.ts'
 import { customerPrompt, extractFields, extractFieldsText, sliceText } from '../_shared/extract_llm.ts'
+import { validateCarrierNumbers } from '../_shared/fmcsa.ts'
+
+// Every mc_number / usdot_number passes through FMCSA verification before the
+// blanks-only write. No key / not-found / name-mismatch -> the number is dropped.
+const FMCSA_WEBKEY = Deno.env.get('FMCSA_WEBKEY') || ''
 
 const STOPWORDS = new Set([
   'inc', 'llc', 'ltd', 'co', 'corp', 'company', 'group', 'the', 'and', 'of',
@@ -178,10 +183,15 @@ async function runBatch(svc: SupabaseClient, o: BatchOpts) {
       if (!cur) proposed[k] = v
     }
 
+    // FMCSA gate: verify any MC/USDOT against FMCSA before writing (fail-closed)
+    const vetted = await validateCarrierNumbers(proposed, c.company_name, { webKey: FMCSA_WEBKEY })
+    if (vetted.notes.length) conflicts.push(...vetted.notes)
+    const proposedFields = vetted.fields as Record<string, string>
+
     let filled = 0
-    if (o.apply && Object.keys(proposed).length) {
+    if (o.apply && Object.keys(proposedFields).length) {
       const { data: n, error: rpcErr } = await svc.rpc('apply_customer_enrichment', {
-        p_customer_id: c.id, p_fields: proposed, p_source_document_id: sourceDocId, p_model: o.model,
+        p_customer_id: c.id, p_fields: proposedFields, p_source_document_id: sourceDocId, p_model: o.model,
       })
       if (rpcErr) { report.push({ id: c.id, company_name: c.company_name, error: rpcErr.message }); continue }
       filled = Number(n) || 0
@@ -288,7 +298,7 @@ Deno.serve(withCors(async (req) => {
     // already make overwrites impossible — this makes disagreements VISIBLE)
     const conflicts: string[] = []
     const { data: cur } = await svc.from('customers')
-      .select('contact_person, phone, email, billing_address, mc_number, usdot_number')
+      .select('company_name, contact_person, phone, email, billing_address, mc_number, usdot_number')
       .eq('id', Number(body.customer_id)).maybeSingle()
     for (const [k, kv] of Object.entries(cur ?? {})) {
       const knownVal = String(kv ?? '').trim()
@@ -297,8 +307,11 @@ Deno.serve(withCors(async (req) => {
         conflicts.push(`${k}: "${got}" vs known "${knownVal}"`)
       }
     }
+    // FMCSA gate: verify any MC/USDOT against FMCSA before writing (fail-closed)
+    const vetted = await validateCarrierNumbers(fields, cur?.company_name ?? null, { webKey: FMCSA_WEBKEY })
+    if (vetted.notes.length) conflicts.push(...vetted.notes)
     const { data: n, error: rpcErr } = await svc.rpc('apply_customer_enrichment', {
-      p_customer_id: Number(body.customer_id), p_fields: fields, p_source_document_id: body.source_document_id ?? null, p_model: 'vision:ratecon',
+      p_customer_id: Number(body.customer_id), p_fields: vetted.fields, p_source_document_id: body.source_document_id ?? null, p_model: 'vision:ratecon',
     })
     if (rpcErr) return json({ error: rpcErr.message }, 500)
     return json({ filled: Number(n) || 0, conflicts })
