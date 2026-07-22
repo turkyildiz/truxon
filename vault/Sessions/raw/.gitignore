@@ -1,0 +1,7 @@
+# Raw session transcripts stay LOCAL — never pushed to GitHub.
+# They're large (100s of MB) and can contain fetched keys/tokens.
+# Kept here as local ground-truth so ~/.claude pruning can't lose them.
+# The readable session logs in ../ ARE committed (durable via GitHub).
+*.jsonl
+*.jsonl.gz
+!.gitignore

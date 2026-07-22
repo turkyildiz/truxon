@@ -31,7 +31,13 @@ How Claude works on Truxon with the owner (Ilker / "Boss"). These are durable be
 - Name residual risk plainly in reports (e.g., the zero-MFA sentinel will show on prod until someone enrolls — that's intended).
 - Never claim "field-verified" what was only build-verified. Flag the exact manual step the owner still owes.
 
-## Memory = this vault (the durable loop)
+## Memory & Sessions = this vault (the durable loop)
+**Sessions:** save each working session so the history is never lost.
+- Readable log notes live in `vault/Sessions/` — **committed** (small, secret-free, GitHub-backed), one per session, indexed in [[Sessions/index|Sessions]].
+- Raw transcripts are archived by `vault/save-session.sh` into `vault/Sessions/raw/*.jsonl.gz` — **local only, gitignored** (they run to 100s of MB and contain fetched keys/tokens; keeping them off GitHub is deliberate). This preserves ground-truth even if `~/.claude` prunes old sessions.
+- At **closeout**: run `save-session.sh`, write the session log, then `save.sh` to commit.
+
+
 - **The single source of truth for memory is `vault/Memory/`.** Claude Code's memory path (`~/.claude/projects/-home-ilker-DEV/memory`) is a **symlink** into it, so every memory write lands here automatically. `MEMORY.md` is the auto-loaded index — add a one-line pointer there for each new note. Details in [[obsidian-vault]].
 - **A memory write isn't safe until it's committed.** After updating memory (or any vault note), commit + push so it rides the GitHub backup — otherwise it's an uncommitted file one `git checkout`/`reset` from gone. Run **`vault/save.sh`** (commits + pushes the whole vault in one shot) or fold it into the run's normal commit.
 - **At every closeout**, the memory update is part of the deliverable ([[finish-before-next]]) — and it gets committed like everything else.

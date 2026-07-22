@@ -15,6 +15,7 @@ The durable home for everything we've built and agreed: Claude's memory, the wor
 - [[engineering-conventions]] — the technical patterns & gotchas that keep changes safe
 - [[Memory/MEMORY|Memory index]] — the auto-loaded index of every memory note
 - [[reports-index]] — the accountability trail (what shipped, when, verified how)
+- [[Sessions/index|Sessions]] — the log of our working sessions (raw transcripts archived locally)
 - [[reference-index]] — pointers into the code repo & key paths
 
 ## 🗂️ Memory notes by theme
