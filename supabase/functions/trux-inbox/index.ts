@@ -24,7 +24,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { extractText, getDocumentProxy } from 'npm:unpdf@0.12.1'
-import { getCaller, json, requireCron, withCors } from '../_shared/auth.ts'
+import { getCaller, json, listAllAuthUsers, requireCron, withCors } from '../_shared/auth.ts'
 import { graph, graphConfigured, graphToken, TRUX_MAILBOX as MAILBOX } from '../_shared/msgraph.ts'
 import { runTrux, type Sb } from '../_shared/truxcore.ts'
 import { extractWorkOrder } from '../_shared/extract_llm.ts'
@@ -243,8 +243,8 @@ Deno.serve(withCors(async (req) => {
         results.push({ id: m.id, rejected: 'auth-headers' })
         continue
       }
-      const { data: users } = await svc.auth.admin.listUsers({ page: 1, perPage: 200 })
-      const authUser = users?.users?.find((u) => u.email?.toLowerCase() === fromEmail)
+      const users = await listAllAuthUsers(svc)
+      const authUser = users.find((u) => u.email?.toLowerCase() === fromEmail)
       const { data: profile } = authUser
         ? await svc.from('profiles').select('role, is_active, full_name').eq('id', authUser.id).maybeSingle()
         : { data: null }

@@ -65,15 +65,15 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.customer-enrich]
-# admin JWT verified in-function via getCaller; monthly cron uses the anon bearer
+# admin JWT verified in-function via getCaller; monthly cron gated by CRON_SECRET
 verify_jwt = false
 
 [functions.doc-rag]
-# NAS worker uses the anon bearer (cron gate in-function); search gated via getCaller
+# NAS worker gated by CRON_SECRET (requireCron in-function); search gated via getCaller
 verify_jwt = false
 
 [functions.dispatch-watch]
-# Trux dispatch shadow: cron-only observe-only mailbox poll (anon-bearer gate)
+# Trux dispatch shadow: cron-only observe-only mailbox poll (CRON_SECRET gate)
 verify_jwt = false
 
 [functions.quote-request]

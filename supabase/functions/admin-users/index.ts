@@ -6,7 +6,7 @@
 //   PATCH  {id, full_name?, password?, role?, is_active?}
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsResponse, getCaller, json, withCors } from '../_shared/auth.ts'
+import { corsResponse, getCaller, json, listAllAuthUsers, withCors } from '../_shared/auth.ts'
 
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver', 'accountant', 'maintenance'])
 
@@ -29,8 +29,8 @@ Deno.serve(withCors(async (req) => {
       .order('username')
     if (error) return json({ error: error.message }, 500)
 
-    const { data: usersData } = await admin.auth.admin.listUsers({ perPage: 1000 })
-    const emails = new Map(usersData.users.map((u) => [u.id, u.email]))
+    const users = await listAllAuthUsers(admin)
+    const emails = new Map(users.map((u) => [u.id, u.email]))
     return json(profiles.map((p) => ({ ...p, email: emails.get(p.id) ?? '' })))
   }
 

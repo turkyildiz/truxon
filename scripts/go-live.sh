@@ -18,8 +18,22 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 if [[ -n "${1:-}" ]]; then
-  # shellcheck disable=SC1090
-  set -a; source "$1"; set +a
+  # Parse KEY=val / export KEY=val WITHOUT shell evaluation, so a value
+  # containing $(…) or backticks stays a literal instead of executing (review
+  # LOW; same hardened parser as go-live-from-work-machine.sh).
+  while IFS= read -r _line; do
+    _line="${_line#"${_line%%[![:space:]]*}"}"
+    case "$_line" in ''|\#*) continue ;; esac
+    _line="${_line#export }"
+    _key="${_line%%=*}"; _val="${_line#*=}"
+    [[ "$_key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    if [[ "$_val" == \"*\" && "$_val" == *\" && ${#_val} -ge 2 ]]; then
+      _val="${_val:1:${#_val}-2}"
+    elif [[ "$_val" == \'*\' && "$_val" == *\' && ${#_val} -ge 2 ]]; then
+      _val="${_val:1:${#_val}-2}"
+    fi
+    export "$_key=$_val"
+  done < "$1"
 fi
 
 red() { printf '\033[31m%s\033[0m\n' "$*"; }

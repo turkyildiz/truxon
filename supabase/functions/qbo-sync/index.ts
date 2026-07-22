@@ -409,7 +409,6 @@ Deno.serve(withCors(async (req) => {
     // SUPABASE_ANON_KEY may be the new-format key, so instead of an exact
     // match, accept any bearer whose JWT payload is this project's anon role
     // (same trust level: the anon key is public; pull is read-only sync).
-    const auth = req.headers.get('Authorization') ?? ''
     const isCron = requireCron(req)
     if (!isCron) {
       const caller = await getCaller(req)
@@ -421,7 +420,6 @@ Deno.serve(withCors(async (req) => {
 
   if (body.mode === 'pnl') {
     // same gate as pull: cron anon bearer or an admin session
-    const auth = req.headers.get('Authorization') ?? ''
     const ok = requireCron(req)
     if (!ok) {
       const caller = await getCaller(req)
@@ -439,7 +437,6 @@ Deno.serve(withCors(async (req) => {
 
   if (body.mode === 'customers') {
     // same gate as pull/pnl: cron anon bearer or an admin session
-    const auth = req.headers.get('Authorization') ?? ''
     const ok = requireCron(req)
     if (!ok) {
       const caller = await getCaller(req)
@@ -458,7 +455,6 @@ Deno.serve(withCors(async (req) => {
   if (body.mode === 'debug_dupes') {
     // Diagnostic: QBO-mirror rows that look like duplicates of native invoices,
     // matched by the digits of the doc number. Same gate as pull/pnl.
-    const auth = req.headers.get('Authorization') ?? ''
     const ok = requireCron(req)
     if (!ok) {
       const caller = await getCaller(req)

@@ -10,7 +10,7 @@
 // call the RPCs as that admin. Pushes go through the notify function, which
 // authenticates on an exact service-key match (claim-independent).
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
-import { json, requireCron, withCors } from '../_shared/auth.ts'
+import { json, listAllAuthUsers, requireCron, withCors } from '../_shared/auth.ts'
 
 function svc(): SupabaseClient {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
@@ -21,8 +21,8 @@ async function adminClient(s: SupabaseClient): Promise<SupabaseClient | null> {
   const { data: profs } = await s.from('profiles').select('id').eq('role', 'admin').eq('is_active', true).limit(10)
   if (!profs?.length) return null
   const ids = new Set((profs as { id: string }[]).map((p) => p.id))
-  const { data: users } = await s.auth.admin.listUsers({ page: 1, perPage: 200 })
-  const admin = users?.users?.find((u) => ids.has(u.id) && u.email)
+  const users = await listAllAuthUsers(s)
+  const admin = users.find((u) => ids.has(u.id) && u.email)
   if (!admin?.email) return null
   const { data: link, error } = await s.auth.admin.generateLink({ type: 'magiclink', email: admin.email })
   if (error || !link?.properties?.hashed_token) return null

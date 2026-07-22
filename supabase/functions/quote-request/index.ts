@@ -6,8 +6,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { corsResponse, json, withCors } from '../_shared/auth.ts'
 
-const recent = new Map<string, number>() // ip → last accepted (per-instance, best-effort)
-
 function s(v: unknown, max = 120): string {
   return String(v ?? '').trim().slice(0, max)
 }
@@ -21,8 +19,6 @@ Deno.serve(withCors(async (req) => {
   if (s(body.website)) return json({ ok: true })
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-  const last = recent.get(ip) ?? 0
-  if (Date.now() - last < 30_000) return json({ error: 'Please wait a moment before sending another request.' }, 429)
 
   const row = {
     contact_name: s(body.contact_name),
@@ -48,9 +44,16 @@ Deno.serve(withCors(async (req) => {
   if (!destOk) return json({ error: 'Destination needs City + State, or a Zip code.' }, 400)
 
   const svc = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+
+  // Durable per-IP cooldown (30s) — shared across isolates, unlike the old
+  // in-memory Map that reset on cold start (review LOW).
+  const { data: allowed } = await svc.rpc('check_ip_rate_limit', {
+    p_ip: ip, p_action: 'quote_request', p_max: 1, p_window: '00:00:30',
+  })
+  if (allowed === false) return json({ error: 'Please wait a moment before sending another request.' }, 429)
+
   const { error } = await svc.from('quote_requests').insert(row)
   if (error) return json({ error: 'Could not save your request — please try again.' }, 500)
-  recent.set(ip, Date.now())
 
   // best-effort push to every active admin
   try {

@@ -82,6 +82,23 @@ export function requireCron(req: Request): boolean {
   return true
 }
 
+/** Enumerate ALL auth users, paginating to exhaustion. `listUsers` returns only
+ * one page (default 50, cap 1000), so a bare find/lookup silently misses anyone
+ * past the cap once the roster grows (review LOW). 50-page backstop = 50k users. */
+export async function listAllAuthUsers(
+  client: SupabaseClient,
+): Promise<Array<{ id: string; email?: string }>> {
+  const all: Array<{ id: string; email?: string }> = []
+  const perPage = 1000
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await client.auth.admin.listUsers({ page, perPage })
+    if (error || !data?.users?.length) break
+    all.push(...data.users)
+    if (data.users.length < perPage) break
+  }
+  return all
+}
+
 /** Constant-time string compare for shared secrets — one helper so every
  * privileged door (fuel-import, toll-sync, notify, watchdog) matches the
  * hardened requireCron instead of a leaky `===` (review LOW). Length is not

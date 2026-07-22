@@ -8,7 +8,7 @@ LOG="logs/vision_$(date +%Y%m).log"
   # Prefer the pre-baked image (VISION_IMAGE=truxon-vision) with poppler already
   # inside — then no apt runs per job. On the bare Playwright image, install
   # poppler only if pdftoppm is missing (M-7).
-  flock -n /tmp/truxon-vision.lock docker run --rm \
+  flock -n .run.lock docker run --rm \
     -v /volume1/docker/truxon-vision:/app -w /app --ipc=host --network host \
     "${VISION_IMAGE:-mcr.microsoft.com/playwright:v1.61.1-jammy}" \
     bash -c "command -v pdftoppm >/dev/null 2>&1 || { apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq --no-install-recommends poppler-utils >/dev/null 2>&1; }; node vision-enrich.mjs"

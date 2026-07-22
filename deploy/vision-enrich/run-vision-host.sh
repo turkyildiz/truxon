@@ -14,5 +14,5 @@ if [ "$LOAD1" -gt 6 ]; then
   echo "$(date '+%F %T') skip: load $LOAD1 too high (media transcoding?)" >> logs/vision_host_$(date +%Y%m).log
   exit 0
 fi
-flock -n /tmp/truxon-vision-host.lock node vision-enrich.mjs >> logs/vision_host_$(date +%Y%m).log 2>&1
+flock -n .run.lock node vision-enrich.mjs >> logs/vision_host_$(date +%Y%m).log 2>&1
 find logs -name 'vision_host_*.log' -mtime +90 -delete 2>/dev/null || true

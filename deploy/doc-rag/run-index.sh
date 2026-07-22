@@ -7,7 +7,7 @@ cd /volume1/docker/truxon-rag
 LOG="logs/index_$(date +%Y%m).log"
 {
   echo "===== $(date "+%F %T") rag index start ====="
-  flock -n /tmp/truxon-rag-index.lock docker run --rm --network host \
+  flock -n .run.lock docker run --rm --network host \
     -v /volume1/docker/truxon-rag:/app -w /app \
     truxon-rag-node node index-docs.mjs
   echo "===== $(date "+%F %T") rag index end (rc=$?) ====="
