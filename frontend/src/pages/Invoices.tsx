@@ -11,7 +11,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Too
 import { Badge, Button, Card, compareValues, Field, formatDate, LoadError, Modal, money, Select, type SortState, Table, toggleSort } from '../components/ui'
 import {
   acctAging, acctMarginMonthly, acctRevenueByCustomer, acctRevenueMonthly, acctSummary, acctUnbilledLoads,
-  addCollectionNote, approvedAccessorialsForLoads, cashflowForecast, collectionsQueue, type CollectionRow,
+  addCollectionNote, approvedAccessorialsForLoads, cashflowForecast, collectionsQueue, loadsWithPod, type CollectionRow,
   factoringOverview, unmarkInvoiceFactored,
   createInvoice, decideAccessorial, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
   listAccessorials, proposeDetentionAccessorials,
@@ -141,6 +141,13 @@ export default function Invoices() {
     queryFn: () => approvedAccessorialsForLoads(billableLoads.map((l) => l.id)),
     enabled: creating && billableLoads.length > 0,
   })
+  // Which billable loads have a POD/delivery-evidence doc on file — bill without
+  // one and the broker often short-pays or disputes (POD-before-billing).
+  const { data: podLoadIds = [] } = useQuery({
+    queryKey: ['loads', 'with-pod', billableLoads.map((l) => l.id).sort().join(',')],
+    queryFn: () => loadsWithPod(billableLoads.map((l) => l.id)),
+    enabled: creating && billableLoads.length > 0,
+  })
 
   const create = useMutation({
     mutationFn: () => createInvoice(Number(customerId), [...selected]),
@@ -250,6 +257,8 @@ export default function Invoices() {
       : f === 'pastdue' ? isPastDue(inv)
       : inv.status === f).length
 
+  const podSet = new Set(podLoadIds)
+  const missingPodSelected = billableLoads.filter((l) => selected.has(l.id) && !podSet.has(l.id))
   const loadsSubtotal = billableLoads.filter((l) => selected.has(l.id)).reduce((sum, l) => sum + Number(l.rate), 0)
   const selectedAcc = approvedAcc.filter((a) => selected.has(a.load_id))
   const accSubtotal = selectedAcc.reduce((sum, a) => sum + Number(a.amount), 0)
@@ -432,12 +441,22 @@ export default function Invoices() {
                   <label key={l.id} className="flex items-center gap-3 rounded-lg border border-line p-2 text-sm">
                     <input type="checkbox" checked={selected.has(l.id)} onChange={() => toggle(l.id)} />
                     <span className="font-medium">{l.load_number}</span>
+                    {!podSet.has(l.id) && (
+                      <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300" title="No proof-of-delivery document on file">⚠️ No POD</span>
+                    )}
                     <span className="flex-1 truncate text-muted">{l.delivery_address}</span>
                     <span className="font-semibold">{money(Number(l.rate))}</span>
                   </label>
                 ))}
               </div>
             )
+          )}
+          {missingPodSelected.length > 0 && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+              ⚠️ {missingPodSelected.length} selected {missingPodSelected.length === 1 ? 'load has' : 'loads have'} no POD on file
+              ({missingPodSelected.map((l) => l.load_number).join(', ')}). Brokers often short-pay or dispute invoices
+              billed without proof of delivery — you can still bill, but attach the POD first when you can.
+            </div>
           )}
           {selected.size > 0 && (
             <div className="space-y-1 text-right text-sm">

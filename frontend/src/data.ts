@@ -2056,6 +2056,22 @@ export async function approvedAccessorialsForLoads(loadIds: number[]): Promise<L
     .select('*').in('load_id', loadIds).eq('status', 'approved')) as unknown as LoadAccessorial[]) ?? []
 }
 
+/** Delivery-evidence doc types that satisfy "we have a POD on file". */
+const POD_DOC_TYPES = ['pod', 'bol', 'receipt', 'scale']
+
+/** Of the given loads, which HAVE a proof-of-delivery document on file. Used to
+ * warn before billing a load with no POD — brokers routinely reject/short-pay
+ * invoices submitted without one (POD-before-billing groundwork). */
+export async function loadsWithPod(loadIds: number[]): Promise<number[]> {
+  if (loadIds.length === 0) return []
+  const rows = (unwrap(await supabase.from('documents')
+    .select('entity_id')
+    .eq('entity_type', 'load')
+    .in('entity_id', loadIds)
+    .in('doc_type', POD_DOC_TYPES)) as unknown as { entity_id: number }[]) ?? []
+  return [...new Set(rows.map((r) => r.entity_id))]
+}
+
 /** Approve or reject a proposed accessorial; approved ones ride the next invoice. */
 export async function decideAccessorial(id: number, approve: boolean): Promise<void> {
   unwrap(await supabase.rpc('decide_accessorial', { p_id: id, p_approve: approve }))
