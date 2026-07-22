@@ -25,6 +25,8 @@ const EVENT_META: Record<string, { label: string; icon: string }> = {
   account_deactivated: { label: 'Account deactivated', icon: '🚫' },
   invoice_void: { label: 'Invoice voided', icon: '🧾' },
   destructive_ddl_blocked: { label: 'Destructive op BLOCKED', icon: '🧨' },
+  destructive_dml_blocked: { label: 'Mass delete BLOCKED', icon: '🧨' },
+  bulk_dml_detected: { label: 'Unusually large update', icon: '⚠️' },
   honeytoken_replayed: { label: 'Honeytoken replayed', icon: '🍯' },
   lockdown_engaged: { label: 'Lockdown engaged', icon: '🔒' },
   lockdown_lifted: { label: 'Lockdown lifted', icon: '🔓' },

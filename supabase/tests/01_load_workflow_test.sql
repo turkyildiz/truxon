@@ -10,7 +10,7 @@ select plan(20);
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-000000000f01'::uuid, 'wf-admin@test.local');
 select is(
   (select role::text from public.profiles where id = '00000000-0000-4000-8000-000000000f01'),
-  'dispatcher',
+  'driver',
   'profile auto-created for new auth user'
 );
 update public.profiles set role = 'admin' where id = '00000000-0000-4000-8000-000000000f01';

@@ -11,8 +11,8 @@ insert into auth.users (id, email, raw_user_meta_data)
           '{"role": "admin", "username": "mallory", "full_name": "Mallory"}'::jsonb);
 select is(
   (select role::text from public.profiles where id = '00000000-0000-4000-8000-000000000a01'),
-  'dispatcher',
-  'metadata role=admin is refused (granted dispatcher)'
+  'driver',
+  'metadata role=admin is refused (granted least-privilege driver)'
 );
 
 insert into auth.users (id, email, raw_user_meta_data)
@@ -29,7 +29,7 @@ insert into auth.users (id, email, raw_user_meta_data)
           '{"role": "superuser!"}'::jsonb);
 select is(
   (select role::text from public.profiles where id = '00000000-0000-4000-8000-000000000a03'),
-  'dispatcher',
+  'driver',
   'unknown role text falls back instead of throwing'
 );
 
@@ -37,8 +37,8 @@ insert into auth.users (id, email)
   values ('00000000-0000-4000-8000-000000000a04'::uuid, 'plain@test.local');
 select is(
   (select role::text from public.profiles where id = '00000000-0000-4000-8000-000000000a04'),
-  'dispatcher',
-  'absent metadata defaults to dispatcher'
+  'driver',
+  'absent metadata defaults to least-privilege driver'
 );
 select is(
   (select username from public.profiles where id = '00000000-0000-4000-8000-000000000a04'),
