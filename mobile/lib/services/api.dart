@@ -55,7 +55,7 @@ class CompanionApi {
       'p_min_lon': minLon,
       'p_max_lat': maxLat,
       'p_max_lon': maxLon,
-      if (kinds != null) 'p_kinds': kinds,
+      'p_kinds': ?kinds,
     });
     return ((data as List?) ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
@@ -138,7 +138,7 @@ class CompanionApi {
       'p_truck_id': truckId,
       'p_inspection_type': inspectionType,
       'p_items': items,
-      if (odometer != null) 'p_odometer': odometer,
+      'p_odometer': ?odometer,
       'p_defects': defects,
       'p_safe': safe,
     });
@@ -259,10 +259,10 @@ class CompanionApi {
     bool radio = false,
   }) async {
     final res = await _sb.functions.invoke('trux-agent', body: {
-      if (sessionId != null) 'session_id': sessionId,
-      if (message != null) 'message': message,
-      if (confirmToken != null) 'confirm_token': confirmToken,
-      if (rejectToken != null) 'reject_token': rejectToken,
+      'session_id': ?sessionId,
+      'message': ?message,
+      'confirm_token': ?confirmToken,
+      'reject_token': ?rejectToken,
       if (radio) 'radio': true,
     });
     final data = res.data;

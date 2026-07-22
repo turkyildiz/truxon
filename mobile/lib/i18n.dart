@@ -41,13 +41,13 @@ Future<void> setLocale(String code) async {
 }
 
 /// Translate a key for the current locale (falls back to English, then the key).
-String tr(String key) => _S[appLocale.value]?[key] ?? _S['en']![key] ?? key;
+String tr(String key) => _strings[appLocale.value]?[key] ?? _strings['en']![key] ?? key;
 
 /// All translation tables — read-only, exists so tests can check key parity
 /// across locales.
-Map<String, Map<String, String>> get translations => _S;
+Map<String, Map<String, String>> get translations => _strings;
 
-const Map<String, Map<String, String>> _S = {
+const Map<String, Map<String, String>> _strings = {
   'en': {
     'justNow': 'just now',
     'dispTab': 'Fleet',

@@ -13,7 +13,7 @@ import 'diag.dart';
 /// custom Murmur admin plumbing. Mumla (Android) and Mumble register the
 /// `mumble://` scheme, so we can hand it the NAS tailnet address directly.
 class MumbleRadio {
-  /// mumble://<user>@<host>:<port>/ — Mumla parses user/host/port from this.
+  /// `mumble://<user>@<host>:<port>/` — Mumla parses user/host/port from this.
   static Uri connectUri({String? username}) {
     final user = (username == null || username.isEmpty) ? '' : '${Uri.encodeComponent(username)}@';
     return Uri.parse('mumble://$user${AppConfig.mumbleHost}:${AppConfig.mumblePort}/');

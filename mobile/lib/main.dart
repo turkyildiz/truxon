@@ -24,7 +24,11 @@ Future<void> main() async {
 
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
-    anonKey: AppConfig.supabaseAnonKey, // publishableKey alias when available
+    // The value IS the new sb_publishable_ key; the param rename to
+    // `publishableKey` is deferred to a dedicated change — this is the field
+    // tablets' auth-init path, not something to churn inside a lint sweep.
+    // ignore: deprecated_member_use
+    anonKey: AppConfig.supabaseAnonKey,
     // Token refreshing is OWNED by AuthRefresher (single shared path with a
     // cross-isolate lock) so the background service can refresh too without
     // ever racing the SDK's rotation. Do not re-enable this.
@@ -42,7 +46,7 @@ Future<void> main() async {
   // Rebuild the whole app when the language changes.
   runApp(ValueListenableBuilder<String>(
     valueListenable: appLocale,
-    builder: (_, __, ___) => const TruxCompanionApp(),
+    builder: (_, _, _) => const TruxCompanionApp(),
   ));
 }
 

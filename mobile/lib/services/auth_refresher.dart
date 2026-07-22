@@ -35,7 +35,7 @@ class AuthRefresher {
   /// Consider a leftover lock crashed/stale after this long.
   static const lockTtl = Duration(seconds: 30);
 
-  /// supabase_flutter's own persistence key ("sb-<ref>-auth-token").
+  /// supabase_flutter's own persistence key (`sb-<ref>-auth-token`).
   static String get persistKey =>
       'sb-${Uri.parse(AppConfig.supabaseUrl).host.split('.').first}-auth-token';
 
