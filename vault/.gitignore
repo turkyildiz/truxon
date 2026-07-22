@@ -1,0 +1,7 @@
+# Obsidian per-machine UI state & caches — keep the shared config, drop the volatile bits
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+.obsidian/.DS_Store
+.trash/
+.write_test

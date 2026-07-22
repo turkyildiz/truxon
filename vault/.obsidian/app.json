@@ -1,0 +1,8 @@
+{
+  "alwaysUpdateLinks": true,
+  "newLinkFormat": "shortest",
+  "useMarkdownLinks": false,
+  "attachmentFolderPath": "Attachments",
+  "showUnsupportedFiles": true,
+  "promptDelete": false
+}

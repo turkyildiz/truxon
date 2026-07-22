@@ -1,0 +1,22 @@
+{
+  "collapse-filter": true,
+  "search": "",
+  "showTags": true,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    { "query": "path:Memory", "color": { "a": 1, "rgb": 5431378 } },
+    { "query": "path:Rules", "color": { "a": 1, "rgb": 14079702 } },
+    { "query": "path:Reports", "color": { "a": 1, "rgb": 5540188 } }
+  ],
+  "collapse-display": true,
+  "showArrow": true,
+  "collapse-forces": true,
+  "centerStrength": 0.5,
+  "repelStrength": 10,
+  "linkStrength": 1,
+  "linkDistance": 250,
+  "scale": 1
+}

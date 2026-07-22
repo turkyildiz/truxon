@@ -1,0 +1,26 @@
+---
+name: trux-dispatch-shadow
+description: "Trux watches dispatch@aidalogistics.com in SHADOW mode — observe + propose, execute nothing, for ~2 months then reassess"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: a28d9126-d517-4423-90d2-26d2f9088c49
+---
+
+**Decision (2026-07-20, Boss):** give Trux read access to the main dispatch inbox **dispatch@aidalogistics.com**, but run it **shadow / observe-only** — Trux does all the work (read every email, extract rate cons → would-be loads, spot PODs/BOLs → would-be filings, flag detention/lumper/TONU accessorials, draft replies) and **logs what it WOULD do**, but **executes nothing and sends no email**. Boss reviews the observation trail for ~2 months to judge accuracy/value, then decides what (if anything) to let Trux actually execute. "Make him do the work but not execute, so we see what Trux is doing for a couple months and take it from there."
+
+**Why this matters:** dispatch@ is the operation in narrative form. Feeds features already built — auto-load-build (rate cons), customer enrichment + AI memory (broker signatures/MC/DOT), doc search (indexes the mail), and **#2 missing-POD detection** (inbound PODs). Highest-leverage remaining item.
+
+**Critical difference from the existing `trux@truxon.com` door ([[wo-email-intake]], `trux-inbox`):** that door only trusts *verified staff* senders. dispatch@ receives **untrusted external mail** (brokers, strangers, spam). So shadow mode is the right first gear: email is DATA never commands (already the model), zero writes, zero sends — pure observation ledger.
+
+**Build shape:** `trux_observations` ledger (per email: sender, subject, classification, extracted data, the action Trux WOULD take, confidence, links) → a `dispatch-watch` poller in shadow mode (read → classify → extract → log; never execute) → an in-app review feed + weekly shadow report.
+
+**✅ LIVE 2026-07-20.** aidalogistics.com is on **Microsoft 365** and the existing truxon.com Graph app already has Mail.Read on dispatch@ (worked first try — same tenant / already granted; no separate consent needed). `dispatch-watch` edge deployed; **cron `truxon-dispatch-watch` every 20 min** (migration 20260720200001). First run: read 25 real emails → 28 observations (12 load_offer, 8 rate_con, 4 pod, 2 check_call, 1 quote, 1 other), high accuracy (TQL/Select Transport rate cons → correct loads; told a check-call apart from its rate-con thread; caught a Certificial COI as compliance). READ-ONLY confirmed: never PATCHes isRead / never moves / never sends → invisible to mailbox users. `mode:'recent'` on the edge returns the ledger. Migration 20260720190001 (ledger + log_observation, 276 pgTAP), commits 81efe16 + c678395.
+
+**⚠ SECURITY FINDING (2026-07-20, Boss flagged "how did Trux get access without an admin change?"):** the MSGRAPH app uses **client-credentials + *application* `Mail.Read`**, which is **tenant-wide** — it can read EVERY mailbox in the org (truxon.com + aidalogistics.com are the same tenant), and `sendMail` sends as trux@. Pre-existing over-privilege since trux-inbox shipped; that's why dispatch@ "just worked" with no new grant. **Decision: keep the read-only shadow running (code only touches trux@ + dispatch@); scope the permission AFTER.** Fix = Exchange Online **Application Access Policy** restricting the app (its Client ID) to a security group containing only trux@ + dispatch@ (`New-DistributionGroup` + `New-ApplicationAccessPolicy -AccessRight RestrictAccess`). Boss runs this in Exchange PowerShell — agent can't (no Exchange admin, must not read the Client ID out of Supabase secrets). Same over-privilege applies to trux-inbox's send path. Tracked as a spawn_task chip.
+
+**✅ Phase 3 SHIPPED (2026-07-20 night):** in-app **Forest Shadow** page at `/shadow` (nav 🕶️, admin+dispatcher) — feed of would-do actions with classification chips, confidence, extracted-data expander, matched load/customer links, mark-reviewed + note. `shadow_summary()` RPC (migration 20260720460001, pgTAP 51), commit de89c9c.
+
+**✅ MINER (2026-07-20 night, owner directive "find missing pods, paperworks and customer data and filling them in"):** `dispatch-watch mode:'mine'` (cron `truxon-dispatch-mine`, every 2h at :37) — a narrow EXECUTOR upgrade: (1) for each load from `loads_missing_pod`, Graph-searches dispatch@ for the load's ref numbers, requires a VERBATIM ref match in subject/preview/filename, classifies the attachment (filename rules, LLM fallback), files pdf/images ≤8MB into documents storage + row; (2) fills BLANK customer contact fields from already-observed broker emails via `apply_customer_enrichment` (fill-only-blank allow-list). Still no sends / no read-state changes / no load-status writes; every action logs to the ledger (`FILED:`/`FILLED:` in would_detail, unreviewed → shows in the Shadow feed as audit trail). 110s soft deadline per run (gateway idle timeout is 150s); passes are incremental via documents + message_id dedup. Migration 20260720470001, commit e14654f.
+
+**REMAINING:** (1) **Scope the M365 app** (Application Access Policy — security). (2) Weekly shadow digest email/summary. (3) Phase 4 (~Sep 2026) = promote more classes from would-do → propose → auto. Note: `DISPATCH_MAILBOX` secret is NOT set (defaults in code to dispatch@aidalogistics.com) — set it if the box ever changes.

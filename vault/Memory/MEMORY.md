@@ -1,0 +1,23 @@
+# Memory index
+
+- [Obsidian vault](obsidian-vault.md) — this memory folder IS the repo-backed Obsidian vault (~/.claude memory symlinks here); rules/behaviors live in vault/Rules
+- [Truxon TMS project](project-truxon.md) — live prod system at ~/src/truxon; pushing main deploys prod, never push without approval
+- [Ilker Turkyildiz](user-ilker.md) — solo dev/owner of Truxon; toolchain paths on this dev box
+- [NAS access](nas-access.md) — SSH WORKS (turkyildiz@100.89.140.98); NAS runs backup/fuel/Valhalla Docker jobs; Funnel URL aida-nas.tail2c5ca.ts.net
+- [C-Suite Owner Playbook](csuite-playbook.md) — 100 questions + 100 metrics; the spec for Trux-as-C-suite (with data gaps named)
+- [Work-order email intake](wo-email-intake.md) — forward a shop sheet to trux@ (subject "WO") → Trux drafts a maintenance record for review
+- [QuickBooks integration](qbo-integration.md) — LIVE: QBO↔Truxon mirror every 30 min; push mode behind a flag; Intuit app gotchas
+- [ITS migration](its-migration.md) — bulk import done; delta capture assisted (Cloudflare blocks unattended login); extraction cracked
+- [Customer enrichment](customer-enrichment.md) — Trux fills blank customer fields (QBO + docs); LIVE on prod (270 fields filled); only the vision rate-con scan is a pending user click
+- [Trux dispatch shadow](trux-dispatch-shadow.md) — dispatch@ shadow LIVE (20-min watcher + /shadow review page); miner files missing PODs/paperwork + fills customer blanks every 2h (owner-approved, audited); M365 app scoping still owed
+- [Finish before next](finish-before-next.md) — clean your plate: commit→push→deploy→verify each task before starting the next
+- [Week standard](week-standard.md) — Mon–Sun, Week 0 = partial year start; use trux_week_* / lib/week.ts, never reinvent week math
+- [One-app radio](one-app-radio.md) — PTT over Supabase Realtime replaces Mumla+Tailscale; Forest answers on air; field smoke test gates side-app removal
+- [Android emulator](android-emulator.md) — headless Pixel-Tablet AVD on dev box; verify ALL tablet UI visually before publishing (standard loop since 2026-07-21)
+- [Northstar project](northstar-project.md) — Truxon PREDICTIVE (Level 5); forecasts #1/#2/#3/#5 live, playbook 171/1000, not_captured down to harsh-braking + driver NPS; #4 breakdown ML awaits data
+- [ELD DriveHOS API](eld-drivehos.md) — telematics feed (GPS/odometer/engine-hrs/HOS) for Northstar; needs Aida's company key to unblock
+- [Geocoding](geocoding.md) — load stops → lat/lon+state for lane rate history; LIVE, all ~975 loads backfilled; unblocks detention detection next
+- [PrePass tolls](tolls-prepass.md) — toll CSVs via SFTP → NAS importer → toll_transactions; LIVE (42 tolls first pull); daily 05:30 cron
+- [NAS local LLM](nas-local-llm.md) — self-hosted qwen2.5:3b does bulk doc classify/extract (token-gated proxy, cloud fallback); 3B beat 7B on measurement; iGPU parked for vision only
+- [Fuel-theft detection](fuel-theft-detection.md) — Forest now flags non-diesel-on-diesel, cash advances, tank overflow, fuel-vs-(dispatch+deadhead)-miles; MPG needs telematics; amount field is dirty
+- [Security posture](security-posture.md) — CRON_SECRET architecture (rotate via secrets set + watchdog setter), my_role raises for inactive, money-path locks; S-08/09/11 CLOSED + verified 2026-07-21 (withCors 100% coverage); residual gap = OTA manifest signing (mitigated by Android same-key install requirement)
