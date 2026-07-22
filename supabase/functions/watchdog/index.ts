@@ -133,6 +133,14 @@ async function runChecks(svc: Svc): Promise<CheckResult[]> {
       detail: p.backup_last_seen ? `last backup heartbeat ${p.backup_last_seen}` : 'no backup heartbeat recorded',
       severity: 'critical',
     })
+    // GPU box (Lynx): warn-level — vision/embeddings/heavy-LLM fall back to the NAS
+    // when it's dark, so it's a degradation, not an outage. Silent until first ping.
+    results.push({
+      name: 'gpu_box_fresh',
+      ok: p.gpu_box_stale !== true,
+      detail: p.gpu_box_last_seen ? `last Lynx heartbeat ${p.gpu_box_last_seen}` : 'no Lynx heartbeat yet',
+      severity: 'warn',
+    })
   } catch (e) {
     results.push({ name: 'db_probes', ok: false, detail: `probe RPC failed: ${e instanceof Error ? e.message : e}` })
   }
