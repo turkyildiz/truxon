@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRef, useState } from 'react'
-import { Badge, Button, Card, Field, formatDateTime, Input, LoadError, money, StatCard, Table } from '../components/ui'
+import { useMemo, useRef, useState } from 'react'
+import { Badge, Button, Card, compareValues, Field, formatDateTime, Input, LoadError, money, StatCard, type SortState, Table, toggleSort } from '../components/ui'
 import { useAuth } from '../auth'
 import { fuelByTruck, fuelIftaSummary, iftaQuarter, importFuelCsv, listFuelTransactions } from '../data'
 import { errorMessage } from '../supabase'
@@ -88,6 +88,62 @@ export default function Fuel() {
   const ifta = iftaQ.data ?? []
   const txns = txnsQ.data ?? []
 
+  // Click-to-sort: per-truck rollup (default biggest spender first) and the
+  // recent-transactions list (default newest first). nulls-last comparator
+  // shape copied from the Invoices receivables list.
+  const [truckSort, setTruckSort] = useState<SortState>({ key: 'spend', dir: 'desc' })
+  const sortedByTruck = useMemo(() => {
+    const val = (r: (typeof byTruck)[number]): unknown => {
+      switch (truckSort.key) {
+        case 'unit': return r.unit_number
+        case 'transactions': return Number(r.transactions)
+        case 'gallons': return Number(r.gallons)
+        case 'spend': return Number(r.spend)
+        default: return null
+      }
+    }
+    const dir = truckSort.dir === 'asc' ? 1 : -1
+    // blanks/nulls stay last in BOTH directions (reversing would surface them)
+    return [...byTruck].sort((a, b) => {
+      const av = val(a), bv = val(b)
+      const aNil = av == null || av === ''
+      const bNil = bv == null || bv === ''
+      if (aNil && bNil) return 0
+      if (aNil) return 1
+      if (bNil) return -1
+      return dir * compareValues(av, bv)
+    })
+  }, [byTruck, truckSort])
+
+  const [txnSort, setTxnSort] = useState<SortState>({ key: 'date', dir: 'desc' })
+  const sortedTxns = useMemo(() => {
+    const val = (t: (typeof txns)[number]): unknown => {
+      switch (txnSort.key) {
+        case 'date': return t.transaction_time ? new Date(t.transaction_time).getTime() : null
+        case 'merchant': return t.merchant
+        case 'card': return t.card_last_four
+        case 'gallons': return t.gallons != null ? Number(t.gallons) : null
+        case 'amount': return Number(t.amount)
+        case 'net': return t.net_of_discount != null ? Number(t.net_of_discount) : null
+        case 'unit': return t.vehicle_name
+        case 'driver': return t.driver_name
+        case 'status': return t.status
+        default: return null
+      }
+    }
+    const dir = txnSort.dir === 'asc' ? 1 : -1
+    // blanks/nulls stay last in BOTH directions (reversing would surface them)
+    return [...txns].sort((a, b) => {
+      const av = val(a), bv = val(b)
+      const aNil = av == null || av === ''
+      const bNil = bv == null || bv === ''
+      if (aNil && bNil) return 0
+      if (aNil) return 1
+      if (bNil) return -1
+      return dir * compareValues(av, bv)
+    })
+  }, [txns, txnSort])
+
   // Headline totals come from the by-truck rollup — server-aggregated over the
   // whole range, so they're not capped by the recent-transactions limit.
   const totalSpend = byTruck.reduce((s, r) => s + Number(r.spend), 0)
@@ -173,8 +229,17 @@ export default function Fuel() {
         ) : byTruck.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted">No fuel spend in this range.</p>
         ) : (
-          <Table headers={['Unit', 'Transactions', 'Gallons', 'Spend']}>
-            {byTruck.map((r) => (
+          <Table
+            headers={[
+              { label: 'Unit', key: 'unit' },
+              { label: 'Transactions', key: 'transactions' },
+              { label: 'Gallons', key: 'gallons' },
+              { label: 'Spend', key: 'spend' },
+            ]}
+            sort={truckSort}
+            onSort={(k) => setTruckSort((p) => toggleSort(p, k))}
+          >
+            {sortedByTruck.map((r) => (
               <tr key={r.truck_id}>
                 <td className="px-3 py-3 font-medium">{r.unit_number}</td>
                 <td className="px-3 py-3">{Number(r.transactions).toLocaleString()}</td>
@@ -217,8 +282,22 @@ export default function Fuel() {
         ) : txns.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted">No transactions in this range.</p>
         ) : (
-          <Table headers={['Date', 'Merchant', 'Card', 'Gallons', 'Amount', 'Net', 'Unit', 'Driver', 'Status']}>
-            {txns.map((t) => (
+          <Table
+            headers={[
+              { label: 'Date', key: 'date' },
+              { label: 'Merchant', key: 'merchant' },
+              { label: 'Card', key: 'card' },
+              { label: 'Gallons', key: 'gallons' },
+              { label: 'Amount', key: 'amount' },
+              { label: 'Net', key: 'net' },
+              { label: 'Unit', key: 'unit' },
+              { label: 'Driver', key: 'driver' },
+              { label: 'Status', key: 'status' },
+            ]}
+            sort={txnSort}
+            onSort={(k) => setTxnSort((p) => toggleSort(p, k))}
+          >
+            {sortedTxns.map((t) => (
               <tr key={t.uuid} className="hover:bg-surface-2">
                 <td className="px-3 py-3 whitespace-nowrap">{formatDateTime(t.transaction_time)}</td>
                 <td className="px-3 py-3">

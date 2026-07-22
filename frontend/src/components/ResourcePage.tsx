@@ -5,11 +5,11 @@
  * and saving.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { errorMessage } from '../supabase'
 import DocsNotes from './DocsNotes'
-import { Button, Card, Field, Input, LoadError, Modal, Select, Table, Textarea } from './ui'
+import { Button, Card, compareValues, Field, Input, LoadError, Modal, Select, type SortState, Table, Textarea, toggleSort } from './ui'
 
 export interface FieldDef {
   name: string
@@ -28,6 +28,10 @@ export interface FieldDef {
 export interface ColumnDef<T> {
   header: string
   render: (item: T) => ReactNode
+  /** When set (with `sortValue`), the header becomes click-to-sort. */
+  sortKey?: string
+  /** Comparable value for sorting (dates as epoch millis, numbers as numbers). */
+  sortValue?: (item: T) => unknown
 }
 
 interface Props<T extends { id: number | string }> {
@@ -56,6 +60,8 @@ interface Props<T extends { id: number | string }> {
    * human-readable message when the delete isn't allowed (the server enforces
    * the real rule). `confirm` builds the confirmation prompt. */
   remove?: { fn: (id: T['id']) => Promise<unknown>; confirm?: (item: T) => string }
+  /** Initial column sort, for pages whose columns declare sortKey/sortValue. */
+  defaultSort?: SortState
 }
 
 export default function ResourcePage<T extends { id: number | string }>({
@@ -75,6 +81,7 @@ export default function ResourcePage<T extends { id: number | string }>({
   onPrefillConsumed,
   fieldOptionsLoader,
   remove,
+  defaultSort,
 }: Props<T>) {
   const qc = useQueryClient()
   const [params] = useSearchParams()
@@ -109,6 +116,25 @@ export default function ResourcePage<T extends { id: number | string }>({
     queryFn: () => list(q),
   })
   const { data: items = [], isLoading } = listQ
+
+  // Click-to-sort on columns that declare sortKey/sortValue.
+  const [sort, setSort] = useState<SortState | null>(defaultSort ?? null)
+  const sorted = useMemo(() => {
+    const col = sort ? columns.find((c) => c.sortKey === sort.key) : undefined
+    const val = col?.sortValue
+    if (!sort || !val) return items
+    const dir = sort.dir === 'asc' ? 1 : -1
+    // blanks/nulls stay last in BOTH directions (reversing would surface them)
+    return [...items].sort((a, b) => {
+      const av = val(a), bv = val(b)
+      const aNil = av == null || av === ''
+      const bNil = bv == null || bv === ''
+      if (aNil && bNil) return 0
+      if (aNil) return 1
+      if (bNil) return -1
+      return dir * compareValues(av, bv)
+    })
+  }, [items, sort, columns])
 
   const save = useMutation({
     mutationFn: (payload: Record<string, unknown>) => {
@@ -199,8 +225,12 @@ export default function ResourcePage<T extends { id: number | string }>({
       ) : items.length === 0 ? (
         <p className="py-8 text-center text-muted">No records yet.</p>
       ) : (
-        <Table headers={[...columns.map((c) => c.header), '']}>
-          {items.map((item) => (
+        <Table
+          headers={[...columns.map((c) => (c.sortKey && c.sortValue ? { label: c.header, key: c.sortKey } : c.header)), '']}
+          sort={sort ?? undefined}
+          onSort={(k) => setSort((p) => toggleSort(p, k))}
+        >
+          {sorted.map((item) => (
             <tr key={item.id} className="hover:bg-surface-2">
               {columns.map((c, i) => (
                 <td key={i} className="px-3 py-3">

@@ -85,14 +85,15 @@ function EquipmentPage({ title, api, queryKey, entityType }: { title: string; ap
       create={api.create}
       update={api.update}
       docs={{ entityType, docTypes: ['Registration', 'Insurance', 'Inspection', 'Other'], label: (t) => `Unit ${t.unit_number}` }}
+      defaultSort={{ key: 'unit', dir: 'asc' }}
       columns={[
-        { header: 'Unit #', render: (t) => <span className="font-medium">{t.unit_number}</span> },
-        { header: 'Make / Model / Year', render: (t) => [t.make, t.model, t.year].filter(Boolean).join(' ') || '—' },
-        { header: 'VIN', render: (t) => t.vin || '—' },
-        { header: 'Plate', render: (t) => (t.plate_number ? `${t.plate_number}${t.plate_expiry ? ` (exp ${formatDate(t.plate_expiry)})` : ''}` : '—') },
-        { header: 'In Service', render: (t) => formatDate(t.in_service_date) },
-        { header: 'Monthly Cost', render: (t) => money(t.monthly_cost) },
-        { header: 'Status', render: (t) => <Badge status={t.status} /> },
+        { header: 'Unit #', sortKey: 'unit', sortValue: (t) => t.unit_number, render: (t) => <span className="font-medium">{t.unit_number}</span> },
+        { header: 'Make / Model / Year', sortKey: 'make_model_year', sortValue: (t) => [t.make, t.model, t.year].filter(Boolean).join(' '), render: (t) => [t.make, t.model, t.year].filter(Boolean).join(' ') || '—' },
+        { header: 'VIN', sortKey: 'vin', sortValue: (t) => t.vin, render: (t) => t.vin || '—' },
+        { header: 'Plate', sortKey: 'plate', sortValue: (t) => t.plate_number, render: (t) => (t.plate_number ? `${t.plate_number}${t.plate_expiry ? ` (exp ${formatDate(t.plate_expiry)})` : ''}` : '—') },
+        { header: 'In Service', sortKey: 'in_service', sortValue: (t) => (t.in_service_date ? new Date(t.in_service_date).getTime() : null), render: (t) => formatDate(t.in_service_date) },
+        { header: 'Monthly Cost', sortKey: 'monthly_cost', sortValue: (t) => Number(t.monthly_cost), render: (t) => money(t.monthly_cost) },
+        { header: 'Status', sortKey: 'status', sortValue: (t) => t.status, render: (t) => <Badge status={t.status} /> },
       ]}
       fields={[
         { name: 'unit_number', label: 'Unit #', required: true },

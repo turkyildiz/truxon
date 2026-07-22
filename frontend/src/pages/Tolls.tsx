@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
-import { Card, Field, formatDateTime, Input, LoadError, money, StatCard, Table } from '../components/ui'
+import { useMemo, useState } from 'react'
+import { Card, compareValues, Field, formatDateTime, Input, LoadError, money, StatCard, type SortState, Table, toggleSort } from '../components/ui'
 import { listTollTransactions, tollByAgency, tollByTruck } from '../data'
 
 /** Local-time YYYY-MM-DD (date inputs and range math stay in the user's zone). */
@@ -38,6 +38,38 @@ export default function Tolls() {
   const byTruck = byTruckQ.data ?? []
   const byAgency = byAgencyQ.data ?? []
   const txns = txnsQ.data ?? []
+
+  // Click-to-sort on the recent-tolls list (default: newest first). nulls-last
+  // comparator shape copied from the Invoices receivables list.
+  const [txnSort, setTxnSort] = useState<SortState>({ key: 'date', dir: 'desc' })
+  const sortedTxns = useMemo(() => {
+    const val = (t: (typeof txns)[number]): unknown => {
+      switch (txnSort.key) {
+        case 'date': {
+          const d = t.post_date_time ?? t.exit_date_time
+          return d ? new Date(d).getTime() : null
+        }
+        case 'agency': return t.toll_agency_name
+        case 'plaza': return t.exit_plaza_name || t.entry_plaza_name
+        case 'unit': return t.vehicle_number
+        case 'read': return t.read_type
+        case 'category': return t.toll_category
+        case 'amount': return Number(t.toll_charge)
+        default: return null
+      }
+    }
+    const dir = txnSort.dir === 'asc' ? 1 : -1
+    // blanks/nulls stay last in BOTH directions (reversing would surface them)
+    return [...txns].sort((a, b) => {
+      const av = val(a), bv = val(b)
+      const aNil = av == null || av === ''
+      const bNil = bv == null || bv === ''
+      if (aNil && bNil) return 0
+      if (aNil) return 1
+      if (bNil) return -1
+      return dir * compareValues(av, bv)
+    })
+  }, [txns, txnSort])
 
   // Headline totals come from the by-truck rollup — server-aggregated over the
   // whole range, so they're not capped by the recent-transactions limit.
@@ -120,8 +152,20 @@ export default function Tolls() {
         ) : txns.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted">No tolls in this range.</p>
         ) : (
-          <Table headers={['Date', 'Agency', 'Plaza', 'Unit', 'Read', 'Category', 'Amount']}>
-            {txns.map((t) => (
+          <Table
+            headers={[
+              { label: 'Date', key: 'date' },
+              { label: 'Agency', key: 'agency' },
+              { label: 'Plaza', key: 'plaza' },
+              { label: 'Unit', key: 'unit' },
+              { label: 'Read', key: 'read' },
+              { label: 'Category', key: 'category' },
+              { label: 'Amount', key: 'amount' },
+            ]}
+            sort={txnSort}
+            onSort={(k) => setTxnSort((p) => toggleSort(p, k))}
+          >
+            {sortedTxns.map((t) => (
               <tr key={t.id} className="hover:bg-surface-2">
                 <td className="px-3 py-3 whitespace-nowrap">{formatDateTime(t.post_date_time ?? t.exit_date_time)}</td>
                 <td className="px-3 py-3">

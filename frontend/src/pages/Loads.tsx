@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Badge, Button, Card, formatDateTime, Input, LoadError, money, Select } from '../components/ui'
+import { Badge, Button, Card, compareValues, formatDateTime, Input, LoadError, money, Select, type SortState, Table, toggleSort } from '../components/ui'
 import { listCustomers, listDrivers, listLoads, listMissingPods } from '../data'
-import { LOAD_STATUSES } from '../types'
+import { LOAD_STATUSES, type Load } from '../types'
 
 const ALL_STATUSES = [...LOAD_STATUSES, 'cancelled' as const]
 
@@ -66,6 +66,35 @@ export default function Loads() {
     queryFn: () => listLoads({ q, statuses: statusList, awaiting_paperwork: awaitingOnly, customer_id: customerId, driver_id: driverId, date_from: dateFrom, date_to: dateTo }),
   })
   const { data: loads = [], isLoading } = loadsQ
+
+  // Click-to-sort on the list columns (default: newest pickup first).
+  const [sort, setSort] = useState<SortState>({ key: 'pickup', dir: 'desc' })
+  const sorted = useMemo(() => {
+    const val = (l: Load): unknown => {
+      switch (sort.key) {
+        case 'load_number': return l.load_number
+        case 'customer': return l.customer_name
+        case 'pickup': return l.pickup_time ? new Date(l.pickup_time).getTime() : null
+        case 'delivery': return l.delivery_time ? new Date(l.delivery_time).getTime() : null
+        case 'driver': return l.driver_name
+        case 'rate': return Number(l.rate)
+        case 'rpm': return l.rate_per_mile
+        case 'status': return l.status
+        default: return null
+      }
+    }
+    const dir = sort.dir === 'asc' ? 1 : -1
+    // blanks/nulls stay last in BOTH directions (reversing would surface them)
+    return [...loads].sort((a, b) => {
+      const av = val(a), bv = val(b)
+      const aNil = av == null || av === ''
+      const bNil = bv == null || bv === ''
+      if (aNil && bNil) return 0
+      if (aNil) return 1
+      if (bNil) return -1
+      return dir * compareValues(av, bv)
+    })
+  }, [loads, sort])
 
   return (
     <div className="space-y-4">
@@ -136,19 +165,21 @@ export default function Loads() {
       ) : loads.length === 0 ? (
         <p className="py-8 text-center text-muted">No loads match.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-line text-left">
-                {['Load #', 'Customer', 'Pickup', 'Delivery', 'Driver', 'Rate', 'RPM', 'Status'].map((h) => (
-                  <th key={h} className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {loads.map((load) => (
+        <Table
+          headers={[
+            { label: 'Load #', key: 'load_number' },
+            { label: 'Customer', key: 'customer' },
+            { label: 'Pickup', key: 'pickup' },
+            { label: 'Delivery', key: 'delivery' },
+            { label: 'Driver', key: 'driver' },
+            { label: 'Rate', key: 'rate' },
+            { label: 'RPM', key: 'rpm' },
+            { label: 'Status', key: 'status' },
+          ]}
+          sort={sort}
+          onSort={(k) => setSort((p) => toggleSort(p, k))}
+        >
+          {sorted.map((load) => (
                 <tr key={load.id} className="cursor-pointer hover:bg-surface-2" onClick={() => navigate(`/loads/${load.id}`)}>
                   <td className="px-3 py-3 font-medium text-brand">
                     <Link to={`/loads/${load.id}`} onClick={(e) => e.stopPropagation()}>
@@ -178,11 +209,9 @@ export default function Loads() {
                       )}
                     </div>
                   </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            </tr>
+          ))}
+        </Table>
       )}
     </Card>
     </div>

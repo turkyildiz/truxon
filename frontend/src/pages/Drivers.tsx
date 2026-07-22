@@ -11,25 +11,30 @@ export default function Drivers() {
       list={listDrivers}
       create={createDriver}
       update={updateDriver}
+      defaultSort={{ key: 'name', dir: 'asc' }}
       columns={[
-        { header: 'Name', render: (d) => <span className="font-medium">{d.full_name}</span> },
-        { header: 'Phone', render: (d) => d.phone || '—' },
-        { header: 'License #', render: (d) => d.license_number || '—' },
+        { header: 'Name', sortKey: 'name', sortValue: (d) => d.full_name, render: (d) => <span className="font-medium">{d.full_name}</span> },
+        { header: 'Phone', sortKey: 'phone', sortValue: (d) => d.phone, render: (d) => d.phone || '—' },
+        { header: 'License #', sortKey: 'license', sortValue: (d) => d.license_number, render: (d) => d.license_number || '—' },
         {
           header: 'License Exp.',
+          sortKey: 'license_exp',
+          sortValue: (d) => (d.license_expiration ? new Date(d.license_expiration).getTime() : null),
           render: (d) => {
             const expired = d.license_expiration && new Date(d.license_expiration) < new Date()
             const soon = d.license_expiration && !expired && new Date(d.license_expiration) < new Date(Date.now() + 30 * 864e5)
             return <span className={expired ? 'font-semibold text-red-600' : soon ? 'font-semibold text-amber-600' : ''}>{formatDate(d.license_expiration)}</span>
           },
         },
-        { header: 'Hired', render: (d) => formatDate(d.hire_date) },
-        { header: 'Pay/Mile', render: (d) => `$${Number(d.pay_per_mile).toFixed(2)}` },
+        { header: 'Hired', sortKey: 'hired', sortValue: (d) => (d.hire_date ? new Date(d.hire_date).getTime() : null), render: (d) => formatDate(d.hire_date) },
+        { header: 'Pay/Mile', sortKey: 'pay_per_mile', sortValue: (d) => Number(d.pay_per_mile), render: (d) => `$${Number(d.pay_per_mile).toFixed(2)}` },
         {
           header: 'Login',
+          sortKey: 'login',
+          sortValue: (d) => !!d.user_id,
           render: (d) => (d.user_id ? <span className="text-sm text-muted">Linked</span> : <span className="text-muted">—</span>),
         },
-        { header: 'Status', render: (d) => <Badge status={d.status} /> },
+        { header: 'Status', sortKey: 'status', sortValue: (d) => d.status, render: (d) => <Badge status={d.status} /> },
       ]}
       fields={[
         { name: 'full_name', label: 'Full Name', required: true },

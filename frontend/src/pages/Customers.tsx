@@ -161,14 +161,17 @@ export default function Customers() {
         prefill={prefill}
         onPrefillConsumed={() => setPrefill(null)}
         docs={{ entityType: 'customer', docTypes: ['Contract', 'Rate Agreement', 'Insurance', 'Other'], label: (c) => c.company_name }}
+        defaultSort={{ key: 'company', dir: 'asc' }}
         columns={[
-          { header: 'Company', render: (c) => <Link className="font-medium text-brand hover:underline" to={`/customers/${c.id}`} onClick={(e) => e.stopPropagation()}>{c.company_name}</Link> },
-          { header: 'Contact', render: (c) => c.contact_person || '—' },
-          { header: 'Phone', render: (c) => c.phone || '—' },
-          { header: 'Email', render: (c) => c.email || '—' },
-          { header: 'Terms', render: (c) => c.payment_terms },
+          { header: 'Company', sortKey: 'company', sortValue: (c) => c.company_name, render: (c) => <Link className="font-medium text-brand hover:underline" to={`/customers/${c.id}`} onClick={(e) => e.stopPropagation()}>{c.company_name}</Link> },
+          { header: 'Contact', sortKey: 'contact', sortValue: (c) => c.contact_person, render: (c) => c.contact_person || '—' },
+          { header: 'Phone', sortKey: 'phone', sortValue: (c) => c.phone, render: (c) => c.phone || '—' },
+          { header: 'Email', sortKey: 'email', sortValue: (c) => c.email, render: (c) => c.email || '—' },
+          { header: 'Terms', sortKey: 'terms', sortValue: (c) => c.payment_terms, render: (c) => c.payment_terms },
           {
             header: 'Status',
+            sortKey: 'status',
+            sortValue: (c) => (c.do_not_use ? 'do not use' : c.is_active ? 'active' : 'inactive'),
             render: (c) =>
               c.do_not_use ? (
                 <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/40 dark:text-red-300">Do Not Use</span>
