@@ -2201,3 +2201,50 @@ export async function setLockdown(on: boolean, reason: string): Promise<void> {
 export async function blessSecurityBaseline(): Promise<{ newly_added: number; removed: number }> {
   return unwrap(await supabase.rpc('bless_security_baseline')) as unknown as { newly_added: number; removed: number }
 }
+
+// ---------- MFA / TOTP (dark-launch: opt-in, not yet enforced at login) ----------
+
+export interface MfaFactor {
+  id: string
+  friendly_name?: string
+  factor_type: string
+  status: 'verified' | 'unverified'
+  created_at: string
+}
+
+/** All enrolled factors for the current user (verified + pending). */
+export async function mfaListFactors(): Promise<MfaFactor[]> {
+  const { data, error } = await supabase.auth.mfa.listFactors()
+  if (error) throw new Error(error.message)
+  return (data?.all ?? []) as MfaFactor[]
+}
+
+export interface MfaEnrollment { factorId: string; qrCode: string; secret: string; uri: string }
+
+/** Begin TOTP enrollment. Clears any stale *unverified* factor first so a
+ * retried enrollment never trips the "friendly name already exists" error. */
+export async function mfaEnrollTotp(friendlyName = 'Authenticator app'): Promise<MfaEnrollment> {
+  try {
+    const existing = await mfaListFactors()
+    for (const f of existing.filter((x) => x.status === 'unverified')) {
+      await supabase.auth.mfa.unenroll({ factorId: f.id })
+    }
+  } catch { /* best effort — enroll still reports the real error below */ }
+  const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName })
+  if (error) throw new Error(error.message)
+  return { factorId: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret, uri: data.totp.uri }
+}
+
+/** Confirm a 6-digit code, verifying the factor (and raising the session to AAL2). */
+export async function mfaVerifyTotp(factorId: string, code: string): Promise<void> {
+  const ch = await supabase.auth.mfa.challenge({ factorId })
+  if (ch.error) throw new Error(ch.error.message)
+  const v = await supabase.auth.mfa.verify({ factorId, challengeId: ch.data.id, code: code.trim() })
+  if (v.error) throw new Error(v.error.message)
+}
+
+/** Remove a factor (disables MFA for this user if it was the last one). */
+export async function mfaUnenroll(factorId: string): Promise<void> {
+  const { error } = await supabase.auth.mfa.unenroll({ factorId })
+  if (error) throw new Error(error.message)
+}
