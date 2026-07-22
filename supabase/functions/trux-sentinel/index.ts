@@ -58,10 +58,22 @@ Deno.serve(withCors(async (req) => {
   const s = svc()
 
   let mode = 'scan'
+  let body: Record<string, unknown> = {}
   try {
-    const b = await req.json()
-    if (b?.mode) mode = String(b.mode)
+    body = await req.json()
+    if (body?.mode) mode = String(body.mode)
   } catch { /* default scan */ }
+
+  // Honeytoken replay check (salting): a rejected privileged secret, hashed by
+  // the shared auth layer, is tested against the decoy-key registry. Cheap and
+  // admin-independent — handle it before minting an admin session.
+  if (mode === 'honeytoken') {
+    let hash = ''
+    try { hash = String((await req.clone().json())?.hash ?? '') } catch { /* ignore */ }
+    if (!/^[0-9a-f]{64}$/.test(hash)) return json({ matched: false })
+    const { data: matched } = await s.rpc('honeytoken_seen', { p_hash: hash })
+    return json({ matched: !!matched })
+  }
 
   const admin = await adminClient(s)
   if (!admin) return json({ error: 'No active admin to run the sentinel as' }, 500)

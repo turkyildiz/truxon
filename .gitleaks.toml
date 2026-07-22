@@ -1,0 +1,18 @@
+# Gitleaks config for Truxon — catch a REAL secret before it's ever pushed.
+# (GitHub push protection already blocks known vendor keys server-side; this
+# runs in CI and locally so we find them earlier and cover custom shapes.)
+title = "Truxon gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known-safe: the public anon JWT (publishable by design) and the honeypot migrations, whose decoy keys are concatenated/hashed and carry no live secret."
+regexes = [
+  # The Supabase public anon JWT is publishable by design (embedded in cron_edge_call + the SPA).
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZS[A-Za-z0-9_.-]+''',
+]
+paths = [
+  '''supabase/migrations/20260722001001_honeypots\.sql''',
+  '''supabase/migrations/20260722002003_honeytokens\.sql''',
+]

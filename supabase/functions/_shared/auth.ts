@@ -78,8 +78,30 @@ export async function getCaller(req: Request): Promise<Caller | Response> {
 export function requireCron(req: Request): boolean {
   const secret = Deno.env.get('CRON_SECRET') ?? ''
   const got = req.headers.get('x-cron-key') ?? ''
-  if (!secret || got.length !== secret.length) return false
+  if (!secret || got.length !== secret.length) { maybeHoneytoken(got); return false }
   let diff = 0
   for (let i = 0; i < secret.length; i++) diff |= secret.charCodeAt(i) ^ got.charCodeAt(i)
-  return diff === 0
+  if (diff !== 0) { maybeHoneytoken(got); return false }
+  return true
+}
+
+/** Salting: a REJECTED privileged secret might be one of the decoy keys the
+ * honeypot serves — i.e. someone read the decoy and is now replaying it. Hash
+ * the rejected value and (fire-and-forget) let the sentinel check it against
+ * the honeytoken registry. We authenticate this internal call with our OWN
+ * real CRON_SECRET; only long-enough candidates are checked, to avoid noise.
+ * Never sends plaintext; never blocks the caller. */
+function maybeHoneytoken(got: string): void {
+  const secret = Deno.env.get('CRON_SECRET') ?? ''
+  const url = Deno.env.get('SUPABASE_URL') ?? ''
+  if (!secret || !url || got.length < 20) return
+  ;(async () => {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(got))
+    const hash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
+    await fetch(`${url}/functions/v1/trux-sentinel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-cron-key': secret },
+      body: JSON.stringify({ mode: 'honeytoken', hash }),
+    })
+  })().catch(() => {})
 }

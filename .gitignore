@@ -35,3 +35,4 @@ deploy/drive-import/drive.env
 deploy/drive-import/.stage/
 deploy/drive-import/manifest.json
 mobile/android/build/
+deploy/tolls/__pycache__/
