@@ -110,9 +110,9 @@ export const ROLE_MODULES: Record<string, string[]> = {
   // per role server-side (roleGuidance + RLS), so each person's Forest only sees
   // and does what their job allows.
   admin: ['dashboard', 'trux', 'track', 'radio', 'loads', 'dispatch', 'shadow', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', 'tolls', ...DRIVES, 'doc_search', 'playbook', 'users', 'security', 'settings'],
-  dispatcher: ['dashboard', 'trux', 'track', 'radio', 'loads', 'dispatch', 'shadow', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', 'tolls', ...DRIVES, 'doc_search', 'playbook'],
-  accountant: ['dashboard', 'trux', 'track', 'loads', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', 'tolls', ...DRIVES, 'doc_search', 'playbook'],
-  maintenance: ['dashboard', 'trux', 'trucks', 'trailers', 'maintenance', ...DRIVES],
+  dispatcher: ['dashboard', 'trux', 'track', 'radio', 'loads', 'dispatch', 'shadow', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', 'tolls', ...DRIVES, 'doc_search', 'playbook', 'account'],
+  accountant: ['dashboard', 'trux', 'track', 'loads', 'customers', 'drivers', 'trucks', 'trailers', 'maintenance', 'reports', 'invoices', 'fuel', 'tolls', ...DRIVES, 'doc_search', 'playbook', 'account'],
+  maintenance: ['dashboard', 'trux', 'trucks', 'trailers', 'maintenance', ...DRIVES, 'account'],
   driver: ['dashboard', 'trux', ...DRIVES],
 }
 
@@ -141,6 +141,7 @@ export const ROUTE_MODULE: { prefix: string; module: string }[] = [
   { prefix: '/playbook', module: 'playbook' },
   { prefix: '/users', module: 'users' },
   { prefix: '/security', module: 'security' },
+  { prefix: '/account', module: 'account' },
   { prefix: '/settings', module: 'settings' },
 ]
 

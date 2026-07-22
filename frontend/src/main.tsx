@@ -40,6 +40,7 @@ const DocSearch = lazy(() => import('./pages/DocSearch'))
 const Playbook = lazy(() => import('./pages/Playbook'))
 const Shadow = lazy(() => import('./pages/Shadow'))
 const Security = lazy(() => import('./pages/Security'))
+const Account = lazy(() => import('./pages/Account'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 15_000 } },
@@ -112,6 +113,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/shadow" element={<Shadow />} />
               <Route path="/users" element={<Users />} />
               <Route path="/security" element={<Security />} />
+              <Route path="/account" element={<Account />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

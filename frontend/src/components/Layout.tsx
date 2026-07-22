@@ -107,6 +107,9 @@ const NAV_GROUPS: { title: string | null; items: NavItem[] }[] = [
     { key: 'security', to: '/security', label: 'Security', icon: '🛡️' },
     { key: 'settings', to: '/settings', label: 'Settings', icon: '⚙️' },
   ] },
+  { title: null, items: [
+    { key: 'account', to: '/account', label: 'My Account', icon: '🔐' },
+  ] },
 ]
 
 function GlobalSearch() {
