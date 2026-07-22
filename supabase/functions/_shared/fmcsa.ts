@@ -38,7 +38,10 @@ export function nameMatches(customer: unknown, fmcsaName: unknown): boolean {
   if (!want.size || !got.size) return false
   let shared = 0
   for (const t of want) if (got.has(t)) shared++
-  return shared >= 1 && shared / want.size >= 0.5
+  // Match if the customer's distinctive tokens are mostly in the FMCSA name, OR the
+  // FMCSA name's tokens are mostly in the customer name (handles a DBA/parent-company
+  // suffix like "AFN, LLC / GlobalTranz" vs FMCSA "AFN LLC").
+  return shared >= 1 && (shared / want.size >= 0.5 || shared / got.size >= 0.6)
 }
 
 export interface FmcsaCarrier {

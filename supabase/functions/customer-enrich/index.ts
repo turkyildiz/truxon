@@ -317,6 +317,46 @@ Deno.serve(withCors(async (req) => {
     return json({ filled: Number(n) || 0, conflicts })
   }
 
+  // ── fmcsa_audit: re-verify stored MC/USDOT against FMCSA (QCMobile via the
+  // FMCSA_WEBKEY). Read-only by default; {apply:true} clears numbers FMCSA can't
+  // confirm belong to the customer (blanks-only safe). Cursor-paged for the 150s cap.
+  if (body.mode === 'fmcsa_audit') {
+    const after = Number(body.after_id) || 0
+    const limit = Math.min(Number(body.limit) || 40, 100)
+    const { data: rows } = await svc.from('customers')
+      .select('id, company_name, mc_number, usdot_number')
+      .or('mc_number.neq.,usdot_number.neq.')
+      .gt('id', after).order('id', { ascending: true }).limit(limit)
+    const report: Record<string, unknown>[] = []
+    let lastId = after
+    let cleared = 0
+    for (const c of rows ?? []) {
+      lastId = c.id as number
+      const mc = String(c.mc_number ?? '').trim(), dot = String(c.usdot_number ?? '').trim()
+      if (!mc && !dot) continue
+      const vetted = await validateCarrierNumbers(
+        { ...(mc ? { mc_number: mc } : {}), ...(dot ? { usdot_number: dot } : {}) },
+        c.company_name, { webKey: FMCSA_WEBKEY })
+      const dropMc = !!mc && vetted.fields.mc_number == null
+      const dropDot = !!dot && vetted.fields.usdot_number == null
+      report.push({ id: c.id, company_name: c.company_name, mc, usdot: dot, notes: vetted.notes, drop_mc: dropMc, drop_usdot: dropDot })
+      if (body.apply === true) {
+        // Reconcile each field to FMCSA truth: canonical value if verified, the
+        // back-filled value if FMCSA supplied one, or '' if it couldn't be confirmed.
+        const newMc = String(vetted.fields.mc_number ?? '')
+        const newDot = String(vetted.fields.usdot_number ?? '')
+        const upd: Record<string, string> = {}
+        if (newMc !== mc) upd.mc_number = newMc
+        if (newDot !== dot) upd.usdot_number = newDot
+        if (Object.keys(upd).length) {
+          await svc.from('customers').update(upd).eq('id', c.id)
+          cleared += Object.keys(upd).length
+        }
+      }
+    }
+    return json({ audited: (rows ?? []).length, lastId, cleared, applied: body.apply === true, report })
+  }
+
   // ── dupes_report: duplicate-customer groups (normalized-name key) ──
   if (body.mode === 'dupes_report') {
     const { data, error } = await svc.rpc('duplicate_customer_groups')

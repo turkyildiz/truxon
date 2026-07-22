@@ -5,6 +5,8 @@ Deno.test('nameMatches tolerates DBA / word-order / suffix noise', () => {
   assertEquals(nameMatches('AM Trans Expedite, LLC', 'AM TRANS EXPEDITE LLC'), true)
   assertEquals(nameMatches('Fusion Transport LLC', 'FUSION TRANSPORT INC'), true)
   assertEquals(nameMatches('Coyote Logistics', 'COYOTE LOGISTICS LLC'), true)
+  // customer name carries a parent/DBA suffix; FMCSA has the shorter legal name
+  assertEquals(nameMatches('AFN, LLC/ GLOBAL TRANZ', 'AFN LLC'), true)
 })
 
 Deno.test('nameMatches rejects unrelated carriers', () => {
