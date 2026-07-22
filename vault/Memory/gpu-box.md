@@ -1,14 +1,18 @@
 ---
 name: gpu-box
-description: "Lynx — the RTX 5060 Ti GPU box (long-parked) for vision + heavier local LLM; separate from the ikedev Intel-iGPU laptop. Setup runbook in deploy/gpu-box"
+description: "Lynx — the RTX 5060 Ti (8 GB) GPU box for vision + local LLM; LIVE 2026-07-22 (driver 595 + Ollama tailnet-only). Separate from the ikedev laptop. SSH: ssh lynx (root@100.110.143.84)"
 metadata:
   type: reference
 ---
 
-The "GPU box" that Northstar/[[nas-local-llm]] were waiting on is **Lynx**, an **RTX 5060 Ti** desktop, being set up 2026-07-22. It is **separate** from `ikedev` — the box Claude runs on is `ikedev`, an Intel **Iris Xe iGPU** laptop (TigerLake-LP, 8 cores, 14 GB, Secure Boot ON, no NVIDIA). So Claude can't configure the GPU box directly; it produces runbooks.
+The "GPU box" that Northstar/[[nas-local-llm]] were waiting on is **Lynx**, an **RTX 5060 Ti** desktop, **set up & LIVE 2026-07-22**. It is **separate** from `ikedev` — the box Claude runs on is `ikedev`, an Intel **Iris Xe iGPU** laptop (no NVIDIA).
 
-**Purpose:** move the parked **vision pipeline** (rate-con scan, minicpm-v — "iGPU parked for vision only") and heavier local-LLM work onto real CUDA. 16 GB VRAM (if the 16 GB variant) fits 7B–14B quantized LLMs + a vision model — a big step up from the NAS `qwen2.5:3b`.
+**Hardware (verified):** RTX 5060 Ti **8 GB** variant (GB206, PCI `10de:2d04`) + Intel Arrow Lake iGPU; **Ubuntu 26.04 LTS**, kernel 7.0.0-28; 20 cores, 30 GiB RAM, 874 GB free; **Secure Boot DISABLED** (so no MOK dance — plain reboot after driver install). NOTE: it's **8 GB, not 16** — run **7B** models, not 14B. Ollama swaps models in/out on demand (`OLLAMA_KEEP_ALIVE=5m`), so vision + reasoning share the 8 GB fine one-at-a-time.
 
-**Key setup gotcha:** the 5060 Ti is **NVIDIA Blackwell (GB206)** → needs a **recent driver (R570+/575)** + CUDA 12.8+; older drivers won't see it. Secure Boot on the box → the driver's kernel module must be MOK-enrolled on reboot (or disable SB). Full step-by-step in `deploy/gpu-box/SETUP.md` (NVIDIA driver → optional CUDA → Ollama GPU + models → wire into the Truxon [[nas-local-llm]] proxy on the tailnet, never internet-exposed → optional dev-box bootstrap).
+**Claude's access (LIVE):** `ssh lynx` from ikedev → `root@100.110.143.84` (tailnet IP), key `~/.ssh/lynx` (ed25519, IdentitiesOnly), key-only root login (`PermitRootLogin prohibit-password`). Config block in `~/.ssh/config`. USB bootstrap sheet the owner ran: `deploy/gpu-box/LYNX-SETUP-USB.txt`. **Gotcha:** connect via the `lynx` alias (or pass `IdentitiesOnly=yes`) — a bare `ssh -i` offers agent keys first and hits MaxAuthTries before the Lynx key.
 
-**Truxon wiring:** front it with the existing token-gated LLM proxy; point the vision + 14B-reasoning route at `http://<gpu-box-tailscale-ip>:11434`, keep the NAS 3B for cheap bulk work. Related: [[nas-local-llm]], [[northstar-project]], [[user-ilker]].
+**Software installed:** NVIDIA **driver 595.71.05** (`nvidia-driver-595-open`, CUDA 13.2) — `nvidia-smi` sees the card. **Ollama 0.32.1** (systemd, enabled), bound `0.0.0.0:11434` but **firewalled tailnet-only** via `ufw` (allow OpenSSH + allow in on `tailscale0`, default-deny) → reachable only over the tailnet, never the internet/LAN. Models: `qwen2.5:7b` (reasoning) + `qwen2.5vl:7b` (vision).
+
+**Key setup gotcha (historical):** the 5060 Ti is **Blackwell (GB206)** → needs driver **R570+**; Ubuntu 26.04 ships **595** as recommended (`-open` kernel module, required for Blackwell). Full runbook in `deploy/gpu-box/SETUP.md`.
+
+**Truxon wiring:** front it with the existing token-gated [[nas-local-llm]] proxy; point the vision + 7B-reasoning route at `http://100.110.143.84:11434`, keep the NAS 3B for cheap bulk work. Related: [[nas-local-llm]], [[northstar-project]], [[user-ilker]], [[nas-access]].

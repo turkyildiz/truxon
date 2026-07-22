@@ -20,7 +20,7 @@
 - [ELD DriveHOS API](eld-drivehos.md) — telematics feed (GPS/odometer/engine-hrs/HOS) for Northstar; needs Aida's company key to unblock
 - [Geocoding](geocoding.md) — load stops → lat/lon+state for lane rate history; LIVE, all ~975 loads backfilled; unblocks detention detection next
 - [PrePass tolls](tolls-prepass.md) — toll CSVs via SFTP → NAS importer → toll_transactions; LIVE (42 tolls first pull); daily 05:30 cron
-- [GPU box: Lynx](gpu-box.md) — RTX 5060 Ti desktop named **Lynx** (separate from ikedev iGPU laptop) for vision + heavier local LLM; Blackwell needs driver 570+; setup runbook in deploy/gpu-box
+- [GPU box: Lynx](gpu-box.md) — RTX 5060 Ti (8 GB) desktop **Lynx**, LIVE 2026-07-22: driver 595 + Ollama (7B models) tailnet-only; `ssh lynx` (root@100.110.143.84); separate from ikedev laptop
 - [NAS local LLM](nas-local-llm.md) — self-hosted qwen2.5:3b does bulk doc classify/extract (token-gated proxy, cloud fallback); 3B beat 7B on measurement; iGPU parked for vision only
 - [Fuel-theft detection](fuel-theft-detection.md) — Forest now flags non-diesel-on-diesel, cash advances, tank overflow, fuel-vs-(dispatch+deadhead)-miles; MPG needs telematics; amount field is dirty
 - [Security posture](security-posture.md) — CRON_SECRET architecture (rotate via secrets set + watchdog setter), my_role raises for inactive, money-path locks; S-08/09/11 CLOSED + verified 2026-07-21 (withCors 100% coverage); residual gap = OTA manifest signing (mitigated by Android same-key install requirement)

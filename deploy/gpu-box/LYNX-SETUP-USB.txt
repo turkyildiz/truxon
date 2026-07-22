@@ -1,0 +1,120 @@
+========================================================================
+  LYNX  (RTX 5060 Ti GPU box)  —  SETUP FROM A BRAND-NEW INSTALL
+  Run these ON LYNX. Copy-paste ONE block at a time. Wait for each to
+  finish before the next. After Step 4, go to the ikedev laptop and
+  type "go" — Claude takes over and does everything else itself.
+========================================================================
+
+  NOTE: This is written for a FRESH machine that has nothing installed
+  (no curl, no ssh, etc). The steps install those first. That's normal.
+
+
+------------------------------------------------------------------------
+STEP 0  —  Open a terminal on Lynx
+------------------------------------------------------------------------
+  Press:  Ctrl + Alt + T
+  (or open the app menu and search for "Terminal")
+
+
+------------------------------------------------------------------------
+STEP 1  —  Install the basic tools (curl, ssh server, etc.)
+------------------------------------------------------------------------
+Paste this whole block. It will ask for your password (you won't see it
+typing — that's normal), then download a few things. Wait for it to end:
+
+  sudo apt update
+  sudo apt install -y curl ca-certificates openssh-server
+
+Now start the SSH server and make sure it runs on every boot:
+
+  sudo systemctl enable --now ssh
+
+Confirm it's running (you want to see the words "active (running)"):
+
+  systemctl status ssh --no-pager | head -3
+
+
+------------------------------------------------------------------------
+STEP 2  —  Join the Tailscale private network
+------------------------------------------------------------------------
+Paste this block. It prints a login LINK — open that link in a browser
+and sign in with the SAME account as your other machines:
+
+  curl -fsSL https://tailscale.com/install.sh | sh
+  sudo tailscale up
+
+When it finishes, get this box's private address (starts with 100.):
+
+  tailscale ip -4
+
+  >>> WRITE DOWN the 100.x.x.x number it prints. Read it to Claude. <<<
+
+
+------------------------------------------------------------------------
+STEP 3  —  Authorize Claude (on ikedev) to log in as root, BY KEY ONLY
+------------------------------------------------------------------------
+Paste this whole block exactly. It installs Claude's key and turns OFF
+password logins for root (key-only = safe). This is the whole approval:
+
+  sudo mkdir -p /root/.ssh && sudo chmod 700 /root/.ssh
+  echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIKEhcgZeYTqm8HsyZ6izHNuZwMkkAE4HRc3naMFuFYn claude@ikedev-lynx' | sudo tee -a /root/.ssh/authorized_keys
+  sudo chmod 600 /root/.ssh/authorized_keys
+  sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+  sudo systemctl restart ssh
+
+Give the machine its name (nice to have):
+
+  sudo hostnamectl set-hostname lynx
+
+Confirm the key landed (should print a line ending in claude@ikedev-lynx):
+
+  sudo cat /root/.ssh/authorized_keys
+
+
+------------------------------------------------------------------------
+STEP 4  —  Tell Claude it's ready
+------------------------------------------------------------------------
+Go to the ikedev laptop and type:   go
+Also give Claude the 100.x.x.x number from Step 2.
+
+Claude then connects and does the rest ON ITS OWN:
+  - full system update
+  - NVIDIA driver (Blackwell 570+/575)   <-- needs ONE reboot, see below
+  - Ollama + the AI models (vision + heavy LLM)
+  - wires it into Truxon over the private network (never the internet)
+
+
+========================================================================
+  THE ONE THING CLAUDE CANNOT DO REMOTELY  —  the reboot
+========================================================================
+After the NVIDIA driver installs, Lynx must REBOOT once.
+
+  * If a BLUE screen appears saying "Enroll MOK" / "Perform MOK
+    management":  select  Enroll MOK  ->  Continue  ->  Yes,  then type
+    the short password Claude told you to set, then Reboot.
+    (One-time Secure Boot safety step. Only happens once, if at all.)
+
+  * If NO blue screen appears, it just boots normally. Nothing to do.
+
+Claude tells you EXACTLY when the reboot is coming and what password (if
+any) to type. After the box comes back up, Claude reconnects by itself.
+
+
+========================================================================
+  TROUBLESHOOTING
+------------------------------------------------------------------------
+  "go" won't connect?
+     On Lynx run:   tailscale ip -4
+     Read Claude the 100.x.x.x number.
+
+  "sshd.service not found" or ssh won't start?
+     You skipped Step 1. Run:  sudo apt install -y openssh-server
+     then:  sudo systemctl enable --now ssh
+
+  "curl: command not found"?
+     Run Step 1 first (it installs curl).
+
+  apt says "Could not get lock" / "another process"?
+     Wait 30 seconds and run the block again (a background update was
+     running). If it persists:  sudo reboot  then start over from Step 1.
+========================================================================
