@@ -4,7 +4,7 @@
 // p95 latency > 5s. Read vectors only by default (safe on production);
 // pass --writes to include a cleaned-up write burst.
 //
-// Usage: node stress.mjs <email> <password> [--writes] [--max=200]
+// Usage: ADMIN_EMAIL=… ADMIN_PASSWORD=… node stress.mjs [--writes] [--max=200]
 import { createClient } from '@supabase/supabase-js'
 import { readFileSync, writeFileSync } from 'node:fs'
 
@@ -12,7 +12,9 @@ const env = Object.fromEntries(
   readFileSync('/home/turkyildiz/TRUXON/frontend/.env.local', 'utf8')
     .split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]),
 )
-const [email, password, ...flags] = process.argv.slice(2)
+// creds from env only (review M-6): argv lands in shell history + ps -ef
+const email = process.env.ADMIN_EMAIL, password = process.env.ADMIN_PASSWORD
+const flags = process.argv.slice(2)
 const WRITES = flags.includes('--writes')
 const MAX = Number((flags.find((f) => f.startsWith('--max=')) || '--max=200').split('=')[1])
 const LEVELS = [1, 5, 10, 25, 50, 100, 200, 400].filter((n) => n <= MAX)

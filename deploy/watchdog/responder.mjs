@@ -37,7 +37,12 @@ const env = Object.fromEntries(
     .map((l) => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1).trim()]),
 )
 const REPO = env.TRUXON_REPO ?? '/home/turkyildiz/TRUXON'
+// HARD GATE (2026-07-21 review H-2): autofix grants commit+push to prod, and
+// the trigger + prompt inputs include attacker-influenceable text (inbox
+// failure messages). Arming it now requires BOTH flags — the second one is a
+// deliberate speed bump so "=1" alone can never re-enable autonomous pushes.
 const AUTOFIX = env.RESPONDER_AUTOFIX === '1'
+  && env.RESPONDER_AUTOFIX_CONFIRM === 'I_ACCEPT_AUTONOMOUS_PROD_PUSH'
 mkdirSync(STATE_DIR, { recursive: true })
 
 const log = (m) => console.log(`[responder] ${new Date().toISOString()} ${m}`)
@@ -93,8 +98,8 @@ SUPABASE_ACCESS_TOKEN env prefix form used throughout git history.
 YOUR MANDATE:
 ${AUTOFIX
     ? `1. Investigate the root cause. Check edge function behavior, reproduce if possible.
-2. AUTONOMOUS: code fixes, edge function redeploys, git commit+push, re-running the
-   watchdog endpoint to verify recovery.
+2. AUTONOMOUS: code fixes, edge function redeploys, git commit (NO push — the
+   owner pushes), re-running the watchdog endpoint to verify recovery.
 3. PROPOSE-ONLY (never execute): production data changes (INSERT/UPDATE/DELETE on
    business tables), schema migrations, secrets changes, anything irreversible.
    Write proposed SQL/steps into your final summary instead.
@@ -125,8 +130,13 @@ if (claudeBin) {
   try {
     // Read-only mode grants only inspection tools; nothing that mutates state.
     // AUTOFIX (explicit owner opt-in) restores full-permission autonomy.
+    // Even armed, autofix no longer gets skip-permissions: an explicit tool
+    // allowlist that can edit/deploy but has NO git push (review H-2 — the
+    // prompt embeds inbox text an outsider can influence; a push to main
+    // deploys prod, so that one action stays human-only).
     const claudeArgs = AUTOFIX
-      ? ['-p', prompt, '--dangerously-skip-permissions']
+      ? ['-p', prompt, '--allowedTools',
+         'Read Glob Grep Edit Write Bash(git log:*) Bash(git show:*) Bash(git diff:*) Bash(git status:*) Bash(git add:*) Bash(git commit:*) Bash(supabase functions deploy:*) Bash(curl:*)']
       : ['-p', prompt, '--allowedTools', 'Read Glob Grep Bash(git log:*) Bash(git show:*) Bash(git diff:*)']
     sessionOut = execFileSync(claudeBin, claudeArgs, {
       cwd: REPO,

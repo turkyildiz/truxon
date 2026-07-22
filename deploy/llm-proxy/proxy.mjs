@@ -3,6 +3,7 @@
 // edge functions to call. Ollama itself has NO auth; this adds a bearer check.
 // Only /v1/* (chat/completions, models) is forwarded — nothing else. Zero deps.
 import http from 'node:http';
+import crypto from 'node:crypto';
 
 const KEY = process.env.LOCAL_LLM_KEY || '';
 const OLLAMA = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
@@ -13,7 +14,12 @@ const log = (m) => console.log(`[llm-proxy] ${new Date().toISOString()} ${m}`);
 
 http.createServer((req, res) => {
   const auth = req.headers['authorization'] || '';
-  if (auth !== `Bearer ${KEY}`) { res.writeHead(401).end('unauthorized'); return; }
+  // constant-time compare (review): this proxy is Funnel-exposed, so no
+  // timing side-channel on the bearer token.
+  const expect = Buffer.from(`Bearer ${KEY}`);
+  const got = Buffer.from(auth);
+  const ok = got.length === expect.length && crypto.timingSafeEqual(got, expect);
+  if (!ok) { res.writeHead(401).end('unauthorized'); return; }
   if (!req.url.startsWith('/v1/')) { res.writeHead(404).end('not found'); return; }
   const chunks = [];
   req.on('data', (c) => chunks.push(c));

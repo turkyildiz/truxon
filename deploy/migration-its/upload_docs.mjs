@@ -1,5 +1,5 @@
 // Phase 2: upload transferred ITS files into Truxon storage + documents table.
-// Usage: node upload_docs.mjs <admin_email> <admin_password>
+// Usage: ADMIN_EMAIL=… ADMIN_PASSWORD=… node upload_docs.mjs
 // Reads files/<itsEditId>/<fileId>__<name> and load_id_map.json.
 import { createClient } from '@supabase/supabase-js'
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
@@ -11,7 +11,8 @@ const env = Object.fromEntries(
     .split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]),
 )
 const sb = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
-const [email, password] = process.argv.slice(2)
+// creds from env only (review M-6): argv lands in shell history + ps -ef
+const email = process.env.ADMIN_EMAIL, password = process.env.ADMIN_PASSWORD
 const { error: loginErr } = await sb.auth.signInWithPassword({ email, password })
 if (loginErr) { console.error('login failed:', loginErr.message); process.exit(1) }
 const { data: userData } = await sb.auth.getUser()

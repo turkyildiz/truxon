@@ -1,5 +1,5 @@
 // Backfill load_stops for migrated ITS loads (full itinerary, incl. the
-// 123 multi-stop loads). Usage: node backfill_stops.mjs <email> <password> <migration_dir>
+// 123 multi-stop loads). Usage: ADMIN_EMAIL=… ADMIN_PASSWORD=… node backfill_stops.mjs <migration_dir>
 import { createClient } from '@supabase/supabase-js'
 import { readFileSync } from 'node:fs'
 
@@ -8,7 +8,9 @@ const env = Object.fromEntries(
     .split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]),
 )
 const sb = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
-const [email, password, dir] = process.argv.slice(2)
+// creds from env only (review M-6): argv lands in shell history + ps -ef
+const email = process.env.ADMIN_EMAIL, password = process.env.ADMIN_PASSWORD
+const [dir] = process.argv.slice(2)
 const { error: loginErr } = await sb.auth.signInWithPassword({ email, password })
 if (loginErr) { console.error('login failed:', loginErr.message); process.exit(1) }
 

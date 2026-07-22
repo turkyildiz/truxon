@@ -95,8 +95,21 @@ def post_rows(rows):
 def main():
     state = json.load(open(STATE_PATH)) if os.path.exists(STATE_PATH) else {'done': []}
     done = set(state.get('done', []))
+    # Host-key pinning (review M-5): encrypted-but-unauthenticated SFTP lets a
+    # MITM harvest the password and feed forged toll CSVs into the financials.
+    # PREPASS_HOSTKEY (tolls.env) = "<type> <base64>" from ssh-keyscan; we fail
+    # closed on absence or mismatch.
+    pin = ENV.get('PREPASS_HOSTKEY', '').strip()
+    if not pin:
+        raise SystemExit('PREPASS_HOSTKEY missing from tolls.env — refusing unauthenticated SFTP')
+    pin_type, pin_b64 = pin.split()[:2]
     t = paramiko.Transport((SFTP['host'], SFTP['port']))
-    t.connect(username=SFTP['user'], password=SFTP['pass'])
+    t.start_client(timeout=30)
+    got = t.get_remote_server_key()
+    if got.get_name() != pin_type or got.get_base64() != pin_b64:
+        t.close()
+        raise SystemExit(f'PrePass host key MISMATCH ({got.get_name()}) — possible MITM, aborting')
+    t.auth_password(username=SFTP['user'], password=SFTP['pass'])
     s = paramiko.SFTPClient.from_transport(t)
     files = [f for f in s.listdir('.') if f.lower().endswith('.csv')]
     new = [f for f in files if f not in done]

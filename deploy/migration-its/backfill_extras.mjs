@@ -1,6 +1,6 @@
 // Backfill driver phone/email/notes and truck/trailer plates from the ITS
 // exports AFTER migration 20260716180001_migration_fields.sql is applied.
-// Usage: node backfill_extras.mjs <admin_email> <admin_password> <xlsx_dir>
+// Usage: ADMIN_EMAIL=… ADMIN_PASSWORD=… node backfill_extras.mjs <xlsx_dir>
 import { createClient } from '@supabase/supabase-js'
 import { readFileSync } from 'node:fs'
 import XLSX from 'xlsx'
@@ -10,7 +10,9 @@ const env = Object.fromEntries(
     .split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]),
 )
 const sb = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
-const [email, password, dir] = process.argv.slice(2)
+// creds from env only (review M-6): argv lands in shell history + ps -ef
+const email = process.env.ADMIN_EMAIL, password = process.env.ADMIN_PASSWORD
+const [dir] = process.argv.slice(2)
 const { error: loginErr } = await sb.auth.signInWithPassword({ email, password })
 if (loginErr) { console.error('login failed:', loginErr.message); process.exit(1) }
 
