@@ -82,6 +82,43 @@ export function requireCron(req: Request): boolean {
   return true
 }
 
+/** Mint an RLS-scoped session for `email` (magiclink generate+verify, no email
+ * actually sent). Lets background jobs write AS a real user instead of the
+ * RLS-bypassing service role, so row policies stay the authority even when the
+ * data being written was chosen by untrusted document text (review LOW). */
+export async function mintUserSession(
+  svc: SupabaseClient, email: string,
+): Promise<{ client: SupabaseClient; userId: string } | null> {
+  const { data: link, error } = await svc.auth.admin.generateLink({ type: 'magiclink', email })
+  if (error || !link?.properties?.hashed_token) return null
+  const url = Deno.env.get('SUPABASE_URL')!
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+  const anon = createClient(url, anonKey)
+  const { data: sess, error: vErr } = await anon.auth.verifyOtp({
+    type: 'magiclink', token_hash: link.properties.hashed_token,
+  })
+  if (vErr || !sess.session) return null
+  const client = createClient(url, anonKey, {
+    global: { headers: { Authorization: `Bearer ${sess.session.access_token}` } },
+  })
+  return { client, userId: sess.session.user.id }
+}
+
+/** Mint a session for the first active admin — for jobs with no human sender
+ * (mailbox miners, sentinels) that still must not write RLS-bypassed. */
+export async function mintAdminSession(
+  svc: SupabaseClient,
+): Promise<{ client: SupabaseClient; userId: string } | null> {
+  const { data: profs } = await svc.from('profiles')
+    .select('id').eq('role', 'admin').eq('is_active', true).limit(10)
+  if (!profs?.length) return null
+  const ids = new Set((profs as { id: string }[]).map((p) => p.id))
+  const users = await listAllAuthUsers(svc)
+  const admin = users.find((u) => ids.has(u.id) && u.email)
+  if (!admin?.email) return null
+  return mintUserSession(svc, admin.email)
+}
+
 /** Enumerate ALL auth users, paginating to exhaustion. `listUsers` returns only
  * one page (default 50, cap 1000), so a bare find/lookup silently misses anyone
  * past the cap once the roster grows (review LOW). 50-page backstop = 50k users. */

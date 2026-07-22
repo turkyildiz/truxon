@@ -116,47 +116,55 @@ export async function extractEquipmentFields(
 
 export interface MatchedEntity { entity_type: string; entity_id: number; label: string }
 
-/** Resolve a classification's entity_ref to a real record. null if no match. */
-export async function matchEntity(svc: Sb, kind: string, ref: string | null): Promise<MatchedEntity | null> {
+/** Resolve a classification's entity_ref to a real record. null if no match.
+ * `db` should be an RLS-scoped session client (the acting user / a minted
+ * admin), NOT the service role — the ref came from untrusted document text, so
+ * row policies must stay the authority on what it can see (review LOW). */
+export async function matchEntity(db: Sb, kind: string, ref: string | null): Promise<MatchedEntity | null> {
   const r = (ref ?? '').trim()
   if (!r || kind === 'unknown') return null
   if (kind === 'truck' || kind === 'trailer') {
     const table = kind === 'truck' ? 'trucks' : 'trailers'
-    const { data } = await svc.from(table).select('id, unit_number')
+    const { data } = await db.from(table).select('id, unit_number')
     const want = digits(r)
     const hit = (data ?? []).find((x: { unit_number: string }) => digits(x.unit_number) === want || x.unit_number === r)
     return hit ? { entity_type: kind, entity_id: hit.id, label: `${kind === 'truck' ? 'Truck' : 'Trailer'} #${hit.unit_number}` } : null
   }
   if (kind === 'driver') {
-    const { data } = await svc.from('drivers').select('id, full_name')
+    const { data } = await db.from('drivers').select('id, full_name')
     const hit = (data ?? []).find((d: { full_name: string }) => norm(d.full_name) === norm(r)) ??
                 (data ?? []).find((d: { full_name: string }) => norm(d.full_name).includes(norm(r)) && norm(r).length > 4)
     return hit ? { entity_type: 'driver', entity_id: hit.id, label: hit.full_name } : null
   }
   if (kind === 'customer') {
-    const { data } = await svc.from('customers').select('id, company_name').ilike('company_name', `%${r}%`).limit(1)
+    const { data } = await db.from('customers').select('id, company_name').ilike('company_name', `%${r}%`).limit(1)
     return data?.[0] ? { entity_type: 'customer', entity_id: data[0].id, label: data[0].company_name } : null
   }
   if (kind === 'load') {
-    const { data } = await svc.from('loads').select('id, load_number').or(`load_number.eq.${r},reference_number.eq.${r}`).limit(1)
+    const { data } = await db.from('loads').select('id, load_number').or(`load_number.eq.${r},reference_number.eq.${r}`).limit(1)
     return data?.[0] ? { entity_type: 'load', entity_id: data[0].id, label: `Load ${data[0].load_number}` } : null
   }
   return null
 }
 
-/** Upload the original file to storage and record it under the entity. */
+/** Upload the original file to storage and record it under the entity.
+ * Split clients (review LOW): `storage` may be the service role (bucket paths
+ * are computed here, not by the document), but the `documents` row — whose
+ * entity/type were chosen by untrusted document text — is inserted through
+ * `db`, an RLS-scoped session, so documents_insert (office role + uploaded_by
+ * = auth.uid()) is enforced. A rejected insert removes the uploaded object. */
 export async function fileDocument(
-  svc: Sb, e: MatchedEntity, att: Attachment, docType: string, uploadedBy: string | null,
+  storage: Sb, db: Sb, e: MatchedEntity, att: Attachment, docType: string, uploadedBy: string | null,
 ): Promise<{ ok: boolean; error?: string; documentId?: number }> {
   const safe = att.name.replace(/[^A-Za-z0-9._-]/g, '_')
   const path = `${e.entity_type}/${e.entity_id}/${crypto.randomUUID().slice(0, 12)}_${safe}`
-  const up = await svc.storage.from('documents').upload(path, att.bytes, { contentType: att.contentType || 'application/octet-stream' })
+  const up = await storage.storage.from('documents').upload(path, att.bytes, { contentType: att.contentType || 'application/octet-stream' })
   if (up.error) return { ok: false, error: up.error.message }
-  const ins = await svc.from('documents').insert({
+  const ins = await db.from('documents').insert({
     entity_type: e.entity_type, entity_id: e.entity_id, doc_type: docType,
     filename: att.name, storage_path: path, content_type: att.contentType || 'application/octet-stream',
     size_bytes: att.bytes.length, uploaded_by: uploadedBy,
   }).select('id').single()
-  if (ins.error) { await svc.storage.from('documents').remove([path]).catch(() => {}); return { ok: false, error: ins.error.message } }
+  if (ins.error) { await storage.storage.from('documents').remove([path]).catch(() => {}); return { ok: false, error: ins.error.message } }
   return { ok: true, documentId: ins.data?.id }
 }

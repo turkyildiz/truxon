@@ -24,7 +24,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { extractText, getDocumentProxy } from 'npm:unpdf@0.12.1'
-import { getCaller, json, listAllAuthUsers, requireCron, withCors } from '../_shared/auth.ts'
+import { getCaller, json, listAllAuthUsers, mintUserSession, requireCron, withCors } from '../_shared/auth.ts'
 import { graph, graphConfigured, graphToken, TRUX_MAILBOX as MAILBOX } from '../_shared/msgraph.ts'
 import { runTrux, type Sb } from '../_shared/truxcore.ts'
 import { extractWorkOrder } from '../_shared/extract_llm.ts'
@@ -107,20 +107,12 @@ function authHeadersOk(headers: { name: string; value: string }[] | undefined): 
 }
 
 /** Mint a real session for the sender so all agent work runs as them. */
-async function userClientFor(svc: Sb, email: string): Promise<{ client: Sb; userId: string } | null> {
-  const { data: link, error } = await svc.auth.admin.generateLink({ type: 'magiclink', email })
-  if (error || !link?.properties?.hashed_token) return null
-  const anon = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!)
-  const { data: sess, error: vErr } = await anon.auth.verifyOtp({
-    type: 'magiclink',
-    token_hash: link.properties.hashed_token,
-  })
-  if (vErr || !sess.session) return null
-  const client = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: `Bearer ${sess.session.access_token}` } },
-  })
-  return { client, userId: sess.session.user.id }
-}
+// Session minting moved to the shared mintUserSession (same magiclink
+// generate+verify flow) so trux-inbox/dispatch-watch share one copy. Loosely
+// typed here exactly like the old local helper — this file's queries predate
+// generated types.
+const userClientFor = mintUserSession as unknown as
+  (svc: Sb, email: string) => Promise<{ client: Sb; userId: string } | null>
 
 async function pdfText(b64: string): Promise<string> {
   const bin = atob(b64)
@@ -439,9 +431,11 @@ Deno.serve(withCors(async (req) => {
         for (const att of docAttachments) {
           const c = await classifyDocument(att, apiKey, textModel, visionModel, context)
           if (!c || c.confidence === 'low' && c.entity_kind === 'unknown') { unreadable.push(att.name); continue }
-          const ent = await matchEntity(svc, c.entity_kind, c.entity_ref)
+          // RLS-scoped: the classification came from the document's own text, so
+          // matching + the documents insert run AS the sender, not service role.
+          const ent = await matchEntity(acting.client, c.entity_kind, c.entity_ref)
           if (!ent) { unmatched.push(`${c.summary || att.name} (${c.entity_kind} "${c.entity_ref ?? '?'}")`); continue }
-          const res = await fileDocument(svc, ent, att, c.doc_type, acting.userId)
+          const res = await fileDocument(svc, acting.client, ent, att, c.doc_type, acting.userId)
           if (!res.ok) { unreadable.push(`${att.name} (${res.error})`); continue }
           filed.push(`${c.doc_type.replace(/_/g, ' ')} → ${ent.label}`)
           // A registration/title on a truck/trailer? Harvest its fields and fill

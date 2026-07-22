@@ -15,7 +15,7 @@
 // box (default dispatch@aidalogistics.com). Dormant until those + Graph access exist.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { json, requireCron, withCors } from '../_shared/auth.ts'
+import { json, mintAdminSession, requireCron, withCors } from '../_shared/auth.ts'
 import { graph, graphToken } from '../_shared/msgraph.ts'
 import { callTextLlm, parseFields, sliceText } from '../_shared/extract_llm.ts'
 
@@ -69,6 +69,12 @@ Deno.serve(withCors(async (req) => {
   // every action lands in the shadow ledger (unreviewed) as an audit trail.
   if (body.mode === 'mine') {
     const stats = { loads_checked: 0, docs_filed: 0, customers_filled: 0, fields_filled: 0, deadline_hit: false, skipped: [] as string[] }
+    // The docs being filed were chosen by untrusted email content, so the
+    // documents rows are written through an RLS-scoped minted admin session,
+    // never the raw service role (review LOW). No session → no filing this
+    // pass (fail closed); the 2h cron retries.
+    const actingAdmin = await mintAdminSession(svc)
+    if (!actingAdmin) stats.skipped.push('mint_admin_session failed — document filing skipped this pass')
     // Return before the 150s gateway idle timeout; the 2h cron resumes where
     // this run left off (documents + ledger dedup make every pass incremental).
     const t0 = Date.now()
@@ -119,8 +125,9 @@ Deno.serve(withCors(async (req) => {
               } catch { /* unclassifiable → skip */ }
             }
             if (!docType) continue
+            if (!actingAdmin) continue // fail closed: no RLS session, no filing
             // already have this doc type on the load? (pod query only excludes pod-family)
-            const { data: existing } = await svc.from('documents').select('id')
+            const { data: existing } = await actingAdmin.client.from('documents').select('id')
               .eq('entity_type', 'load').eq('entity_id', l.load_id).eq('doc_type', docType).limit(1)
             if (existing?.length) continue
 
@@ -131,9 +138,12 @@ Deno.serve(withCors(async (req) => {
             const path = `load/${l.load_id}/${crypto.randomUUID().slice(0, 12)}_${safeName}`
             const up = await svc.storage.from('documents').upload(path, bytes, { contentType: ct || 'application/pdf' })
             if (up.error) { stats.skipped.push(`upload ${name}: ${up.error.message}`); continue }
-            const ins = await svc.from('documents').insert({
+            // Insert AS the minted admin — documents_insert RLS (office role +
+            // uploaded_by = auth.uid()) is the authority, not the service key.
+            const ins = await actingAdmin.client.from('documents').insert({
               entity_type: 'load', entity_id: l.load_id, doc_type: docType, filename: name,
               storage_path: path, content_type: ct || 'application/pdf', size_bytes: bytes.length,
+              uploaded_by: actingAdmin.userId,
             })
             if (ins.error) { await svc.storage.from('documents').remove([path]); stats.skipped.push(`insert ${name}: ${ins.error.message}`); continue }
             filedForLoad++; stats.docs_filed++
