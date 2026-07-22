@@ -17,7 +17,7 @@
 - [One-app radio](one-app-radio.md) — PTT over Supabase Realtime replaces Mumla+Tailscale; Forest answers on air; field smoke test gates side-app removal
 - [Android emulator](android-emulator.md) — headless Pixel-Tablet AVD on dev box; verify ALL tablet UI visually before publishing (standard loop since 2026-07-21)
 - [Northstar project](northstar-project.md) — Truxon PREDICTIVE (Level 5); forecasts #1/#2/#3/#5 live, playbook 171/1000, not_captured down to harsh-braking + driver NPS; #4 breakdown ML awaits data
-- [ELD DriveHOS API](eld-drivehos.md) — telematics feed (GPS/odometer/engine-hrs/HOS) for Northstar; needs Aida's company key to unblock
+- [ELD DriveHOS API](eld-drivehos.md) — telematics feed (GPS/odometer/engine-hrs/HOS) for Northstar; **LIVE** (both keys set, eld-sync running, 138K+ location rows); #4 breakdown-ML just needs data-accumulation time
 - [Geocoding](geocoding.md) — load stops → lat/lon+state for lane rate history; LIVE, all ~975 loads backfilled; unblocks detention detection next
 - [PrePass tolls](tolls-prepass.md) — toll CSVs via SFTP → NAS importer → toll_transactions; LIVE (42 tolls first pull); daily 05:30 cron
 - [GPU box: Lynx](gpu-box.md) — RTX 5060 Ti (8 GB) desktop **Lynx**, LIVE 2026-07-22: driver 595 + Ollama (7B models) tailnet-only; `ssh lynx` (root@100.110.143.84); separate from ikedev laptop

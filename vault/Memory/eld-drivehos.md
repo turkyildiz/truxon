@@ -1,6 +1,6 @@
 ---
 name: eld-drivehos
-description: "DriveHOS ELD partner API — telematics feed for Northstar (GPS, odometer, engine hours, HOS); blocked on the company key"
+description: "DriveHOS ELD partner API — telematics feed for Northstar (GPS, odometer, engine hours, HOS). LIVE: eld-sync running, 138K+ location rows, both keys set."
 metadata: 
   node_type: memory
   type: reference
