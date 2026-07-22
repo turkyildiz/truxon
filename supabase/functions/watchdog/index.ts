@@ -141,6 +141,15 @@ async function runChecks(svc: Svc): Promise<CheckResult[]> {
       detail: p.gpu_box_last_seen ? `last Lynx heartbeat ${p.gpu_box_last_seen}` : 'no Lynx heartbeat yet',
       severity: 'warn',
     })
+    // Sentinel scans must LAND (findings' last_seen moves every 15-min scan).
+    // pg_cron "succeeded" only means the HTTP call was queued — the 07-22
+    // incident ran 20.5h dark that way (GoTrue canary 500 → no acting admin).
+    results.push({
+      name: 'sentinel_fresh',
+      ok: p.sentinel_stale !== true,
+      detail: p.sentinel_last_scan ? `findings last refreshed ${p.sentinel_last_scan}` : 'no findings yet',
+      severity: 'critical',
+    })
   } catch (e) {
     results.push({ name: 'db_probes', ok: false, detail: `probe RPC failed: ${e instanceof Error ? e.message : e}` })
   }

@@ -25,6 +25,8 @@ interface DenimObligation {
 }
 interface DenimJob {
   id?: string | number
+  uuid?: string
+  job_id?: string | number
   reference_number?: string | null
   status?: string
   created_at?: string
@@ -68,7 +70,7 @@ Deno.serve(withCors(async (req) => {
   }
 
   // ── pull (default): jobs -> match -> factored metadata ──
-  const stats = { pages: 0, jobs: 0, matched: 0, updated: 0, fees_set: 0, unmatched: [] as string[] }
+  const stats = { pages: 0, jobs: 0, matched: 0, updated: 0, fees_set: 0, unmatched: [] as string[], job_keys: [] as string[] }
   const maxPages = Math.min(Number(body.pages) || 5, 20)
   const t0 = Date.now()
 
@@ -93,6 +95,7 @@ Deno.serve(withCors(async (req) => {
     const payload = await r.json() as Record<string, unknown>
     const jobs = (payload.data ?? payload.jobs ?? payload.results ?? payload) as DenimJob[]
     if (!Array.isArray(jobs) || jobs.length === 0) break
+    if (!stats.job_keys.length && jobs[0]) stats.job_keys = Object.keys(jobs[0] as Record<string, unknown>)
     stats.pages++
 
     for (const j of jobs) {
@@ -113,7 +116,10 @@ Deno.serve(withCors(async (req) => {
         .reduce((s, o) => s + (Number(o.total_amount) || 0), 0)
       const fee = feeCents > 0 ? Math.round(feeCents) / 100 : null
 
-      const patch: Record<string, unknown> = { denim_job_id: String(j.id ?? ''), factor_name: 'Denim' }
+      // live pull showed 350 matches but denim_job_id stayed '' — the payload
+      // doesn't use `id`; accept the known aliases before giving up
+      const jobId = j.id ?? j.uuid ?? j.job_id ?? ''
+      const patch: Record<string, unknown> = { denim_job_id: String(jobId), factor_name: 'Denim' }
       if (!inv.factored_at) patch.factored_at = j.created_at ?? new Date().toISOString()
       if (fee != null && Number(inv.factoring_fee ?? 0) !== fee) { patch.factoring_fee = fee; stats.fees_set++ }
       const { error } = await svc.from('invoices').update(patch).eq('id', inv.id)
