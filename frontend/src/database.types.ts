@@ -1559,6 +1559,27 @@ export type Database = {
           },
         ]
       }
+      ip_rate_limit_events: {
+        Row: {
+          action: string
+          created_at: string
+          id: number
+          ip: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: never
+          ip: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: never
+          ip?: string
+        }
+        Relationships: []
+      }
       llm_budget: {
         Row: {
           id: number
@@ -3741,6 +3762,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      check_ip_rate_limit: {
+        Args: {
+          p_action: string
+          p_ip: string
+          p_max: number
+          p_window?: string
+        }
+        Returns: boolean
+      }
       check_rate_limit: {
         Args: { p_action: string; p_max: number; p_window?: string }
         Returns: boolean
@@ -4486,6 +4516,7 @@ export type Database = {
       security_audit_recent: { Args: { p_limit?: number }; Returns: Json }
       security_audit_verify: { Args: never; Returns: Json }
       security_console: { Args: never; Returns: Json }
+      security_scorecard: { Args: never; Returns: Json }
       segment_economics: {
         Args: { p_end: string; p_start: string }
         Returns: Json

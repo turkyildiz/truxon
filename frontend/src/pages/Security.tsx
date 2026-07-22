@@ -5,7 +5,7 @@ import { useAuth } from '../auth'
 import { Badge, Button, Card, Field, LoadError, Modal, PageHeader, formatDateTime } from '../components/ui'
 import {
   blessSecurityBaseline, mfaEnrollTotp, mfaListFactors, mfaUnenroll, mfaVerifyTotp,
-  securityConsole, setLockdown, type MfaEnrollment, type SecurityConsole,
+  securityConsole, securityScorecard, setLockdown, type MfaEnrollment, type SecurityConsole,
 } from '../data'
 import { errorMessage } from '../supabase'
 
@@ -112,6 +112,8 @@ export default function Security() {
 
       <MfaCard />
 
+      <TechMetricsCard />
+
       {c.open_findings.length > 0 && (
         <Card title={`Open security alerts (${c.open_findings.length})`}>
           <ul className="divide-y divide-line">
@@ -185,6 +187,35 @@ export default function Security() {
         {err && <p className="mt-3 text-sm text-danger">{err}</p>}
       </Modal>
     </div>
+  )
+}
+
+/** The computed Technology/security playbook metrics (MFA %, incidents, POD OCR
+ * success…) — the same numbers that now answer the C-suite playbook. */
+function TechMetricsCard() {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['security-scorecard'],
+    queryFn: securityScorecard,
+    refetchInterval: 300_000,
+  })
+  if (isLoading) return null
+  if (error) return <Card title="Security metrics"><LoadError error={error} onRetry={refetch} /></Card>
+  const s = data!
+  const pct = (v: number | null) => (v == null ? '—' : `${v}%`)
+  const tiles: [string, string, boolean, boolean][] = [
+    ['MFA coverage', `${pct(s.mfa_coverage_pct)}`, (s.mfa_coverage_pct ?? 0) > 0, false],
+    ['Open critical security', String(s.open_critical_security), s.open_critical_security === 0, s.open_critical_security > 0],
+    ['Cyber incidents (30d)', String(s.cyber_incidents_30d), s.cyber_incidents_30d === 0, false],
+    ['Honeypot hits (30d)', String(s.honeypot_hits_30d), s.honeypot_hits_30d === 0, s.honeypot_hits_30d > 0],
+    ['Data recon exceptions (7d)', String(s.data_recon_exceptions_7d), s.data_recon_exceptions_7d === 0, false],
+    ['POD OCR success', pct(s.pod_ocr_success_pct), (s.pod_ocr_success_pct ?? 0) >= 90, false],
+  ]
+  return (
+    <Card title="Security metrics" actions={<span className="text-xs text-muted">feeds the C-suite playbook</span>}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {tiles.map(([l, v, ok, warn]) => <Stat key={l} label={l} value={v} ok={ok} warn={warn} />)}
+      </div>
+    </Card>
   )
 }
 

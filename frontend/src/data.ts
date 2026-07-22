@@ -2218,6 +2218,25 @@ export async function blessSecurityBaseline(): Promise<{ newly_added: number; re
   return unwrap(await supabase.rpc('bless_security_baseline')) as unknown as { newly_added: number; removed: number }
 }
 
+export interface SecurityScorecard {
+  mfa_coverage_pct: number | null
+  mfa_enrolled_users: number
+  office_users: number
+  cyber_incidents_30d: number
+  honeypot_hits_30d: number
+  open_critical_security: number
+  data_recon_exceptions_7d: number
+  pod_ocr_success_pct: number | null
+  audit_chain_intact: boolean
+  ransomware_guard_armed: boolean
+  as_of: string
+}
+
+/** Computed Technology/security playbook metrics (MFA %, incidents, POD OCR…). */
+export async function securityScorecard(): Promise<SecurityScorecard> {
+  return unwrap(await supabase.rpc('security_scorecard')) as unknown as SecurityScorecard
+}
+
 // ---------- MFA / TOTP (dark-launch: opt-in, not yet enforced at login) ----------
 
 export interface MfaFactor {
