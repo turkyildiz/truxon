@@ -3,7 +3,7 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Button, Card, Field, Input, money, Select, Textarea } from '../components/ui'
-import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, estimateLoadMargin, extractPdf, fleetCostBasis, laneRateForRoute, type ExtractedStop } from '../data'
+import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, eldFleetLive, estimateLoadMargin, extractPdf, fleetCostBasis, laneRateForRoute, type EldFleetRow, type ExtractedStop } from '../data'
 import { errorMessage } from '../supabase'
 import { ReferenceDataBanner, useReferenceData } from '../useReferenceData'
 import FleetMap from './FleetMap'
@@ -26,6 +26,14 @@ const EMPTY_STOPS: StopForm[] = [emptyStop('pickup'), emptyStop('delivery')]
 
 const stopLine = (s: StopForm) => [s.facility, s.address].filter(Boolean).join(', ')
 
+/** "9h 40m" from HOS seconds remaining; null-safe. */
+function hosLeft(sec: number | null | undefined): string | null {
+  if (sec == null) return null
+  const h = Math.floor(sec / 3600)
+  const m = Math.round((sec % 3600) / 60)
+  return `${h}h ${String(m).padStart(2, '0')}m`
+}
+
 /** Route order: pickups in sequence, then deliveries in sequence. */
 function routeOf(stops: StopForm[]): { origin: string; destination: string; waypoints: string[] } {
   const ordered = [...stops.filter((s) => s.stop_type === 'pickup'), ...stops.filter((s) => s.stop_type === 'delivery')].filter(stopLine)
@@ -46,6 +54,16 @@ export default function Dispatch() {
   const [pendingCustomer, setPendingCustomer] = useState<string | null>(null)
 
   const { customers, drivers, trucks, trailers, isError: refError, retry: retryRef } = useReferenceData()
+
+  // Live HOS + position so the assignment picker knows who actually has hours
+  // (refreshes with the 15-min ELD sync; stale-while-revalidate is fine here).
+  const fleetQ = useQuery({ queryKey: ['eld-fleet-live'], queryFn: eldFleetLive, staleTime: 60_000, retry: false })
+  const hosByDriver = new Map<number, EldFleetRow>()
+  const liveByTruck = new Map<number, EldFleetRow>()
+  for (const v of fleetQ.data ?? []) {
+    if (v.driver_id != null && !hosByDriver.has(v.driver_id)) hosByDriver.set(v.driver_id, v)
+    if (v.truck_id != null && !liveByTruck.has(v.truck_id)) liveByTruck.set(v.truck_id, v)
+  }
 
   const extract = useMutation({
     mutationFn: async (file: File) => {
@@ -388,22 +406,44 @@ export default function Dispatch() {
             <Field label="Driver">
               <Select value={form.driver_id} onChange={(e) => setForm({ ...form, driver_id: e.target.value })}>
                 <option value="">Assign later</option>
-                {drivers.filter((d) => d.status === 'active').map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.full_name}
-                  </option>
-                ))}
+                {drivers.filter((d) => d.status === 'active').map((d) => {
+                  const live = hosByDriver.get(d.id)
+                  const left = hosLeft(live?.hos_drive_sec)
+                  return (
+                    <option key={d.id} value={d.id}>
+                      {d.full_name}
+                      {left ? ` — ${left} drive left${live?.duty_status === 'DS_D' ? ' (driving now)' : ''}` : ''}
+                    </option>
+                  )
+                })}
               </Select>
+              {form.driver_id && (() => {
+                const live = hosByDriver.get(Number(form.driver_id))
+                if (!live) return null
+                const drive = hosLeft(live.hos_drive_sec)
+                const lowHours = (live.hos_drive_sec ?? Infinity) < 2 * 3600
+                return (
+                  <p className={`mt-1 text-xs ${lowHours ? 'text-amber-600 dark:text-amber-400' : 'text-muted'}`}>
+                    {lowHours ? '⚠ ' : ''}HOS: {drive ?? '—'} drive · shift {hosLeft(live.hos_shift_sec) ?? '—'} · cycle{' '}
+                    {hosLeft(live.hos_cycle_sec) ?? '—'}
+                    {live.location ? ` · truck ${live.unit ?? '?'} near ${live.location}` : ''}
+                  </p>
+                )
+              })()}
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Truck">
                 <Select value={form.truck_id} onChange={(e) => setForm({ ...form, truck_id: e.target.value })}>
                   <option value="">—</option>
-                  {trucks.filter((t) => t.status === 'available' || String(t.id) === form.truck_id).map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.unit_number}
-                    </option>
-                  ))}
+                  {trucks.filter((t) => t.status === 'available' || String(t.id) === form.truck_id).map((t) => {
+                    const live = liveByTruck.get(t.id)
+                    return (
+                      <option key={t.id} value={t.id}>
+                        {t.unit_number}
+                        {live?.location ? ` — ${live.location}` : ''}
+                      </option>
+                    )
+                  })}
                 </Select>
               </Field>
               <Field label="Trailer">

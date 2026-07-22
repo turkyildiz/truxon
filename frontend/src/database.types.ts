@@ -4008,6 +4008,15 @@ export type Database = {
         }[]
       }
       eld_fleet_live: { Args: never; Returns: Json }
+      eld_fleet_mpg: {
+        Args: { p_end: string; p_start: string }
+        Returns: {
+          eld_miles: number
+          gallons_tracked: number
+          mpg: number
+        }[]
+      }
+      eld_link_drivers: { Args: never; Returns: number }
       eld_link_vehicles: { Args: never; Returns: number }
       enqueue_doc_search: {
         Args: { p_entity_type?: string; p_query: string }
@@ -4622,6 +4631,7 @@ export type Database = {
           total: number
         }[]
       }
+      speeding_summary: { Args: { p_days?: number }; Returns: Json }
       stop_dwell_summary: {
         Args: { p_days?: number; p_radius_mi?: number }
         Returns: Json

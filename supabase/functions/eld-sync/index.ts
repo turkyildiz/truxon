@@ -122,6 +122,7 @@ Deno.serve(withCors(async (req) => {
       })), { onConflict: 'driver_id' })
     }
     await svc.rpc('eld_link_vehicles')
+    await svc.rpc('eld_link_drivers')
 
     // ── history sweep (nightly; end_days_ago windows a backfill without
     //    tripping the per-vehicle page guard) ──

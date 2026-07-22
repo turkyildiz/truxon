@@ -1749,6 +1749,7 @@ export interface EldFleetRow {
   location: string | null
   ts: string | null
   driver_name: string | null
+  driver_id: number | null
   hos_drive_sec: number | null
   hos_shift_sec: number | null
   hos_cycle_sec: number | null
