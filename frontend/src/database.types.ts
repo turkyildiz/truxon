@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   public: {
     Tables: {
       activity_log: {
@@ -3873,6 +3868,18 @@ export type Database = {
       }
       customer_profile: { Args: { p_customer_id: number }; Returns: Json }
       customer_rate_profile: { Args: { p_customer_id: number }; Returns: Json }
+      customer_revenue_extras: { Args: { p_days?: number }; Returns: Json }
+      customers_over_exposure: {
+        Args: never
+        Returns: {
+          avg_days_to_pay: number
+          company_name: string
+          credit_limit: number
+          customer_id: number
+          exposure: number
+          over_by: number
+        }[]
+      }
       dashboard_summary: { Args: never; Returns: Json }
       decide_accessorial: {
         Args: { p_approve: boolean; p_id: number }
@@ -4024,6 +4031,7 @@ export type Database = {
         }[]
       }
       factoring_overview: { Args: never; Returns: Json }
+      finance_extras: { Args: never; Returns: Json }
       fleet_cost_basis: { Args: never; Returns: Json }
       fleet_odometers: {
         Args: never
@@ -4367,6 +4375,7 @@ export type Database = {
         }[]
       }
       normalize_company_name: { Args: { p: string }; Returns: string }
+      ops_service_metrics: { Args: { p_days?: number }; Returns: Json }
       parking_in_bbox: {
         Args: {
           p_max_lat: number
@@ -4649,6 +4658,7 @@ export type Database = {
           violations: number
         }[]
       }
+      truck_mpg: { Args: { p_days?: number }; Returns: Json }
       trux_first_monday: { Args: { p_year: number }; Returns: string }
       trux_insights_feed: {
         Args: { p_include_resolved?: boolean }
@@ -4926,6 +4936,101 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      iceberg_namespaces: {
+        Row: {
+          bucket_name: string
+          catalog_id: string
+          created_at: string
+          id: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          bucket_name: string
+          catalog_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          bucket_name?: string
+          catalog_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iceberg_namespaces_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "buckets_analytics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      iceberg_tables: {
+        Row: {
+          bucket_name: string
+          catalog_id: string
+          created_at: string
+          id: string
+          location: string
+          name: string
+          namespace_id: string
+          remote_table_id: string | null
+          shard_id: string | null
+          shard_key: string | null
+          updated_at: string
+        }
+        Insert: {
+          bucket_name: string
+          catalog_id: string
+          created_at?: string
+          id?: string
+          location: string
+          name: string
+          namespace_id: string
+          remote_table_id?: string | null
+          shard_id?: string | null
+          shard_key?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bucket_name?: string
+          catalog_id?: string
+          created_at?: string
+          id?: string
+          location?: string
+          name?: string
+          namespace_id?: string
+          remote_table_id?: string | null
+          shard_id?: string | null
+          shard_key?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iceberg_tables_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "buckets_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iceberg_tables_namespace_id_fkey"
+            columns: ["namespace_id"]
+            isOneToOne: false
+            referencedRelation: "iceberg_namespaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       migrations: {
         Row: {
@@ -5447,3 +5552,4 @@ export const Constants = {
     },
   },
 } as const
+

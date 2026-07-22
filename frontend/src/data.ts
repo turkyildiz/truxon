@@ -1171,6 +1171,31 @@ export async function fuelByTruck(start: string, end: string): Promise<FuelByTru
   return (data as unknown as FuelByTruckRow[]) ?? []
 }
 
+export interface TruckMpgRow {
+  truck_id: number
+  unit_number: string
+  eld_miles: number
+  days_tracked: number | null
+  gallons: number
+  gallons_tracked: number
+  fuel_cost: number
+  mpg: number | null
+  fuel_cost_per_mile: number | null
+}
+export interface TruckMpgSummary {
+  window_days: number
+  since: string
+  fleet: { eld_miles: number; gallons: number; gallons_tracked: number; fuel_cost: number; mpg: number | null; fuel_cost_per_mile: number | null }
+  trucks: TruckMpgRow[]
+  weekly: { week_start: string; miles: number; gallons: number; mpg: number | null }[]
+  basis: string
+}
+
+/** Real MPG: ELD actual miles ÷ diesel gallons, per truck + fleet + weekly. */
+export async function truckMpg(days = 30): Promise<TruckMpgSummary> {
+  return unwrap(await supabase.rpc('truck_mpg', { p_days: days })) as unknown as TruckMpgSummary
+}
+
 /** IFTA rollup per jurisdiction over the range. */
 export async function fuelIftaSummary(start: string, end: string): Promise<FuelIftaRow[]> {
   const data = unwrap(await supabase.rpc('fuel_ifta_summary', { p_start: start, p_end: end }))

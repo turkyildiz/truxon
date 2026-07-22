@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useRef, useState } from 'react'
 import { Badge, Button, Card, compareValues, Field, formatDateTime, Input, LoadError, money, StatCard, type SortState, Table, toggleSort } from '../components/ui'
 import { useAuth } from '../auth'
-import { fuelByTruck, fuelIftaSummary, iftaQuarter, importFuelCsv, listFuelTransactions } from '../data'
+import { fuelByTruck, fuelIftaSummary, iftaQuarter, importFuelCsv, listFuelTransactions, truckMpg } from '../data'
 import { errorMessage } from '../supabase'
 import type { FuelImportResult } from '../types'
 
@@ -22,6 +22,67 @@ function quarterLabel(offset = 0): string {
   let y = d.getFullYear()
   while (q < 1) { q += 4; y -= 1 }
   return `${y}-Q${q}`
+}
+
+/** Real MPG: ELD actual miles ÷ diesel gallons — per truck, fleet, weekly trend. */
+function MpgCard() {
+  const [days, setDays] = useState(30)
+  const q = useQuery({ queryKey: ['fuel', 'mpg', days], queryFn: () => truckMpg(days), retry: false })
+  if (q.isError) return null
+  const d = q.data
+  return (
+    <Card title="⚙️ Real MPG (ELD miles ÷ diesel gallons)">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs text-muted">
+          Miles are actual GPS-banked driving (loaded + deadhead). Fuel only counts toward MPG on days the truck's ELD reported — a dead ELD can't fake a ratio. Per-truck MPG hidden under 30 tracked gal.
+        </span>
+        <div className="flex gap-1">
+          {[14, 30, 90].map((n) => (
+            <button
+              key={n}
+              onClick={() => setDays(n)}
+              className={`rounded-lg px-2 py-1 text-xs font-medium ${days === n ? 'bg-surface text-body shadow' : 'text-muted hover:text-body'}`}
+            >
+              {n}d
+            </button>
+          ))}
+        </div>
+      </div>
+      {q.isLoading ? (
+        <p className="py-8 text-center text-muted">Loading…</p>
+      ) : !d || d.trucks.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted">No ELD miles + fuel overlap in this window yet.</p>
+      ) : (
+        <>
+          <div className="mb-3 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatCard label="Fleet MPG" value={d.fleet.mpg != null ? d.fleet.mpg.toFixed(2) : '—'} icon="⚙️" color="green" />
+            <StatCard label="ELD Miles" value={Math.round(d.fleet.eld_miles).toLocaleString()} icon="🛣️" color="blue" />
+            <StatCard label="Diesel Gallons" value={Math.round(d.fleet.gallons).toLocaleString()} icon="🛢️" color="amber" />
+            <StatCard label="Fuel $/Mile" value={d.fleet.fuel_cost_per_mile != null ? `$${Number(d.fleet.fuel_cost_per_mile).toFixed(3)}` : '—'} icon="💸" color="purple" />
+          </div>
+          <Table headers={['Unit', 'ELD miles', 'Days tracked', 'Gallons', 'Tracked gal', 'MPG', 'Fuel $/mi']}>
+            {d.trucks.map((t) => (
+              <tr key={t.truck_id} className="hover:bg-surface-2">
+                <td className="px-3 py-2.5 font-medium">{t.unit_number}</td>
+                <td className="px-3 py-2.5">{Math.round(Number(t.eld_miles)).toLocaleString()}</td>
+                <td className="px-3 py-2.5 text-muted">{t.days_tracked ?? '—'}</td>
+                <td className="px-3 py-2.5">{Number(t.gallons).toLocaleString(undefined, { maximumFractionDigits: 1 })}</td>
+                <td className="px-3 py-2.5">{Number(t.gallons_tracked).toLocaleString(undefined, { maximumFractionDigits: 1 })}</td>
+                <td className="px-3 py-2.5 font-semibold">{t.mpg != null ? Number(t.mpg).toFixed(2) : '—'}</td>
+                <td className="px-3 py-2.5">{t.fuel_cost_per_mile != null ? `$${Number(t.fuel_cost_per_mile).toFixed(3)}` : '—'}</td>
+              </tr>
+            ))}
+          </Table>
+          {d.weekly.length > 1 && (
+            <p className="mt-2 text-xs text-muted">
+              Weekly fleet MPG:{' '}
+              {d.weekly.map((w) => `${w.week_start.slice(5)} → ${w.mpg != null ? Number(w.mpg).toFixed(1) : '—'}`).join(' · ')}
+            </p>
+          )}
+        </>
+      )}
+    </Card>
+  )
 }
 
 /** The filing view: GPS-attributed MILES per jurisdiction + fuel bought there. */
@@ -220,6 +281,8 @@ export default function Fuel() {
         <StatCard label="Avg $/Gal" value={avgPerGal != null ? `$${avgPerGal.toFixed(3)}` : '—'} icon="📈" color="amber" />
         <StatCard label="Transactions" value={totalTxns.toLocaleString()} icon="🧾" color="purple" />
       </div>
+
+      <MpgCard />
 
       <Card title="Fuel by Truck">
         {byTruckQ.isError ? (

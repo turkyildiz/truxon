@@ -123,11 +123,13 @@ Deno.serve(withCors(async (req) => {
     }
     await svc.rpc('eld_link_vehicles')
 
-    // ── history sweep (nightly) ──
+    // ── history sweep (nightly; end_days_ago windows a backfill without
+    //    tripping the per-vehicle page guard) ──
     if (body.mode === 'history') {
       const days = Number(body.days) || 2
-      const end = new Date()
-      const start = new Date(Date.now() - days * 86400000)
+      const endOff = Number(body.end_days_ago) || 0
+      const end = new Date(Date.now() - endOff * 86400000)
+      const start = new Date(end.getTime() - days * 86400000)
       let inserted = 0
       for (const v of vehicles.filter((x) => x.active)) {
         let token = ''
