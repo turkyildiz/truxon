@@ -22,6 +22,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 class SessionStore {
   static const kAccessToken = 'sb_access_token';
   static const kGpsQueue = 'gps_queue';
+  // Set true by the UI isolate while signing out so the tracking isolate's
+  // onDestroy clears the GPS queue instead of re-persisting the departing
+  // driver's points on top of the wipe (M-2 race).
+  static const kGpsSignout = 'gps_signout';
 
   static const _secure = FlutterSecureStorage();
 

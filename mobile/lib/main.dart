@@ -7,6 +7,7 @@ import 'theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_shell.dart';
 import 'services/alarms.dart';
+import 'services/secure_session.dart';
 import 'services/session_store.dart';
 
 Future<void> main() async {
@@ -32,7 +33,12 @@ Future<void> main() async {
     // Token refreshing is OWNED by AuthRefresher (single shared path with a
     // cross-isolate lock) so the background service can refresh too without
     // ever racing the SDK's rotation. Do not re-enable this.
-    authOptions: const FlutterAuthClientOptions(autoRefreshToken: false),
+    // The session blob (incl. the refresh token) is persisted to the keystore
+    // via SecureLocalStorage, not plaintext prefs (M-3).
+    authOptions: const FlutterAuthClientOptions(
+      autoRefreshToken: false,
+      localStorage: SecureLocalStorage(),
+    ),
   );
 
   // Hand the current access token to the background GPS isolate, and keep it

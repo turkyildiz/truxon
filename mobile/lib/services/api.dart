@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_refresher.dart';
+import 'secure_session.dart';
 import 'diag.dart';
 import 'session_store.dart';
 import 'tracking_service.dart';
@@ -300,9 +301,7 @@ class CompanionApi {
       // Only adopt a LIVE session — recovering an expired one would trigger
       // gotrue's own internal refresh outside the lock.
       try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.reload();
-        final raw = prefs.getString(AuthRefresher.persistKey);
+        final raw = await SecureSession.read(); // keystore-backed now (M-3)
         if (raw != null) {
           final sess = Map<String, dynamic>.from(jsonDecode(raw) as Map);
           final exp = (sess['expires_at'] as num?)?.toInt() ?? 0;
@@ -321,13 +320,30 @@ class CompanionApi {
   /// queues — a returned/shared device must not keep tracking or hold the
   /// previous driver's queued points (security report P0).
   Future<void> signOut() async {
+    // Raise the sign-out flag BEFORE stopping the service so the tracking
+    // isolate's onDestroy sees it and skips re-persisting the queue (M-2).
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(SessionStore.kGpsSignout, true);
+    } catch (_) {}
     try {
       await TruxTrackingService.instance.setTracking(false);
     } catch (_) {/* never block sign-out on the tracker */}
+    // Wait (bounded) for the service to actually stop, so its onDestroy has run
+    // before we do the final wipe — stopService() returning doesn't guarantee
+    // the isolate's teardown write already landed.
+    try {
+      for (var i = 0; i < 20; i++) {
+        if (!await TruxTrackingService.instance.isRunningServiceAsync()) break;
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+    } catch (_) {}
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
       await prefs.remove(SessionStore.kGpsQueue);
       await prefs.remove('status_outbox');
+      await prefs.remove(SessionStore.kGpsSignout);
     } catch (_) {}
     await SessionStore.saveAccessToken(null);
     await _sb.auth.signOut();

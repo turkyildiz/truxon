@@ -143,6 +143,24 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   /// permission prompt if it isn't granted yet; the driver has no way to turn
   /// this off inside the app. `ok` is honest: only a full "Allow all the time"
   /// grant clears the red banner (see TruxTrackingService.setTracking).
+  /// Sign-out wipe: on a shared cab tablet the departing driver must leave
+  /// nothing personal behind. signOut() already kills tracking + the GPS/status
+  /// queues; here we also detach this device's push token (LOW) and clear the
+  /// diagnostic log + radio username that otherwise survive to the next login.
+  Future<void> _signOut() async {
+    _copilot?.stop();
+    _copilot = null;
+    try {
+      await PushService.unregisterCurrent(_api);
+    } catch (_) {/* never block sign-out */}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(Diag.kLog);
+      await prefs.remove(RadioRx.kUser);
+    } catch (_) {}
+    await _api.signOut();
+  }
+
   Future<void> _startTracking() async {
     bool ok = false;
     try {
@@ -260,7 +278,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           actions: [
             IconButton(
               tooltip: tr('signOut'),
-              onPressed: () => _api.signOut(),
+              onPressed: _signOut,
               icon: const Icon(Icons.logout),
             ),
           ],

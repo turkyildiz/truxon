@@ -69,4 +69,17 @@ class PushService {
       });
     });
   }
+
+  /// Detach this device's FCM token from the signing-out driver so a returned
+  /// shared tablet stops receiving their DND-piercing dispatch alarms (LOW).
+  /// The token is device-scoped, so re-fetching it here is safe.
+  static Future<void> unregisterCurrent(CompanionApi api) async {
+    if (!available) return;
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) await api.unregisterPushToken(token);
+    } catch (e) {
+      Diag.log('push: unregister on sign-out failed: $e');
+    }
+  }
 }

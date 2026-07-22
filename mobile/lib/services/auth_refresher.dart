@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config.dart';
 import 'diag.dart';
+import 'secure_session.dart';
 import 'session_store.dart';
 
 /// THE single token refresher — the only code in the app allowed to spend a
@@ -101,7 +102,9 @@ class AuthRefresher {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.reload();
-      final raw = prefs.getString(persistKey);
+      // Session blob (incl. refresh token) lives in the keystore now (M-3);
+      // the lock below still rides prefs (it's a non-secret coordination nonce).
+      final raw = await SecureSession.read();
       if (raw == null || raw.isEmpty) return null; // signed out
       Map<String, dynamic> sess;
       try {
@@ -148,7 +151,7 @@ class AuthRefresher {
         if (res.statusCode == 200) {
           final body = Map<String, dynamic>.from(jsonDecode(res.body) as Map);
           final merged = mergeSession(sess, body, nowSecs);
-          await prefs.setString(persistKey, jsonEncode(merged));
+          await SecureSession.write(jsonEncode(merged));
           final newAccess = merged['access_token'] as String;
           await SessionStore.saveAccessToken(newAccess);
           Diag.log('auth: refreshed (single-path)');

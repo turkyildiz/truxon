@@ -128,6 +128,17 @@ class _TrackingHandler extends TaskHandler {
   @override
   Future<void> onDestroy(DateTime timestamp) async {
     await _radio.dispose();
+    // If the UI isolate is signing out, do NOT re-persist this driver's queue —
+    // that write could land after signOut() wipes it and resurrect the points
+    // under the next driver's JWT (M-2). Clear both keys instead so the wipe is
+    // final regardless of ordering.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    if (prefs.getBool(SessionStore.kGpsSignout) ?? false) {
+      await prefs.remove(SessionStore.kGpsQueue);
+      await prefs.remove(SessionStore.kGpsSignout);
+      return;
+    }
     await _persistQueue();
   }
 
