@@ -73,10 +73,11 @@ async function ollamaVision(images, prompt) {
       messages: [{ role: 'user', content: prompt, images }],
       format: 'json',
       stream: false,
-      // Keep Ollama's default 4096-token window: on the 8 GB card a larger num_ctx
-      // OOMs the vision model's KV cache. RASTER_DPI is tuned (≈150) so a page
-      // image stays under that window. FMCSA verification backstops number reads.
-      options: { temperature: 0 },
+      // 8k context fits on the 8 GB card since Lynx runs Ollama with flash-attention
+      // + q8_0 KV-cache quantization (see deploy/gpu-box) — gives multi-page headroom
+      // without overflowing the window. RASTER_DPI stays 150: at 200 the vision
+      // ENCODER activations (not the KV cache) OOM the card. FMCSA backstops numbers.
+      options: { temperature: 0, num_ctx: 8192 },
     }),
     signal: AbortSignal.timeout(600_000), // GPU is fast, but keep a generous ceiling
   })
