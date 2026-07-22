@@ -102,4 +102,17 @@ if [[ -n "${WATCHDOG_REPORT_KEY:-}" && -n "${SUPABASE_ANON_KEY:-}" ]]; then
     >/dev/null 2>&1 || echo "  (heartbeat ping failed — backup itself is fine)"
 fi
 
+# DR: mirror the (already GPG-encrypted) release-signing bundle offsite to the
+# private "dr-vault" storage bucket, so a dev-box+NAS double loss cannot lose the
+# app signing key (that would force a full fleet re-key). Encrypted at rest.
+if [[ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
+  for f in "$(dirname "$BACKUP_DIR")"/../release-signing/*.gpg /volume1/docker/truxon-backup/release-signing/*.gpg; do
+    [ -f "$f" ] || continue
+    curl -fsS -m 30 -X POST "${SUPABASE_URL}/storage/v1/object/dr-vault/release-signing/$(basename "$f")" \
+      -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+      -H "x-upsert: true" -H "Content-Type: application/octet-stream" --data-binary "@$f" \
+      >/dev/null 2>&1 && echo "  [dr-vault] offsite: $(basename "$f")" || echo "  (dr-vault upload failed for $(basename "$f"))"
+  done
+fi
+
 echo "Backup complete: $BACKUP_DIR (db_${STAMP}, documents_${STAMP})"
