@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
   public: {
     Tables: {
       activity_log: {
@@ -2582,6 +2587,48 @@ export type Database = {
         }
         Relationships: []
       }
+      truck_parking: {
+        Row: {
+          available: string
+          capacity: number | null
+          lat: number
+          lon: number
+          name: string
+          open: boolean | null
+          site_id: string
+          state: string
+          trend: string
+          trust: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          available?: string
+          capacity?: number | null
+          lat: number
+          lon: number
+          name?: string
+          open?: boolean | null
+          site_id: string
+          state: string
+          trend?: string
+          trust?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          available?: string
+          capacity?: number | null
+          lat?: number
+          lon?: number
+          name?: string
+          open?: boolean | null
+          site_id?: string
+          state?: string
+          trend?: string
+          trust?: boolean | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       truck_weekly_features: {
         Row: {
           breakdown_next_4w: boolean | null
@@ -3927,6 +3974,23 @@ export type Database = {
           mpg: number
         }[]
       }
+      fuel_efficiency_by_truck: {
+        Args: { p_days?: number }
+        Returns: {
+          deadhead_miles: number
+          diesel_spend: number
+          expected_gallons: number
+          gallon_variance_pct: number
+          gallons: number
+          implied_mpg: number
+          loaded_miles: number
+          nondiesel_gallons: number
+          nonfuel_spend: number
+          total_miles: number
+          truck_id: number
+          unit_number: string
+        }[]
+      }
       fuel_ifta_summary: {
         Args: { p_end: string; p_start: string }
         Returns: {
@@ -3994,6 +4058,7 @@ export type Database = {
       import_fuel_transactions: { Args: { p_rows: Json }; Returns: Json }
       import_toll_transactions: { Args: { p_rows: Json }; Returns: Json }
       ingest_vehicle_positions: { Args: { p_points: Json }; Returns: Json }
+      insight_detail: { Args: { p_id: number }; Returns: Json }
       insurance_snapshot: { Args: never; Returns: Json }
       invoice_balance: {
         Args: { i: Database["public"]["Tables"]["invoices"]["Row"] }
@@ -4200,6 +4265,26 @@ export type Database = {
         }[]
       }
       normalize_company_name: { Args: { p: string }; Returns: string }
+      parking_in_bbox: {
+        Args: {
+          p_max_lat: number
+          p_max_lon: number
+          p_min_lat: number
+          p_min_lon: number
+        }
+        Returns: {
+          available: string
+          capacity: number
+          lat: number
+          lon: number
+          name: string
+          open: boolean
+          site_id: string
+          state: string
+          trend: string
+          updated_at: string
+        }[]
+      }
       playbook_coverage: { Args: never; Returns: Json }
       playbook_metrics_list: {
         Args: { p_owner?: string; p_search?: string; p_status?: string }
@@ -4554,6 +4639,7 @@ export type Database = {
         Args: { p_kind: string; p_rows: Json }
         Returns: number
       }
+      upsert_truck_parking: { Args: { p_rows: Json }; Returns: number }
       void_invoice: { Args: { p_invoice_id: number }; Returns: undefined }
       watchdog_action_count: {
         Args: { p_action_key: string; p_since_minutes: number }
@@ -4724,101 +4810,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      iceberg_namespaces: {
-        Row: {
-          bucket_name: string
-          catalog_id: string
-          created_at: string
-          id: string
-          metadata: Json
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          bucket_name: string
-          catalog_id: string
-          created_at?: string
-          id?: string
-          metadata?: Json
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          bucket_name?: string
-          catalog_id?: string
-          created_at?: string
-          id?: string
-          metadata?: Json
-          name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "iceberg_namespaces_catalog_id_fkey"
-            columns: ["catalog_id"]
-            isOneToOne: false
-            referencedRelation: "buckets_analytics"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      iceberg_tables: {
-        Row: {
-          bucket_name: string
-          catalog_id: string
-          created_at: string
-          id: string
-          location: string
-          name: string
-          namespace_id: string
-          remote_table_id: string | null
-          shard_id: string | null
-          shard_key: string | null
-          updated_at: string
-        }
-        Insert: {
-          bucket_name: string
-          catalog_id: string
-          created_at?: string
-          id?: string
-          location: string
-          name: string
-          namespace_id: string
-          remote_table_id?: string | null
-          shard_id?: string | null
-          shard_key?: string | null
-          updated_at?: string
-        }
-        Update: {
-          bucket_name?: string
-          catalog_id?: string
-          created_at?: string
-          id?: string
-          location?: string
-          name?: string
-          namespace_id?: string
-          remote_table_id?: string | null
-          shard_id?: string | null
-          shard_key?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "iceberg_tables_catalog_id_fkey"
-            columns: ["catalog_id"]
-            isOneToOne: false
-            referencedRelation: "buckets_analytics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "iceberg_tables_namespace_id_fkey"
-            columns: ["namespace_id"]
-            isOneToOne: false
-            referencedRelation: "iceberg_namespaces"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       migrations: {
         Row: {
@@ -5340,4 +5331,3 @@ export const Constants = {
     },
   },
 } as const
-

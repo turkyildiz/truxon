@@ -1416,6 +1416,24 @@ export async function acknowledgeInsight(id: number): Promise<void> {
   unwrap(await supabase.rpc('acknowledge_insight', { p_id: id }))
 }
 
+export interface InsightDetail {
+  id: number
+  title: string
+  detail: string | null
+  severity: string
+  category: string
+  subject: string | null
+  why: string
+  first_seen: string | null
+  last_seen: string | null
+  records: Record<string, unknown>[]
+}
+
+/** Full evidence + reasoning for one Sentinel finding (click-through). */
+export async function insightDetail(id: number): Promise<InsightDetail> {
+  return unwrap(await supabase.rpc('insight_detail', { p_id: id })) as unknown as InsightDetail
+}
+
 // ---------- Trux premium voice ----------
 
 /** POST answer text to the trux-tts edge function; returns MP3 audio (the key
