@@ -206,7 +206,7 @@ export default function Radio() {
     <div className="mx-auto max-w-lg space-y-4">
       <Card title="📻 Fleet radio">
         <p className="mb-3 text-xs text-muted">
-          Same channel as every truck tablet — hold the button, talk, release. No Mumble needed.
+          Same channel as every truck tablet — hold the button, talk, release. No extra app needed.
           Status:{' '}
           <span className={status === 'online' ? 'text-emerald-600' : 'text-amber-600'}>{status}</span>
         </p>
