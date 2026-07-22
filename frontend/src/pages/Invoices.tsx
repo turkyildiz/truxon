@@ -486,7 +486,7 @@ function ForecastTab() {
     <div className="space-y-4">
       <Card title="Cash-flow forecast — next 8 weeks">
         <p className="mb-3 text-xs text-muted">
-          Money <strong>in</strong> is projected from each broker's learned pay behavior + delivered-but-unbilled loads; money <strong>out</strong> is your trailing 8-week average (fuel + driver pay + truck fixed). A transparent estimate, not a guarantee.
+          Money <strong>in</strong> is factoring-aware: the <strong>advance</strong> (your observed rate) lands days after invoicing — including future hauling at your trailing 8-week revenue run-rate — while <strong>reserves</strong> land at each broker's learned pay behavior. Money <strong>out</strong> is your trailing 8-week average of tracked costs (fuel + driver pay + truck fixed + tolls + maintenance). A transparent estimate, not a guarantee.
         </p>
         {cfQ.isLoading ? (
           <p className="py-8 text-center text-muted">Loading…</p>
