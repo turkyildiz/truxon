@@ -1,8 +1,8 @@
-# RTX 5060 Ti box — setup runbook
+# Lynx (RTX 5060 Ti box) — setup runbook
 
-The dedicated GPU box we parked the vision + heavier local-LLM work on (see [[nas-local-llm]], [[northstar-project]]). The **5060 Ti is NVIDIA Blackwell (GB206)** — new enough that it needs a **recent driver (R570+/575)** and **CUDA 12.8+**; anything older won't see the card.
+**Lynx** is the dedicated GPU box we parked the vision + heavier local-LLM work on (see [[nas-local-llm]], [[northstar-project]]). The **5060 Ti is NVIDIA Blackwell (GB206)** — new enough that it needs a **recent driver (R570+/575)** and **CUDA 12.8+**; anything older won't see the card.
 
-> **Run these ON the 5060 Ti box** — not on `ikedev` (the Intel-iGPU laptop). Versions below move fast; sanity-check against current NVIDIA/Ubuntu docs. `sudo` steps are yours.
+> **Run these ON Lynx** — not on `ikedev` (the Intel-iGPU laptop). Set the hostname while you're at it: `sudo hostnamectl set-hostname lynx`. Versions below move fast; sanity-check against current NVIDIA/Ubuntu docs. `sudo` steps are yours.
 
 ## 0. Assumptions
 - Ubuntu 24.04+ (26.04 fine). 16 GB VRAM variant assumed (fits 7B–14B quantized LLMs + a vision model). If 8 GB, stick to ≤8B + smaller vision models.

@@ -1,11 +1,11 @@
 ---
 name: gpu-box
-description: "The RTX 5060 Ti box — the long-parked GPU box for vision + heavier local LLM; separate from the ikedev Intel-iGPU laptop. Setup runbook in deploy/gpu-box"
+description: "Lynx — the RTX 5060 Ti GPU box (long-parked) for vision + heavier local LLM; separate from the ikedev Intel-iGPU laptop. Setup runbook in deploy/gpu-box"
 metadata:
   type: reference
 ---
 
-The "GPU box" that Northstar/[[nas-local-llm]] were waiting on is an **RTX 5060 Ti** desktop, being set up 2026-07-22. It is **separate** from `ikedev` — the box Claude runs on is `ikedev`, an Intel **Iris Xe iGPU** laptop (TigerLake-LP, 8 cores, 14 GB, Secure Boot ON, no NVIDIA). So Claude can't configure the GPU box directly; it produces runbooks.
+The "GPU box" that Northstar/[[nas-local-llm]] were waiting on is **Lynx**, an **RTX 5060 Ti** desktop, being set up 2026-07-22. It is **separate** from `ikedev` — the box Claude runs on is `ikedev`, an Intel **Iris Xe iGPU** laptop (TigerLake-LP, 8 cores, 14 GB, Secure Boot ON, no NVIDIA). So Claude can't configure the GPU box directly; it produces runbooks.
 
 **Purpose:** move the parked **vision pipeline** (rate-con scan, minicpm-v — "iGPU parked for vision only") and heavier local-LLM work onto real CUDA. 16 GB VRAM (if the 16 GB variant) fits 7B–14B quantized LLMs + a vision model — a big step up from the NAS `qwen2.5:3b`.
 
