@@ -73,9 +73,12 @@ async function ollamaVision(images, prompt) {
       messages: [{ role: 'user', content: prompt, images }],
       format: 'json',
       stream: false,
+      // Keep Ollama's default 4096-token window: on the 8 GB card a larger num_ctx
+      // OOMs the vision model's KV cache. RASTER_DPI is tuned (≈150) so a page
+      // image stays under that window. FMCSA verification backstops number reads.
       options: { temperature: 0 },
     }),
-    signal: AbortSignal.timeout(600_000), // CPU inference is slow
+    signal: AbortSignal.timeout(600_000), // GPU is fast, but keep a generous ceiling
   })
   if (!r.ok) throw new Error(`ollama ${r.status}: ${(await r.text()).slice(0, 120)}`)
   const j = await r.json()
