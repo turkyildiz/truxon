@@ -24,4 +24,5 @@
 - [NAS local LLM](nas-local-llm.md) — self-hosted qwen2.5:3b does bulk doc classify/extract (token-gated proxy, cloud fallback); 3B beat 7B on measurement; iGPU parked for vision only
 - [Fuel-theft detection](fuel-theft-detection.md) — Forest now flags non-diesel-on-diesel, cash advances, tank overflow, fuel-vs-(dispatch+deadhead)-miles; MPG needs telematics; amount field is dirty
 - [Denim factoring](denim-factoring.md) — LIVE 2026-07-22 (owner gave API key); denim-sync reconciles factoring jobs→invoices every 2h, read-only, no money movement; key is edge-secret only (owner: add to vault)
+- [Offsite NAS](offsite-nas.md) — INDIANCREEK, 2nd Synology at a different site; on the tailnet via a Docker Tailscale container (100.99.180.17); waiting only on owner to authorize the rsync key, then Claude wires nightly encrypted replication
 - [Security posture](security-posture.md) — CRON_SECRET architecture (rotate via secrets set + watchdog setter), my_role raises for inactive, money-path locks; S-08/09/11 CLOSED + verified 2026-07-21 (withCors 100% coverage); residual gap = OTA manifest signing (mitigated by Android same-key install requirement)
