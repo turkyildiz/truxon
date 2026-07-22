@@ -593,6 +593,42 @@ export async function acctSummary(): Promise<AcctSummary> {
   return unwrap(await supabase.rpc('acct_summary')) as unknown as AcctSummary
 }
 
+// ── Factoring (interim, before the Denim API sync) ──────────────────────────
+export interface FactoringInvoiceRow {
+  id: number
+  invoice_number: string
+  customer: string | null
+  total: number
+  advanced: number
+  reserve_pending: number
+  fee: number | null
+  factor: string | null
+  factored_at: string | null
+  reserve_released: boolean
+}
+export interface FactoringOverview {
+  summary: {
+    factored_count: number
+    total_factored: number
+    advanced: number
+    reserve_pending: number
+    fees: number
+  }
+  invoices: FactoringInvoiceRow[]
+}
+
+export async function factoringOverview(): Promise<FactoringOverview> {
+  return unwrap(await supabase.rpc('factoring_overview')) as unknown as FactoringOverview
+}
+
+export async function markInvoiceFactored(id: number, factor = 'Denim', fee?: number): Promise<void> {
+  unwrap(await supabase.rpc('mark_invoice_factored', { p_id: id, p_factor: factor, p_fee: fee ?? undefined }))
+}
+
+export async function unmarkInvoiceFactored(id: number): Promise<void> {
+  unwrap(await supabase.rpc('unmark_invoice_factored', { p_id: id }))
+}
+
 export interface ScenarioResult {
   baseline: { monthly_revenue: number; monthly_fuel: number; monthly_insurance: number; monthly_other_costs: number; monthly_net: number; cash: number }
   shock: { revenue_pct: number; fuel_pct: number; insurance_pct: number }

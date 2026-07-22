@@ -12,6 +12,7 @@ import { Badge, Button, Card, Field, formatDate, LoadError, Modal, money, Select
 import {
   acctAging, acctMarginMonthly, acctRevenueByCustomer, acctRevenueMonthly, acctSummary, acctUnbilledLoads,
   addCollectionNote, cashflowForecast, collectionsQueue, type CollectionRow,
+  factoringOverview, unmarkInvoiceFactored,
   createInvoice, decideAccessorial, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
   listAccessorials, proposeDetentionAccessorials,
   glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
@@ -21,7 +22,7 @@ import { downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
 import { errorMessage } from '../supabase'
 import type { Invoice } from '../types'
 
-type Tab = 'overview' | 'receivables' | 'aging' | 'collections' | 'unbilled' | 'detention' | 'forecast' | 'reports'
+type Tab = 'overview' | 'receivables' | 'aging' | 'collections' | 'factoring' | 'unbilled' | 'detention' | 'forecast' | 'reports'
 type Filter = 'all' | 'unpaid' | 'pastdue' | 'paid' | 'draft' | 'void'
 
 const TABS: { key: Tab; label: string }[] = [
@@ -29,6 +30,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'receivables', label: 'Receivables' },
   { key: 'aging', label: 'Aging' },
   { key: 'collections', label: '📞 Collections' },
+  { key: 'factoring', label: '🏦 Factoring' },
   { key: 'unbilled', label: 'Unbilled' },
   { key: 'detention', label: '⏱️ Detention' },
   { key: 'forecast', label: '🔮 Forecast' },
@@ -355,6 +357,7 @@ export default function Invoices() {
 
       {tab === 'aging' && <AgingTab />}
       {tab === 'collections' && <CollectionsTab />}
+      {tab === 'factoring' && <FactoringTab />}
       {tab === 'unbilled' && <UnbilledTab onBill={billCustomer} />}
       {tab === 'detention' && <DetentionTab />}
       {tab === 'forecast' && <ForecastTab />}
@@ -521,6 +524,70 @@ function ForecastTab() {
           </Table>
         )}
       </Card>
+    </div>
+  )
+}
+
+function FactoringTab() {
+  const qc = useQueryClient()
+  const q = useQuery({ queryKey: ['factoring'], queryFn: factoringOverview, retry: false })
+  const unfactor = useMutation({
+    mutationFn: (id: number) => unmarkInvoiceFactored(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['factoring'] }); qc.invalidateQueries({ queryKey: ['acct-summary'] }) },
+  })
+
+  if (q.isLoading) return <p className="py-8 text-center text-muted">Loading…</p>
+  if (q.isError) return <LoadError error={q.error} onRetry={() => q.refetch()} />
+  const s = q.data!.summary
+  const rows = q.data!.invoices
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted">
+        Factored invoices are financed by <strong>{rows[0]?.factor ?? 'your factor'}</strong>: you get the
+        advance up front and the <strong>reserve</strong> later, when the broker pays the factor. These are
+        <strong> not overdue from the broker</strong> — the factor owns collecting them — so they're pulled out of
+        Receivables/Aging and tracked here instead. Fees fill in once the Denim API sync is connected.
+      </p>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Factored (open)" value={money(s.total_factored)} sub={`${s.factored_count} invoices`} />
+        <Kpi label="Advanced" value={money(s.advanced)} sub="received up front" tone="good" />
+        <Kpi label="Reserve pending" value={money(s.reserve_pending)} sub="owed by the factor" tone="warn" />
+        <Kpi label="Factoring fees" value={s.fees > 0 ? money(s.fees) : '—'} sub={s.fees > 0 ? 'this period' : 'TBD (agreement)'} />
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="py-8 text-center text-muted">No factored invoices. Mark an invoice factored from Receivables.</p>
+      ) : (
+        <Table headers={['Invoice', 'Broker', 'Total', 'Advanced', 'Reserve pending', 'Factored', 'Status', '']}>
+          {rows.map((r) => (
+            <tr key={r.id} className="hover:bg-surface-2">
+              <td className="px-3 py-2.5 font-medium">{r.invoice_number}</td>
+              <td className="px-3 py-2.5 text-muted">{r.customer ?? '—'}</td>
+              <td className="px-3 py-2.5">{money(Number(r.total))}</td>
+              <td className="px-3 py-2.5 text-green-700 dark:text-green-300">{money(Number(r.advanced))}</td>
+              <td className="px-3 py-2.5 font-semibold text-amber-700 dark:text-amber-300">{money(Number(r.reserve_pending))}</td>
+              <td className="px-3 py-2.5 text-muted">{r.factored_at ? formatDate(r.factored_at) : '—'}</td>
+              <td className="px-3 py-2.5">
+                {r.reserve_released
+                  ? <span className="rounded px-1.5 py-0.5 text-xs font-semibold bg-green-500/15 text-green-700 dark:text-green-300">Reserve released</span>
+                  : <span className="rounded px-1.5 py-0.5 text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300">Reserve pending</span>}
+              </td>
+              <td className="px-3 py-2.5 text-right">
+                <button
+                  onClick={() => unfactor.mutate(r.id)}
+                  disabled={unfactor.isPending}
+                  className="rounded-lg border border-line px-2 py-1 text-xs text-muted hover:text-body disabled:opacity-50"
+                  title="Not actually factored? Put it back into broker A/R."
+                >
+                  Un-factor
+                </button>
+              </td>
+            </tr>
+          ))}
+        </Table>
+      )}
     </div>
   )
 }

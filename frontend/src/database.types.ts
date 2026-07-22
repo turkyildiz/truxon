@@ -1487,6 +1487,9 @@ export type Database = {
           created_at: string
           customer_id: number
           due_date: string | null
+          factor_name: string | null
+          factored_at: string | null
+          factoring_fee: number | null
           id: number
           invoice_date: string
           invoice_number: string
@@ -1505,6 +1508,9 @@ export type Database = {
           created_at?: string
           customer_id: number
           due_date?: string | null
+          factor_name?: string | null
+          factored_at?: string | null
+          factoring_fee?: number | null
           id?: never
           invoice_date?: string
           invoice_number: string
@@ -1523,6 +1529,9 @@ export type Database = {
           created_at?: string
           customer_id?: number
           due_date?: string | null
+          factor_name?: string | null
+          factored_at?: string | null
+          factoring_fee?: number | null
           id?: never
           invoice_date?: string
           invoice_number?: string
@@ -3730,6 +3739,9 @@ export type Database = {
           created_at: string
           customer_id: number
           due_date: string | null
+          factor_name: string | null
+          factored_at: string | null
+          factoring_fee: number | null
           id: number
           invoice_date: string
           invoice_number: string
@@ -3931,6 +3943,7 @@ export type Database = {
           unit_number: string
         }[]
       }
+      factoring_overview: { Args: never; Returns: Json }
       fleet_cost_basis: { Args: never; Returns: Json }
       fleet_odometers: {
         Args: never
@@ -4064,6 +4077,10 @@ export type Database = {
         Args: { i: Database["public"]["Tables"]["invoices"]["Row"] }
         Returns: number
       }
+      invoice_balance_raw: {
+        Args: { i: Database["public"]["Tables"]["invoices"]["Row"] }
+        Returns: number
+      }
       lane_rate_history: {
         Args: { p_dest_state: string; p_origin_state: string }
         Returns: Json
@@ -4191,6 +4208,10 @@ export type Database = {
       maintenance_summary: {
         Args: { p_end: string; p_start: string }
         Returns: Json
+      }
+      mark_invoice_factored: {
+        Args: { p_factor?: string; p_fee?: number; p_id: number }
+        Returns: undefined
       }
       match_document_embeddings: {
         Args: { p_count?: number; p_embedding: string; p_entity_type?: string }
@@ -4456,6 +4477,9 @@ export type Database = {
           created_at: string
           customer_id: number
           due_date: string | null
+          factor_name: string | null
+          factored_at: string | null
+          factoring_fee: number | null
           id: number
           invoice_date: string
           invoice_number: string
@@ -4622,6 +4646,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      unmark_invoice_factored: { Args: { p_id: number }; Returns: undefined }
       upsert_doc_embeddings: {
         Args: {
           p_chunks: Json
