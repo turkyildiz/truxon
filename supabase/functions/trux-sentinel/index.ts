@@ -81,6 +81,19 @@ Deno.serve(withCors(async (req) => {
   const { data: scan, error: scanErr } = await admin.rpc('sentinel_scan')
   if (scanErr) return json({ error: scanErr.message }, 500)
 
+  // (R9 #86) Monday map: one grouped, deduped digest of the whole open board.
+  if (mode === 'weekly') {
+    const { data: dg } = await admin.rpc('sentinel_weekly_digest') as {
+      data: { open?: number; critical?: number; new_7d?: number; resolved_7d?: number; text?: string } | null
+    }
+    if ((dg?.open ?? 0) > 0 || (dg?.new_7d ?? 0) > 0) {
+      await pushAdmins(s,
+        `Forest weekly — ${dg?.open ?? 0} open (${dg?.critical ?? 0} critical), +${dg?.new_7d ?? 0} new / −${dg?.resolved_7d ?? 0} resolved this week`,
+        dg?.text ?? 'See the Forest feed.', false)
+    }
+    return json({ mode, digest: dg })
+  }
+
   if (mode === 'brief') {
     const { data: sum } = await admin.rpc('sentinel_open_summary') as { data: { open?: number; critical?: number; top?: { severity: string; title: string }[] } | null }
     const openN = sum?.open ?? 0
