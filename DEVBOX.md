@@ -1,6 +1,8 @@
 # Truxon Dev Box (this machine)
 
 > Re-provisioned 2026-07-23 on new hardware (Ryzen AI 7 350, 16 threads, 28 GB RAM) — old box was too slow for Android emulation. Username is now `ike`; repo lives at `/home/ike/TRUXON` with `~/src/truxon` symlinked to it, so the paths below still work.
+>
+> **Rebuilding or replacing this machine? → [`deploy/devbox/MIGRATION.md`](deploy/devbox/MIGRATION.md)** — two bootstrap scripts + a short owner checklist make a laptop swap a ~30-minute routine. That kit is kept current by standing rule; this file only describes daily use.
 
 ## Locations
 - Repo: `~/src/truxon` (symlink → `/home/ike/TRUXON`)

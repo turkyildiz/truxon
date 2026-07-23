@@ -1,6 +1,7 @@
 # Memory index
 
 - [Obsidian vault](obsidian-vault.md) — this memory folder IS the repo-backed Obsidian vault (~/.claude memory symlinks here); rules/behaviors live in vault/Rules
+- [Devbox migration](devbox-migration.md) — laptop swap = scripted ~30-min routine (deploy/devbox/ kit); STANDING RULE: setup changes update the kit in the same commit; nothing durable lives only on one box
 - [Secrets vault](secrets-vault.md) — all secrets in a KeePassXC .kdbx (NAS primary + local backup + offsite); owner holds master password; tooling in deploy/secrets
 - [Disaster recovery](disaster-recovery.md) — dev-box death is survivable (prod is cloud, code+vault on GitHub, signing key on NAS); residual SPOF = signing bundle is NAS-only, not offsite
 - [DR readiness roadmap](dr-readiness-roadmap.md) — plan to take DR/cyber-recovery from 84→100, centered on an automated weekly watchdog drill (6 checks + self-alarming)
