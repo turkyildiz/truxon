@@ -97,4 +97,10 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **#152 v15 release readiness** — release APK builds clean (63.9 MB); emulator visual pass done for the login surface in light + dark (no crashes in logcat). The authenticated screen walk needs the driver2 password, which by design exists only with the owner (rotated 2026-07-21, never persisted) — rotating it myself would sign out the real tablet #2, so I did not. **Owner: one emulator login (or share the test password again) + `cd ~/src/truxon/mobile && ROLLOUT=100 ./publish-release.sh "v15: settlement, breakdown, fuel receipts, wallet, diagnostics, offline v2 + Spanish"` publishes the OTA.**
 - **Suite: 922 pgTAP / 162 files · mobile 99 flutter tests.** All pushed + live-verified on prod.
 
+### Aug-1 sprint — day 2 (new dev box lynxdev; block list recovered from old-box transcript)
+- **#104 Rate-con line items** — `load_line_items` (RLS office-only, posture-baselined); extraction prompt itemizes ONLY charges printed on the document (single-total rate cons yield one line_haul row — no invented breakdowns); Dispatch shows the breakdown under the Rate field and saves it on load create.
+- **#105 Rate-con reconciliation** — `ratecon_recon_report()` (mismatch list ranked by |delta|, honest `not_extracted` count, fuel-surcharge capture stats for the pending G flip) + sentinel `ratecon_recon:` money-warn (>$1 drift, auto-resolves when booked rate matches the paper). Sentinel lineage head is now `20260723150003`.
+- Live-verified: migrations local=remote, anon → `permission denied` on the RPC (gate holds), extract-pdf redeployed.
+- **Suite: 930 pgTAP / 163 files** — one real test catch on the way: RLS assertions are no-ops as `postgres`; the driver-invisibility test needed `set local role authenticated`.
+
 *(Run continues; closeout will finalize the count.)*
