@@ -19,4 +19,5 @@ Every autonomous run closes with a report: what shipped, the commit range, how e
 
 ## Cumulative
 As of 2026-07-22: **~29 commits** across the 48h plan → R5 → R6 → R7. Playbook coverage **129 → 171/1000**. The full defense-in-depth security stack, MFA-for-all, and a mature proactive sentinel (~40 checks) are live; Forest answers security + billing-health questions from real data.
+- [R9 — 200-block run (in progress)](ACCOUNTABILITY_R9_2026-07-23.md) — DOT compliance build-out done (sentinels + DQF + compliance log), accounting v2 done (Denim recon caught real fee data, cost-of-factoring 1.99%/5.3% APR, write-off packet, true OR, per-truck P&L)
 - [R8 — 100-block run](ACCOUNTABILITY_R8_2026-07-22.md) — ~82/100 done; ELD analytics core, fuel-theft on GPS truth, offline voice shipped, offsite NAS live; 2 incidents found+fixed
