@@ -10,7 +10,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { driverTrail, fleetLive, recentWeatherWarnings, type FleetPin } from '../data'
+import { driverTrail, fleetLive, recentWeatherWarnings, truckTrail, type FleetPin } from '../data'
 import { Card, PageHeader } from '../components/ui'
 
 function hosLabel(sec: number | null | undefined): string {
@@ -169,10 +169,20 @@ function MapCanvas({
       marker.on('click', () => {
         map.setView([p.lat, p.lng], Math.max(map.getZoom(), 9))
         trailRef.current?.clearLayers()
-        driverTrail(p.driver_id).then((pts) => {
+        // ELD breadcrumb tail (last 4h) is the primary trail — dense and alive
+        // even when the phone app isn't reporting; phone trail is the fallback.
+        const drawPhone = () => driverTrail(p.driver_id).then((pts) => {
           if (pts.length < 2 || !trailRef.current) return
           L.polyline(pts.map((t) => [t.lat, t.lng]), { color, weight: 3, opacity: 0.7, dashArray: '4 6' }).addTo(trailRef.current)
         })
+        if (p.truck_id != null) {
+          truckTrail(p.truck_id).then((pts) => {
+            if (!trailRef.current) return
+            if (pts.length >= 2) {
+              L.polyline(pts.map((t) => [t.lat, t.lng]), { color, weight: 3, opacity: 0.75 }).addTo(trailRef.current)
+            } else void drawPhone()
+          }).catch(() => void drawPhone())
+        } else void drawPhone()
       })
       marker.addTo(layer)
       latlngs.push([p.lat, p.lng])

@@ -233,6 +233,24 @@ export async function driverTrail(driverId: number): Promise<{ lat: number; lng:
   return (data ?? []).map((p) => ({ lat: p.lat, lng: p.lng })).reverse()
 }
 
+/** Last 4 hours of ELD breadcrumbs for one truck — denser than the phone
+ * trail and alive even when the companion app isn't reporting (R9 #60). */
+export async function truckTrail(truckId: number): Promise<{ lat: number; lng: number }[]> {
+  const since = new Date(Date.now() - 4 * 3600_000).toISOString()
+  const data = unwrap(
+    await supabase
+      .from('eld_location_history')
+      .select('lat, lng, ts')
+      .eq('truck_id', truckId)
+      .gt('ts', since)
+      .not('lat', 'is', null)
+      .order('ts', { ascending: true })
+      .limit(2000),
+  )
+  return (data ?? []).filter((p) => p.lat != null && p.lng != null)
+    .map((p) => ({ lat: Number(p.lat), lng: Number(p.lng) }))
+}
+
 export async function createDriver(payload: Row): Promise<Driver> {
   return unwrap(await supabase.from('drivers').insert(payload as TablesInsert<'drivers'>).select().single())
 }
