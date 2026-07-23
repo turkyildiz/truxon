@@ -44,6 +44,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // ABI note: release APKs are built with --split-per-abi (see
+        // build-apk.sh) — do NOT add ndk.abiFilters here; it conflicts with
+        // the splits mechanism and is ignored for plugin-AAR jniLibs anyway.
     }
 
     signingConfigs {
