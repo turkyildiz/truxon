@@ -64,3 +64,15 @@ jobs:
         run: supabase db start
       - name: Run pgTAP tests
         run: supabase test db
+
+  # Edge-function unit tests (pure logic in _shared/*.test.ts — FMCSA
+  # verification gate, Denim reconcile). No secrets, no network.
+  edge-functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Run deno tests
+        run: deno test --quiet supabase/functions/_shared/
