@@ -62,6 +62,9 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **#63 Breakdown-ML readiness** — live: 36 rows, 0 breakdowns observed, honestly not trainable (~10 weeks to the row bar; a healthy fleet delaying the model is fine).
 - **#86 Weekly sentinel digest** — Monday 12:20 push, grouped by category with critical-first samples; live render: 154 open / 45 critical across 6 categories in one message.
 - **Suite at checkpoint: 871 pgTAP / 146 files.**
+- **#87 Sentinel snooze** — 😴 7d on the feed: finding stays open and truthful, but brief/digest/pushes skip it until the date passes; brief reports how many are sleeping.
+- Section F is effectively complete (75 covered by the sliver-aging nag; 79 needs payroll data — honest gap; 83's pre-book guard already existed).
+- **Suite at checkpoint: 874 pgTAP / 147 files.**
 - **#45/46 Harsh-driving proxy** — breadcrumbs are dense (p90 gap 10s), so ≥25 mph lost in ≤12s is banked nightly as a hard-braking proxy (labeled a proxy everywhere). Live: 77 braking + 31 acceleration events in 2 days; real samples like 45→9 mph in 10s. On the driver scorecard as 'Harsh'; playbook harsh metric flipped with an honest source note.
 
 *(Run continues; closeout will finalize the count.)*
