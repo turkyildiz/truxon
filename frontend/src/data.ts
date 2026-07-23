@@ -2445,3 +2445,29 @@ export async function dotAuditPack(): Promise<DotAuditPack | null> {
   const data = unwrap(await supabase.rpc('dot_audit_pack'))
   return (data as unknown as DotAuditPack) ?? null
 }
+
+export interface WriteoffProposal {
+  id: number
+  status: 'proposed' | 'approved'
+  amount: number
+  invoice_number: string
+  invoice_date: string
+  customer: string | null
+  factor: string | null
+}
+
+export interface WriteoffList {
+  proposed_total: number
+  approved_total: number
+  rows: WriteoffProposal[]
+}
+
+/** Fee write-off proposals — Truxon never writes these to QBO. */
+export async function qboWriteoffList(): Promise<WriteoffList | null> {
+  unwrap(await supabase.rpc('qbo_writeoff_seed'))
+  return (unwrap(await supabase.rpc('qbo_writeoff_list')) as unknown as WriteoffList) ?? null
+}
+
+export async function qboWriteoffDecide(id: number, approve: boolean): Promise<void> {
+  unwrap(await supabase.rpc('qbo_writeoff_decide', { p_id: id, p_approve: approve }))
+}

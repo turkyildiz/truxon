@@ -16,7 +16,7 @@ import {
   createInvoice, decideAccessorial, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
   listAccessorials, proposeDetentionAccessorials,
   glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
-  qboConnectUrl, qboStatus, recordInvoicePayment, revenueForecast, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
+  qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
 } from '../data'
 import { downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
 import { errorMessage } from '../supabase'
@@ -626,6 +626,62 @@ function ForecastTab() {
   )
 }
 
+/** Fee-sliver write-off proposals. Approving changes status only — the books
+ * are applied by the accountant in QBO; the 30-min mirror clears them here. */
+function WriteoffCard() {
+  const qc = useQueryClient()
+  const q = useQuery({ queryKey: ['qbo-writeoffs'], queryFn: qboWriteoffList, retry: false })
+  const decide = useMutation({
+    mutationFn: ({ id, approve }: { id: number; approve: boolean }) => qboWriteoffDecide(id, approve),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qbo-writeoffs'] }),
+  })
+  const d = q.data
+  if (q.isError || !d || d.rows.length === 0) return null
+  const proposed = d.rows.filter((r) => r.status === 'proposed')
+  const approved = d.rows.filter((r) => r.status === 'approved')
+  return (
+    <Card title={`🧾 Factoring-fee write-offs — ${money(d.proposed_total)} proposed`}>
+      <p className="mb-2 text-xs text-muted">
+        These invoices are settled; only the factoring fee is left on the books as a fake receivable.
+        Approving here <strong>does not touch QBO</strong> — it builds the packet below for your accountant
+        to apply (write-off or credit memo). Once applied in QBO, the mirror clears them automatically.
+      </p>
+      {proposed.length > 0 && (
+        <div className="max-h-64 overflow-y-auto">
+          <table className="w-full text-sm">
+            <tbody>
+              {proposed.map((r) => (
+                <tr key={r.id} className="border-t border-line">
+                  <td className="px-2 py-1.5 font-medium">{r.invoice_number}</td>
+                  <td className="px-2 py-1.5 text-muted">{r.customer ?? '—'}</td>
+                  <td className="px-2 py-1.5">{formatDate(r.invoice_date)}</td>
+                  <td className="px-2 py-1.5 font-semibold">{money(Number(r.amount))}</td>
+                  <td className="px-2 py-1.5 text-right">
+                    <button type="button" className="btn btn-primary mr-1 px-2 py-0.5 text-xs" disabled={decide.isPending}
+                      onClick={() => decide.mutate({ id: r.id, approve: true })}>Approve</button>
+                    <button type="button" className="btn px-2 py-0.5 text-xs" disabled={decide.isPending}
+                      onClick={() => decide.mutate({ id: r.id, approve: false })}>Dismiss</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {approved.length > 0 && (
+        <div className="mt-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted">
+            Accountant packet — approved, awaiting QBO entry ({money(d.approved_total)})
+          </div>
+          <p className="text-sm text-muted">
+            {approved.map((r) => `${r.invoice_number} ${money(Number(r.amount))}`).join(' · ')}
+          </p>
+        </div>
+      )}
+    </Card>
+  )
+}
+
 function FactoringTab() {
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['factoring'], queryFn: factoringOverview, retry: false })
@@ -662,6 +718,7 @@ function FactoringTab() {
 
   return (
     <div className="space-y-4">
+      <WriteoffCard />
       <p className="text-sm text-muted">
         Factored invoices are financed by <strong>{rows[0]?.factor ?? 'your factor'}</strong>: you get the
         advance up front and the <strong>reserve</strong> later, when the broker pays the factor. These are

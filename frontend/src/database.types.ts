@@ -2391,6 +2391,44 @@ export type Database = {
         }
         Relationships: []
       }
+      qbo_writeoff_proposals: {
+        Row: {
+          amount: number
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          id: number
+          invoice_id: number
+          status: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: number
+          invoice_id: number
+          status?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: number
+          invoice_id?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qbo_writeoff_proposals_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: true
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quote_requests: {
         Row: {
           company: string
@@ -4651,6 +4689,12 @@ export type Database = {
       qbo_mark_voided: { Args: { p_qbo_ids: Json }; Returns: number }
       qbo_status: { Args: never; Returns: Json }
       qbo_upsert_invoices: { Args: { p_rows: Json }; Returns: Json }
+      qbo_writeoff_decide: {
+        Args: { p_approve: boolean; p_id: number }
+        Returns: undefined
+      }
+      qbo_writeoff_list: { Args: never; Returns: Json }
+      qbo_writeoff_seed: { Args: never; Returns: number }
       record_invoice_payment: {
         Args: {
           p_amount: number
