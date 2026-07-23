@@ -2502,3 +2502,18 @@ export interface FactoringCost {
 export async function factoringCostSummary(): Promise<FactoringCost | null> {
   return (unwrap(await supabase.rpc('factoring_cost_summary')) as unknown as FactoringCost) ?? null
 }
+
+export interface RevRecMonth {
+  month: string
+  delivered: number
+  delivered_loads: number
+  invoiced: number
+  cross_month_loads: number
+  cross_month_amount: number
+}
+
+/** Revenue earned (delivery month) vs booked (invoice month). */
+export async function revRecDrift(months = 6): Promise<RevRecMonth[]> {
+  const d = unwrap(await supabase.rpc('rev_rec_drift', { p_months: months })) as unknown as { months: RevRecMonth[] } | null
+  return d?.months ?? []
+}

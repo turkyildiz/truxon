@@ -16,7 +16,7 @@ import {
   createInvoice, decideAccessorial, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
   listAccessorials, proposeDetentionAccessorials,
   glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
-  denimReconciliation, factoringCostSummary, qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
+  denimReconciliation, factoringCostSummary, qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, revRecDrift, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
 } from '../data'
 import { downloadCustomerStatement, downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
 import { errorMessage } from '../supabase'
@@ -1251,6 +1251,42 @@ function GlSection() {
 }
 
 // ── Reports ──────────────────────────────────────────────────────────────────
+/** Earned (delivery month) vs booked (invoice month) — the cross-month drift. */
+function RevRecCard() {
+  const q = useQuery({ queryKey: ['rev-rec-drift'], queryFn: () => revRecDrift(6), retry: false })
+  const rows = q.data ?? []
+  if (q.isError || rows.length === 0) return null
+  const anyDrift = rows.some((m) => m.cross_month_loads > 0)
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-4">
+      <h3 className="mb-1 text-sm font-semibold text-body">Revenue recognition — earned vs booked</h3>
+      <p className="mb-2 text-xs text-muted">
+        Earned = loads by delivery month; booked = invoices by invoice month. Cross-month = freight
+        billed in a different month than it delivered — why a &ldquo;great month&rdquo; can be last month&rsquo;s work.
+      </p>
+      <Table headers={['Month', 'Earned', 'Booked', 'Gap', 'Cross-month']}>
+        {rows.map((m) => {
+          const gap = Number(m.invoiced) - Number(m.delivered)
+          return (
+            <tr key={m.month}>
+              <td className="px-3 py-2 font-medium">{m.month}</td>
+              <td className="px-3 py-2">{money(Number(m.delivered))}</td>
+              <td className="px-3 py-2">{money(Number(m.invoiced))}</td>
+              <td className={`px-3 py-2 ${Math.abs(gap) > 5000 ? 'font-semibold text-amber-700 dark:text-amber-300' : 'text-muted'}`}>
+                {gap === 0 ? '—' : money(gap)}
+              </td>
+              <td className="px-3 py-2 text-muted">
+                {m.cross_month_loads > 0 ? `${m.cross_month_loads} loads · ${money(Number(m.cross_month_amount))}` : '—'}
+              </td>
+            </tr>
+          )
+        })}
+      </Table>
+      {!anyDrift && <p className="mt-1 text-xs text-green-700 dark:text-green-300">Every load billed in its delivery month ✓</p>}
+    </div>
+  )
+}
+
 function ReportsTab() {
   const custQ = useQuery({ queryKey: ['acct-by-customer'], queryFn: () => acctRevenueByCustomer(365), retry: false })
   const marginQ = useQuery({ queryKey: ['acct-margin'], queryFn: () => acctMarginMonthly(12), retry: false })
@@ -1259,6 +1295,7 @@ function ReportsTab() {
   return (
     <div className="space-y-6">
       <GlSection />
+      <RevRecCard />
       {margins.length > 0 && (
         <div className="rounded-2xl border border-line bg-surface p-4">
           <h3 className="mb-2 text-sm font-semibold text-body">Revenue vs direct-cost margin (fuel + tolls + maintenance)</h3>

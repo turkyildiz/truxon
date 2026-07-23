@@ -4773,6 +4773,7 @@ export type Database = {
         Args: { p_action: string; p_log_id: number }
         Returns: undefined
       }
+      rev_rec_drift: { Args: { p_months?: number }; Returns: Json }
       revenue_forecast: {
         Args: { p_weeks?: number }
         Returns: {
