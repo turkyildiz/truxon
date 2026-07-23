@@ -8,6 +8,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { json, requireCron, withCors } from '../_shared/auth.ts'
+import { digits, lookupByDot, lookupByMc, nameMatches } from '../_shared/fmcsa.ts'
 
 const BASE = 'https://mobile.fmcsa.dot.gov/qc/services'
 
@@ -57,6 +58,40 @@ Deno.serve(withCors(async (req) => {
   const svc = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   const webKey = Deno.env.get('FMCSA_WEBKEY')
   if (!webKey) return json({ skipped: 'no FMCSA_WEBKEY configured' })
+
+  const body = await req.json().catch(() => ({})) as Record<string, unknown>
+
+  // ── weekly customer authority sweep (R8): re-verify every customer that
+  //    carries an MC/USDOT; the sentinel reads customer_fmcsa_checks ──
+  if (body.mode === 'customers') {
+    const { data: custs } = await svc.from('customers')
+      .select('id, company_name, mc_number, usdot_number, do_not_use')
+    let checked = 0, problems = 0
+    for (const c of custs ?? []) {
+      if (c.do_not_use) continue
+      if (!digits(c.mc_number) && !digits(c.usdot_number)) continue
+      const dotN = digits(c.usdot_number)
+      const mcN = digits(c.mc_number)
+      if (!dotN && !mcN) continue
+      const carrier = dotN ? await lookupByDot(dotN, webKey) : await lookupByMc(mcN, webKey)
+      if (!carrier) continue   // API hiccup or number vanished — no row update, stays stale
+      // deno-lint-ignore no-explicit-any
+      const oos = normDate((carrier as any).oosDate)
+      const match = nameMatches(c.company_name, carrier.legalName) ||
+        nameMatches(c.company_name, carrier.dbaName)
+      const allowed = String(carrier.allowedToOperate ?? '')
+      if (allowed === 'N' || oos || !match) problems++
+      await svc.from('customer_fmcsa_checks').upsert({
+        customer_id: c.id, checked_at: new Date().toISOString(),
+        usdot: dotN, mc: mcN,
+        legal_name: String(carrier.legalName ?? ''),
+        allowed_to_operate: allowed, oos_date: oos,
+        name_match: match, raw: carrier,
+      }, { onConflict: 'customer_id' })
+      checked++
+    }
+    return json({ mode: 'customers', checked, problems })
+  }
 
   const { data: cs } = await svc.from('company_settings').select('usdot_number').eq('id', 1).single()
   const dot = String(cs?.usdot_number ?? '').replace(/\D/g, '')
