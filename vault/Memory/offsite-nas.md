@@ -13,11 +13,8 @@ metadata:
 
 **Replication key:** generated on aida-nas at `/volume1/docker/truxon-backup/.ssh/offsite_rsync(.pub)`, pubkey `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINGtk5Lju49Ltx1pQ26GyBC5olR0P6UvAdT++wnMuxYa aida-nas->indiancreek-offsite`.
 
-**⚠ PENDING — owner (doing it when home):** authorize that key on INDIANCREEK (Synology StrictModes needs exact perms; File Station can't set them reliably, so 3-liner):
-```
-mkdir -p ~/.ssh && chmod 700 ~/.ssh
-echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINGtk5Lju49Ltx1pQ26GyBC5olR0P6UvAdT++wnMuxYa aida-nas->indiancreek-offsite' >> ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
-```
+**Key AUTHORIZED + working (2026-07-23):** owner ran the 3-liner + `chmod 755 "$HOME"` (Synology StrictModes also rejects a group-writable HOME — needed both). `ssh -i offsite_rsync -o IdentitiesOnly=yes turkyildiz@100.99.180.17` works from aida-nas. Target dirs created: **`/volume1/homes/turkyildiz/truxon-offsite/{backups,release-signing}`** (no write perm on /volume1 root without DSM, home dir is same volume). ⚠ Volume is **99% full (1.1 TB free of 63 TB)** — fine for our ~8 GB GPG set, flagged to owner.
 
-**THEN Claude finishes (CLI, no browser):** (1) verify `ssh -i offsite_rsync turkyildiz@100.99.180.17`; (2) create `truxon-offsite` shared folder; (3) add nightly `rsync -a --delete` of `backups/*.gpg` + `release-signing/*.gpg` → INDIANCREEK into aida-nas `scripts/backup.sh` (right after 02:00 backup, tailnet only); (4) offsite heartbeat (source `indiancreek`) + a watchdog `offsite_fresh` check; (5) first full sync + sha256 verify. Runbook: `deploy/backup/OFFSITE-NAS-SETUP.md`. Related: [[disaster-recovery]], [[nas-access]], [[secrets-vault]].
+**⚠ PENDING — owner (one DSM checkbox):** Synology's patched server-side rsync refuses non-root rsync-over-SSH ("Permission denied, please try again" AFTER successful key auth) unless **Control Panel → File Services → rsync → Enable rsync service** is ticked on INDIANCREEK. Owner enabling; fallback = tar-over-SSH.
+
+**THEN Claude finishes:** (1) first full sync of `backups/*.gpg` + `release-signing/*.gpg` + sha256 verify; (2) nightly `rsync -a --delete` into aida-nas `scripts/backup.sh` + repo `deploy/backup/backup.sh` (after the 02:00 backup, tailnet only, `-e ssh -i offsite_rsync -o IdentitiesOnly=yes`); (3) offsite heartbeat (source `offsite`) + watchdog `offsite_fresh` check. Runbook: `deploy/backup/OFFSITE-NAS-SETUP.md`. Related: [[disaster-recovery]], [[nas-access]], [[secrets-vault]].
