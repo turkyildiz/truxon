@@ -8,7 +8,9 @@ metadata:
 
 **Verify ALL tablet-app UI work on the emulator BEFORE publishing** (owner asked "cant you use android simulator?" 2026-07-21 — this is now the standard loop; never style blind again).
 
-Setup that exists: `/dev/kvm` present; SDK at `/home/ilker/sdk/android` with `emulator` package + `system-images;android-35;google_apis;x86_64`; AVD **truxtab** (Pixel Tablet, 2560x1600).
+Setup that exists: `/dev/kvm` present; SDK at `~/sdk/android` with `emulator` package + `system-images;android-35;google_apis;x86_64`; AVD **truxtab** (Pixel Tablet, 2560x1600).
+
+**New dev box (2026-07-23):** Ryzen AI 7 350, 16 threads, 28 GB RAM — owner upgraded specifically because emulation was slow. truxtab recreated here; cold headless boot in **29s** with `-memory 4096 -cores 4` (use these instead of the old `-memory 2048`). Old-box caveats (ANR dialogs, emulator dying under memory pressure) should no longer apply, but keep the wait-for-`sys.boot_completed` poll. Note: fresh AVD = wiped session → the authed walk needs the owner to log in driver2 once (rotated password is owner-only).
 
 The loop:
 1. Boot headless: `$ANDROID_HOME/emulator/emulator -avd truxtab -no-window -no-audio -gpu swiftshader_indirect -no-boot-anim -memory 2048` then `adb wait-for-device` + poll `sys.boot_completed`. Software GPU is SLOW — expect ANR dialogs (tap Wait) and give launches 20-25s. The emulator can die under memory pressure (14GB box); just re-boot it.

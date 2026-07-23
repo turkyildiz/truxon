@@ -37,7 +37,7 @@ Legend: 🔴 critical (loss hurts) · 🟡 important · 🟢 public-safe (store 
 | `Microsoft Graph` tenant/client id + client secret | 🔴 | Supabase edge secrets (`msgraph`) | forest@ mailbox access |
 | `ELB (ElevenLabs) API key` | 🟡 | Supabase edge secret (`trux-tts`) | Forest's voice |
 | `LLM_API_KEY` (agent/extraction) | 🟡 | Supabase edge secret | OpenRouter-style key |
-| `FCM / Firebase` (push) | 🟡 | Supabase edge secret; `google-services.json` | driver alarms |
+| `FCM / Firebase` (push) | 🟡 | Supabase edge secret; `mobile/android/app/google-services.json` (gitignored) | driver alarms; **attach google-services.json as a file to this entry** (public-safe but not in git — losing it blocks APK builds until a Firebase-console re-download) |
 | `PrePass SFTP` host/user/pass + `PREPASS_HOSTKEY` | 🟡 | NAS `tolls.env` | toll pull |
 | `AtoB fuel` login | 🟡 | NAS fuel job env | fuel CSV pull |
 | `Denim factoring API key` | ⏳ | not issued yet | pending owner |

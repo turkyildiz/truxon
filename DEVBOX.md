@@ -1,10 +1,14 @@
 # Truxon Dev Box (this machine)
 
+> Re-provisioned 2026-07-23 on new hardware (Ryzen AI 7 350, 16 threads, 28 GB RAM) — old box was too slow for Android emulation. Username is now `ike`; repo lives at `/home/ike/TRUXON` with `~/src/truxon` symlinked to it, so the paths below still work.
+
 ## Locations
-- Repo: `~/src/truxon`
+- Repo: `~/src/truxon` (symlink → `/home/ike/TRUXON`)
 - Flutter: `~/sdk/flutter`
-- Android SDK: `~/sdk/android`
+- Android SDK: `~/sdk/android` (platforms 35+36, emulator, AVD `truxtab`)
+- Java: `~/sdk/jdk17` (Temurin, JAVA_HOME in ~/.bashrc)
 - Supabase CLI: `~/.local/bin/supabase`
+- Deno: `~/.deno/bin/deno`
 - Node (nvm): Node 24 LTS
 
 ## Daily workflow
