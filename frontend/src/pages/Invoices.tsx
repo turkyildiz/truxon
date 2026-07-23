@@ -1263,6 +1263,8 @@ function RevRecCard() {
       <p className="mb-2 text-xs text-muted">
         Earned = loads by delivery month; booked = invoices by invoice month. Cross-month = freight
         billed in a different month than it delivered — why a &ldquo;great month&rdquo; can be last month&rsquo;s work.
+        A persistent gap with no cross-month loads means invoices not linked to Truxon loads (QBO history,
+        accessorial-only billing) — a linkage gap, not a timing problem.
       </p>
       <Table headers={['Month', 'Earned', 'Booked', 'Gap', 'Cross-month']}>
         {rows.map((m) => {
