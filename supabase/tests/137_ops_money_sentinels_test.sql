@@ -23,12 +23,15 @@ values ('load', (select max(id) from public.loads), 'POD', 'pod.pdf', 'test/pod.
 
 -- #80/#81 fuel + toll on a day the ELD says the truck sat (ELD alive other days)
 insert into public.trucks (unit_number) values ('OM-T');
+-- ELD banked movement on the days AROUND the quiet day (proves the bank was
+-- alive; a lone missing row is a known job gap, not a parked truck)
 insert into public.eld_daily_miles (day, truck_id, state, miles)
-values (current_date - 3, (select id from public.trucks where unit_number='OM-T'), 'OH', 300);
+values (current_date - 4, (select id from public.trucks where unit_number='OM-T'), 'OH', 300),
+       (current_date - 2, (select id from public.trucks where unit_number='OM-T'), 'OH', 280);
 insert into public.fuel_transactions (uuid, truck_id, transaction_time, amount, gallons)
-values ('om-fuel-1', (select id from public.trucks where unit_number='OM-T'), now() - interval '1 day', 250, 60);
+values ('om-fuel-1', (select id from public.trucks where unit_number='OM-T'), now() - interval '3 days', 250, 60);
 insert into public.toll_transactions (toll_id, truck_id, exit_date_time, toll_charge)
-values ('om-toll-1', (select id from public.trucks where unit_number='OM-T'), now() - interval '1 day', 35);
+values ('om-toll-1', (select id from public.trucks where unit_number='OM-T'), now() - interval '3 days', 35);
 
 -- #82 duplicate load entry
 insert into public.loads (customer_id, rate, miles, status, pickup_time, pickup_address, delivery_address)
