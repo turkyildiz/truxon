@@ -50,7 +50,10 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **#60 Map breadcrumb tails** — click a truck, see its last 4h of ELD GPS (solid); phone trail stays the dashed fallback.
 - **#62 IFTA close package** — 🖨️ printable per-jurisdiction miles+gallons PDF with the coverage window printed on the page.
 - **#51/61 Dock-time league** — dwell avg/P50/P90 + detention $ per facility; live: TQL delivery docks P90 14.8h, $672 detention in 45 days. Bonus catch: the codebase's negated auth-gate idiom passes on a null role claim (test-context only, not API-exploitable) — new function written positive-form, idiom-wide audit chipped for a separate session.
-- **Suite now 862 pgTAP / 141 files** · mobile 87 · deno 8.
+- **Suite now 866 pgTAP / 143 files** · mobile 87 · deno 8.
+- **#52/53 ETA + late-risk** — straight-line ×1.25 @ 47 mph net vs appointment, HOS-checked; Late-risk card on Dispatch (5-min refresh). Estimate labeled an estimate.
+- **#54/55 Truck-day utilization** — moving vs parked days per unit from the ELD bank; live: unit 09 moved 22/24 days ($1,653/moving day), unit 14 $4,922/day. **Second live catch:** state attribution DELETES the blank-state day row — gap detection was counting every attributed day as a gap (real backlog 63, not 156) and utilization read 0 moving days; both fixed to any-state semantics.
+- **#113 HOS on dispatch** — verified already live pre-R9 (hours-left on the driver picker).
 - **#45/46 Harsh-driving proxy** — breadcrumbs are dense (p90 gap 10s), so ≥25 mph lost in ≤12s is banked nightly as a hard-braking proxy (labeled a proxy everywhere). Live: 77 braking + 31 acceleration events in 2 days; real samples like 45→9 mph in 10s. On the driver scorecard as 'Harsh'; playbook harsh metric flipped with an honest source note.
 
 *(Run continues; closeout will finalize the count.)*
