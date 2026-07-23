@@ -2418,3 +2418,30 @@ export async function listComplianceEvents(): Promise<ComplianceEvent[]> {
 export async function addComplianceEvent(e: Omit<ComplianceEvent, 'id'>): Promise<void> {
   unwrap(await supabase.from('driver_compliance_events').insert(e as never).select('id'))
 }
+
+export interface DotAuditPack {
+  drivers_active: number
+  cdl_on_file: number
+  cdl_expired: { driver: string; expired: string }[]
+  cdl_expiring_60d: { driver: string; expires: string }[]
+  medcard_on_file: number
+  medcard_expired: { driver: string; expired: string }[]
+  mvr_reviewed_12m: number
+  clearinghouse_12m: number
+  drug_pool_enrolled: number
+  dqf_complete: number
+  trucks_active: number
+  plates_expired: { unit: string; expired: string }[]
+  annual_inspection_current: number
+  eld_reporting_7d: number
+  dvir_drivers_30d: number
+  safety_events_365d: number
+  not_tracked: string[]
+  as_of: string
+}
+
+/** The DOT audit binder in numbers (admin/accountant). */
+export async function dotAuditPack(): Promise<DotAuditPack | null> {
+  const data = unwrap(await supabase.rpc('dot_audit_pack'))
+  return (data as unknown as DotAuditPack) ?? null
+}

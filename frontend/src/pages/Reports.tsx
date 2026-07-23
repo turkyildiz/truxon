@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { customerKeepFire, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { customerKeepFire, dotAuditPack, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -38,6 +38,49 @@ function OwnerFlash({ weekOffset }: { weekOffset: number }) {
           accent={f.sentinel.critical ? 'text-rose-600 dark:text-rose-400' : safetyEvents ? 'text-amber-600' : undefined}
         />
       </div>
+    </Card>
+  )
+}
+
+/** The audit binder in numbers: what an auditor asks for vs what's on file. */
+function DotAuditCard() {
+  const q = useQuery({ queryKey: ['dot-audit-pack'], queryFn: dotAuditPack, retry: false })
+  const p = q.data
+  if (q.isError || !p) return null
+  const stat = (label: string, have: number, want: number) => (
+    <div key={label}>
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted">{label}</div>
+      <div className={`text-lg font-bold ${have >= want ? 'text-green-700 dark:text-green-300' : 'text-rose-600 dark:text-rose-400'}`}>
+        {have}/{want}
+      </div>
+    </div>
+  )
+  const flags: string[] = [
+    ...p.cdl_expired.map((c) => `CDL expired: ${c.driver}`),
+    ...p.medcard_expired.map((c) => `Med card expired: ${c.driver}`),
+    ...p.plates_expired.map((c) => `Plate expired: unit ${c.unit}`),
+  ]
+  return (
+    <Card title="🛃 DOT Audit Readiness">
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+        {stat('CDL on file', p.cdl_on_file, p.drivers_active)}
+        {stat('Med cards', p.medcard_on_file, p.drivers_active)}
+        {stat('DQF complete', p.dqf_complete, p.drivers_active)}
+        {stat('MVR reviews 12m', p.mvr_reviewed_12m, p.drivers_active)}
+        {stat('Clearinghouse 12m', p.clearinghouse_12m, p.drivers_active)}
+        {stat('Testing pool', p.drug_pool_enrolled, p.drivers_active)}
+        {stat('Annual inspections', p.annual_inspection_current, p.trucks_active)}
+        {stat('ELD reporting 7d', p.eld_reporting_7d, p.trucks_active)}
+        {stat('DVIR drivers 30d', p.dvir_drivers_30d, p.drivers_active)}
+      </div>
+      {flags.length > 0 && (
+        <ul className="mt-3 list-inside list-disc text-sm text-rose-600 dark:text-rose-400">
+          {flags.map((f) => <li key={f}>{f}</li>)}
+        </ul>
+      )}
+      <p className="mt-2 text-[11px] text-muted">
+        Not tracked: {p.not_tracked.join('; ')}. Fix records on the Drivers / Equipment pages; log MVR &amp; Clearinghouse in the Compliance log.
+      </p>
     </Card>
   )
 }
@@ -419,6 +462,7 @@ export default function Reports() {
           <ReportTable title="By Truck" rows={data.by_truck} />
           <ReportTable title="By Driver" rows={data.by_driver} isDriver />
           <DriverCards weekOffset={Math.max(0, Math.round((new Date(todayISO() + 'T00:00:00').getTime() - new Date(weekOf + 'T00:00:00').getTime()) / (7 * 86400000)))} />
+          <DotAuditCard />
           <LanesCard />
           <StressCard />
           <PricingDisciplineCard />
