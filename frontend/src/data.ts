@@ -1220,6 +1220,24 @@ export async function fuelRecon(days = 45): Promise<FuelReconRow[]> {
   return (data as unknown as FuelReconRow[]) ?? []
 }
 
+export interface FinanceMarch {
+  ytd_revenue_growth_yoy_pct: number | null
+  freight_revenue_12m: number
+  lease_expense_12m: number
+  qtd_ebitda_margin_pct: number | null
+  top10_profit_concentration_pct: number | null
+  pct_revenue_below_variable_cost: number | null
+  pct_revenue_below_full_cost: number | null
+  variable_rpm_used: number
+  breakeven_rpm_used: number | null
+  as_of: string
+}
+
+/** Pricing-discipline + growth cluster (playbook #12/13/61/97/99/100/105). */
+export async function financeMarch(): Promise<FinanceMarch> {
+  return unwrap(await supabase.rpc('finance_march')) as unknown as FinanceMarch
+}
+
 /** IFTA rollup per jurisdiction over the range. */
 export async function fuelIftaSummary(start: string, end: string): Promise<FuelIftaRow[]> {
   const data = unwrap(await supabase.rpc('fuel_ifta_summary', { p_start: start, p_end: end }))

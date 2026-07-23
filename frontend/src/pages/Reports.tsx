@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { customerKeepFire, driverNpsSummary, driverScorecard, laneSummary, loadActuals, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { customerKeepFire, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -106,6 +106,32 @@ function KeepFireCard() {
           </tr>
         ))}
       </Table>
+    </Card>
+  )
+}
+
+/** Pricing discipline — the money quietly left on the table at booking time. */
+function PricingDisciplineCard() {
+  const q = useQuery({ queryKey: ['finance-march'], queryFn: financeMarch, retry: false })
+  const d = q.data
+  if (q.isError || !d) return null
+  const pct = (v: number | null, digits = 1) => (v == null ? '—' : `${Number(v).toFixed(digits)}%`)
+  const belowFull = d.pct_revenue_below_full_cost
+  return (
+    <Card title="🎯 Pricing discipline & growth">
+      <p className="mb-3 text-xs text-muted">
+        Below-cost shares are trailing-90d revenue booked under the fleet's variable
+        (${Number(d.variable_rpm_used).toFixed(2)}/mi) and fully-allocated
+        ({d.breakeven_rpm_used != null ? `$${Number(d.breakeven_rpm_used).toFixed(2)}/mi` : '—'}) cost.
+        Every point of "below full cost" is revenue that pays the bills but not the business.
+      </p>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <FlashStat label="YTD revenue vs last year" value={pct(d.ytd_revenue_growth_yoy_pct)} accent={d.ytd_revenue_growth_yoy_pct != null && d.ytd_revenue_growth_yoy_pct >= 0 ? 'text-green-600 dark:text-green-300' : 'text-red-600 dark:text-red-300'} />
+        <FlashStat label="QTD EBITDA margin" value={pct(d.qtd_ebitda_margin_pct)} />
+        <FlashStat label="Rev below variable cost" value={pct(d.pct_revenue_below_variable_cost)} accent={Number(d.pct_revenue_below_variable_cost) > 2 ? 'text-red-600 dark:text-red-300' : undefined} />
+        <FlashStat label="Rev below full cost" value={pct(belowFull)} accent={Number(belowFull) >= 10 ? 'text-red-600 dark:text-red-300' : Number(belowFull) >= 5 ? 'text-amber-600 dark:text-amber-300' : undefined} />
+        <FlashStat label="Top-10 customer share" value={pct(d.top10_profit_concentration_pct, 0)} accent={Number(d.top10_profit_concentration_pct) >= 80 ? 'text-amber-600 dark:text-amber-300' : undefined} />
+      </div>
     </Card>
   )
 }
@@ -391,6 +417,7 @@ export default function Reports() {
           <DriverCards weekOffset={Math.max(0, Math.round((new Date(todayISO() + 'T00:00:00').getTime() - new Date(weekOf + 'T00:00:00').getTime()) / (7 * 86400000)))} />
           <LanesCard />
           <StressCard />
+          <PricingDisciplineCard />
           <ActualsCard />
           <KeepFireCard />
           <NpsCard />
