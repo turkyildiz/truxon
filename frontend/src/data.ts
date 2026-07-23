@@ -1993,6 +1993,9 @@ export interface FleetCostBasis {
   toll_per_mile: number
   breakeven_rpm: number
   avg_rpm: number
+  gl_all_in_rpm?: number | null
+  basis?: string
+  equipment_gap_per_mile?: number | null
 }
 export interface LoadMargin {
   total_miles: number

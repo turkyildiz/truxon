@@ -16,7 +16,7 @@ import {
   createInvoice, decideAccessorial, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
   listAccessorials, proposeDetentionAccessorials,
   glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
-  creditMemoSummary, denimReconciliation, factoringCostSummary, paymentApplicationAudit, qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, revRecDrift, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
+  creditMemoSummary, denimReconciliation, factoringCostSummary, fleetCostBasis, paymentApplicationAudit, qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, revRecDrift, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
 } from '../data'
 import { downloadCustomerStatement, downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
 import { errorMessage } from '../supabase'
@@ -1173,6 +1173,34 @@ function DetentionTab() {
 }
 
 // ── GL section: the full picture from the books ─────────────────────────────
+/** The break-even number with its recipe on the table — including the
+ * equipment payments the GL can't see (R9 #41). */
+function BreakevenBasisCard() {
+  const q = useQuery({ queryKey: ['fleet-cost-basis'], queryFn: () => fleetCostBasis(), staleTime: 30 * 60 * 1000, retry: false })
+  const b = q.data
+  if (q.isError || !b) return null
+  const fuelPerMile = b.mpg > 0 ? b.fuel_price / b.mpg : 0
+  const part = (label: string, v: number | null | undefined) =>
+    v != null && Number(v) > 0 ? `${label} $${Number(v).toFixed(2)}` : null
+  const parts = [
+    part('fuel', fuelPerMile), part('driver', b.pay_per_mile), part('fixed', b.fixed_per_mile),
+    part('tolls', b.toll_per_mile), part('equipment gap', b.equipment_gap_per_mile),
+  ].filter(Boolean)
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-4">
+      <h4 className="mb-1 text-sm font-semibold text-body">Break-even, with the recipe on the table</h4>
+      <div className="grid grid-cols-3 gap-3">
+        <Kpi label="Break-even" value={`$${Number(b.breakeven_rpm).toFixed(2)}/mi`} sub={`basis: ${b.basis ?? 'component'}`} />
+        <Kpi label="Booked avg" value={`$${Number(b.avg_rpm).toFixed(2)}/mi`}
+          tone={Number(b.avg_rpm) > Number(b.breakeven_rpm) ? 'good' : 'bad'} />
+        <Kpi label="Equipment gap" value={Number(b.equipment_gap_per_mile ?? 0) > 0 ? `$${Number(b.equipment_gap_per_mile).toFixed(2)}/mi` : '—'}
+          sub={Number(b.equipment_gap_per_mile ?? 0) > 0 ? 'payments the GL can’t see' : 'GL covers equipment'} />
+      </div>
+      <p className="mt-2 text-xs text-muted">Per mile: {parts.join(' · ')}</p>
+    </div>
+  )
+}
+
 function GlSection() {
   const pnlQ = useQuery({ queryKey: ['gl-pnl'], queryFn: () => glPnlMonthly(12), retry: false })
   const cfoQ = useQuery({ queryKey: ['gl-cfo'], queryFn: glCfoSnapshot, retry: false })
@@ -1196,7 +1224,13 @@ function GlSection() {
         {cfo?.current_ratio != null && <Kpi label="Current ratio" value={String(cfo.current_ratio)} tone={Number(cfo.current_ratio) < 1 ? 'bad' : 'good'} />}
         {cfo?.dpo != null && <Kpi label="DPO" value={`${cfo.dpo}d`} sub="days payable outstanding" />}
         {cfo?.overhead_per_tractor_month != null && <Kpi label="Overhead / tractor" value={money(Number(cfo.overhead_per_tractor_month))} sub="per month" />}
+        {cfo?.operating_ratio_equip_adj != null && (
+          <Kpi label="True OR (equip-adj)" value={`${cfo.operating_ratio_equip_adj}%`}
+            sub={Number(cfo.equipment_gap_12m) > 0 ? `+${money(Number(cfo.equipment_gap_12m))} payments the GL can't see` : 'GL covers all equipment cost'}
+            tone={Number(cfo.operating_ratio_equip_adj) > 95 ? 'bad' : 'good'} />
+        )}
       </div>
+      <BreakevenBasisCard />
       <div className="rounded-2xl border border-line bg-surface p-4">
         <h4 className="mb-2 text-sm font-semibold text-body">Revenue vs net income (all costs)</h4>
         <ResponsiveContainer width="100%" height={220}>

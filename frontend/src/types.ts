@@ -395,6 +395,9 @@ export interface CfoSnapshot {
   overhead_per_tractor_month: number | null
   total_cost_of_risk_12m: number | null
   revenue_12m: number | null
+  operating_ratio_12m: number | null
+  equipment_gap_12m: number | null
+  operating_ratio_equip_adj: number | null
 }
 
 /** QuickBooks connection + sync status card (admin only). */
