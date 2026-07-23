@@ -41,6 +41,8 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 5. **Fee write-offs**: 116 proposals ($17,359) on Invoices → Factoring; approve → hand packet to accountant.
 6. **INDIANCREEK ~99% full** — prune before nightly replication grows.
 7. MVR / Clearinghouse / testing-pool: 33 warns live; log events in the new Compliance log as you do them.
+8. **Possible duplicate load entry**: loads #24/#27 look keyed twice (same broker/day/addresses/rate) — cancel one if so.
+9. **TQL delivery docks**: P90 dwell 14.8h, $672 detention in 45 days — the dock-time league card is your exhibit.
 
 ### F/D. Sentinels v3 + ELD (76–84/88, 45/46, 57)
 - **#76 Pickup detention** — premise was real (8 pickup events measured, 0 proposals banked); the proposer covers pickups, the imbalance was historic. Catch-up run banked 13 pickup proposals with evidence.
@@ -54,6 +56,9 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **#52/53 ETA + late-risk** — straight-line ×1.25 @ 47 mph net vs appointment, HOS-checked; Late-risk card on Dispatch (5-min refresh). Estimate labeled an estimate.
 - **#54/55 Truck-day utilization** — moving vs parked days per unit from the ELD bank; live: unit 09 moved 22/24 days ($1,653/moving day), unit 14 $4,922/day. **Second live catch:** state attribution DELETES the blank-state day row — gap detection was counting every attributed day as a gap (real backlog 63, not 156) and utilization read 0 moving days; both fixed to any-state semantics.
 - **#113 HOS on dispatch** — verified already live pre-R9 (hours-left on the driver picker).
+- **#56 Speeding trend** — minutes at 75+ this week vs last, per truck, with delta.
+- **Forest catalog sync** — all 13 of tonight's report functions in the PREFER list; trux-agent + trux-inbox redeployed.
+- **Suite at checkpoint: 867 pgTAP / 144 files.**
 - **#45/46 Harsh-driving proxy** — breadcrumbs are dense (p90 gap 10s), so ≥25 mph lost in ≤12s is banked nightly as a hard-braking proxy (labeled a proxy everywhere). Live: 77 braking + 31 acceleration events in 2 days; real samples like 45→9 mph in 10s. On the driver scorecard as 'Harsh'; playbook harsh metric flipped with an honest source note.
 
 *(Run continues; closeout will finalize the count.)*
