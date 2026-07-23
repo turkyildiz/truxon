@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../services/doc_scan.dart';
+import '../services/offline_brain.dart';
 import '../theme.dart';
 import 'map_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -93,6 +96,8 @@ class _LoadsScreenState extends State<LoadsScreen> {
     try {
       await _replayOutbox();
       final loads = await widget.api.myLoads();
+      // dead-zone brain reads this cache when there's no signal to fetch with
+      unawaited(OfflineBrain.cacheLoads(loads));
       final active = loads.any((l) => l.status == 'assigned' || l.status == 'in_transit');
       widget.onTrackingHint?.call(active);
       Map<String, dynamic>? week;

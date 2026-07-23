@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -6,6 +9,8 @@ import '../config.dart';
 import '../i18n.dart';
 import 'api.dart';
 import 'diag.dart';
+import 'offline_brain.dart';
+import 'offline_voice.dart';
 
 enum VoiceState { idle, listening, thinking, speaking }
 
@@ -29,6 +34,12 @@ class TruxVoiceController extends ChangeNotifier {
   final SpeechToText _stt = SpeechToText();
   final FlutterTts _tts = FlutterTts();
 
+  /// Dead-zone stack (task #105): on-device sherpa STT + Piper TTS + the
+  /// offline intent brain. Engaged whenever the network is gone; queued work
+  /// drains automatically when coverage returns.
+  final OfflineVoice offline = OfflineVoice();
+  bool offlineMode = false;
+
   final List<TruxTurn> turns = [];
   VoiceState state = VoiceState.idle;
   String partial = '';
@@ -39,7 +50,33 @@ class TruxVoiceController extends ChangeNotifier {
 
   bool get isBusy => state != VoiceState.idle;
 
+  Future<bool> _isOffline() async {
+    try {
+      final res = await Connectivity().checkConnectivity();
+      return res.contains(ConnectivityResult.none);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  StreamSubscription<List<ConnectivityResult>>? _connSub;
+
   Future<void> init() async {
+    // Offline pack: fetch silently on WiFi if missing; drain the dead-zone
+    // queue every time coverage comes back.
+    _maybeFetchModels();
+    _connSub = Connectivity().onConnectivityChanged.listen((res) async {
+      if (!res.contains(ConnectivityResult.none)) {
+        offlineMode = false;
+        final sent = await OfflineBrain.drain(_api);
+        if (sent > 0) {
+          turns.add(TruxTurn(
+              'trux', 'Back in coverage — pushed $sent queued update${sent == 1 ? '' : 's'}.'));
+          notifyListeners();
+        }
+        if (res.contains(ConnectivityResult.wifi)) _maybeFetchModels();
+      }
+    });
     // TTS — pick a warm American voice for Forest.
     try {
       await _tts.awaitSpeakCompletion(true);
@@ -64,6 +101,23 @@ class TruxVoiceController extends ChangeNotifier {
       Diag.log('voice: stt init failed: $e');
     }
     notifyListeners();
+  }
+
+  bool _fetchingModels = false;
+  Future<void> _maybeFetchModels() async {
+    if (_fetchingModels) return;
+    _fetchingModels = true;
+    try {
+      if (await offline.modelsPresent()) return;
+      final conn = await Connectivity().checkConnectivity();
+      if (!conn.contains(ConnectivityResult.wifi)) return; // ~105 MB — WiFi only
+      final ok = await offline.downloadModels();
+      Diag.log('offline-voice: model fetch ${ok ? 'complete' : 'failed'}');
+    } catch (e) {
+      Diag.log('offline-voice: model fetch error: $e');
+    } finally {
+      _fetchingModels = false;
+    }
   }
 
   Future<void> _selectAmericanVoice() async {
@@ -107,10 +161,44 @@ class TruxVoiceController extends ChangeNotifier {
   Future<void> toggleMic() async {
     if (state == VoiceState.listening) {
       await _stt.stop();
+      await offline.stopListening();
+      if (offlineMode) {
+        state = VoiceState.idle;
+        notifyListeners();
+      }
       return;
     }
     if (state == VoiceState.speaking) {
       await _tts.stop();
+    }
+    // Dead zone? Run the whole turn on-device (sherpa STT -> offline brain ->
+    // Piper). Device STT/TTS often silently require Google servers, so the
+    // offline pack is the only stack we trust without bars.
+    offlineMode = await _isOffline() && await offline.ensureEngines();
+    if (offlineMode) {
+      partial = '';
+      state = VoiceState.listening;
+      notifyListeners();
+      final text = await offline.listenOnce(onPartial: (p) {
+        partial = p;
+        notifyListeners();
+      });
+      if (text.isEmpty) {
+        state = VoiceState.idle;
+        notifyListeners();
+        return;
+      }
+      turns.add(TruxTurn('you', text));
+      partial = '';
+      state = VoiceState.thinking;
+      notifyListeners();
+      final reply = await OfflineBrain.handle(text);
+      turns.add(TruxTurn('trux', reply));
+      state = VoiceState.speaking;
+      notifyListeners();
+      await offline.speak(reply);
+      _onSpeakDone();
+      return;
     }
     if (!_sttReady) {
       _sttReady = await _stt.initialize();
@@ -167,6 +255,18 @@ class TruxVoiceController extends ChangeNotifier {
       turns.add(TruxTurn('trux', spoken, proposals: proposals));
       await _speak(spoken);
     } catch (e) {
+      // Cloud brain unreachable mid-turn (coverage dropped after the mic
+      // opened): degrade to the offline brain instead of a bare error.
+      if (await offline.ensureEngines()) {
+        offlineMode = true;
+        final reply = await OfflineBrain.handle(text);
+        turns.add(TruxTurn('trux', reply));
+        state = VoiceState.speaking;
+        notifyListeners();
+        await offline.speak(reply);
+        _onSpeakDone();
+        return;
+      }
       turns.add(TruxTurn('trux', tr('voiceError')));
       await _speak(tr('voiceError'));
     }
@@ -243,6 +343,8 @@ class TruxVoiceController extends ChangeNotifier {
   void dispose() {
     _stt.stop();
     _tts.stop();
+    _connSub?.cancel();
+    offline.dispose();
     super.dispose();
   }
 }
