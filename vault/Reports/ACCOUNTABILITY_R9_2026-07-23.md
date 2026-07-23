@@ -90,6 +90,11 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **#150 Scan compression** — 2200px q70 before upload (5-10 MB → ~½ MB), EXIF stripped, OCR still runs on the original, raw-bytes fallback.
 - **#149 Diagnostics screen** — one-tap checks (version, server latency, GPS permission/service, push) + copy-paste report with the field log; wired from About.
 - **#146 Push preferences** — weather/paperwork/other can be quieted; assignment + breakdown alarms can never be muted (tested).
-- **Suite: 922 pgTAP / 162 files · mobile 90 flutter tests.** All pushed + live-verified on prod.
+- **#139/#140 Offline brain v2** — pickup/load-number/breakdown/detention intents; full Spanish (Spanish phrase → Spanish answer). Two real bugs caught by tests: "still waiting at the dock" would have read as *arrived* (ordering), and Dart's ASCII `\b` never matches after an accented character ("entregué" was unreachable). Honest limit: the sherpa STT model is English-trained — Spanish text handling is exact, Spanish *speech* recognition is best-effort until a bilingual model ships.
+- **#147 Dark-mode audit** — theme system was already sound (ThemeMode.system + brightness-aware status colors); one real defect fixed (About-tab log panel was near-invisible in dark).
+- **#148 Cab-mount mode** — persisted keep-screen-awake toggle (wakelock), re-armed on app start.
+- **#151 Staged OTA rollout** — `rolloutPct` in latest.json + stable per-device buckets; `ROLLOUT=25 ./publish-release.sh "…"` ships a 25% wave, republish wider to widen; absent pct = everyone (old manifests unaffected).
+- **#152 v15 release readiness** — release APK builds clean (63.9 MB); emulator visual pass done for the login surface in light + dark (no crashes in logcat). The authenticated screen walk needs the driver2 password, which by design exists only with the owner (rotated 2026-07-21, never persisted) — rotating it myself would sign out the real tablet #2, so I did not. **Owner: one emulator login (or share the test password again) + `cd ~/src/truxon/mobile && ROLLOUT=100 ./publish-release.sh "v15: settlement, breakdown, fuel receipts, wallet, diagnostics, offline v2 + Spanish"` publishes the OTA.**
+- **Suite: 922 pgTAP / 162 files · mobile 99 flutter tests.** All pushed + live-verified on prod.
 
 *(Run continues; closeout will finalize the count.)*
