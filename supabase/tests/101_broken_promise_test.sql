@@ -6,7 +6,9 @@ create extension if not exists pgtap with schema extensions;
 select plan(4);
 
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-00000000c101'::uuid, 'col@test.local');
-update public.profiles set role = 'accountant' where id = '00000000-0000-4000-8000-00000000c101';
+-- admin, not accountant: sentinel_scan is admin/service gated and the positive-form
+-- gate (20260723001001) no longer lets a NULL auth.role() slip through under pgTAP
+update public.profiles set role = 'admin' where id = '00000000-0000-4000-8000-00000000c101';
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-00000000c101"}', true);
 
 insert into public.customers (company_name) values ('Promise Broker');
