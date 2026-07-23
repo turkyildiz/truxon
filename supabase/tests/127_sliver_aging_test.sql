@@ -1,4 +1,5 @@
--- Sliver aging sentinel: 90+ day fee residuals nag once, in aggregate.
+-- Sliver aging sentinel: 90+ day-old invoices with fee residue nag once, in
+-- aggregate — anchored on invoice_date (factored_at is all backfill-dated).
 begin;
 create extension if not exists pgtap with schema extensions;
 select plan(2);
@@ -10,7 +11,7 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000
 insert into public.customers (company_name) values ('SA Broker');
 insert into public.invoices (invoice_number, customer_id, invoice_date, due_date, total, status, source, qbo_balance, factored_at, factoring_fee, factor_name)
 values ('SA-OLD', (select id from public.customers where company_name='SA Broker'),
-        current_date - 120, current_date - 90, 1200, 'sent', 'qbo', 45, now() - interval '100 days', 45, 'Denim');
+        current_date - 120, current_date - 90, 1200, 'sent', 'qbo', 45, now() - interval '2 days', 45, 'Denim');
 
 select public.sentinel_scan();
 select ok(exists (select 1 from public.trux_insights
