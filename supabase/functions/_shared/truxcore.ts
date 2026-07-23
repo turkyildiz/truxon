@@ -60,6 +60,11 @@ Revenue convention: completed/billed loads, delivery_time as the date. Example: 
 RULES: rate-per-mile and similar averages must be WEIGHTED — sum(rate)/nullif(sum(miles),0) — never avg(rate/miles). Always select the supporting figures (counts, sums) alongside any ratio and show them in your answer so the user can verify. If a result looks implausible (e.g. rate/mile far outside $1.50-$6 for linehaul), double-check with a second query before answering.`,
     parameters: { type: 'object', properties: { sql: { type: 'string' } }, required: ['sql'] },
   },
+  bank_balance: {
+    name: 'bank_balance',
+    description: 'LIVE bank balance — pulls current bank-account balances fresh from QuickBooks at ask time. Returns each bank account with its balance, the total, and when QBO last updated each account. For "what\'s our bank balance / how much cash is in the bank right now" use THIS, not gl_cfo_snapshot (that is the nightly snapshot, for trends). HONESTY: this is the balance per the BOOKS — QBO\'s register with bank-feed transactions matched — which can trail the bank\'s own site by a day or by unmatched transactions; say so when you answer. If the checking register is NEGATIVE that is the known books artifact (factoring advances/deposits not yet recorded in QBO), NOT a real overdraft — explain it instead of alarming, and point to the bank\'s own site for the spendable number.',
+    parameters: { type: 'object', properties: {} },
+  },
   system_status: {
     name: 'system_status',
     description: 'Current Truxon system health: watchdog check states (email pipeline, edge functions, AI provider, Microsoft Graph auth)',
@@ -155,7 +160,7 @@ export function toolsForRole(role: string): ToolDef[] {
         return [
           'search_customers', 'search_loads', 'list_available_equipment', 'dashboard_recap', 'weekly_report',
           'list_equipment', 'recent_maintenance', 'create_load', 'assign_resources', 'change_load_status',
-          'system_status', 'query_data',
+          'system_status', 'bank_balance', 'query_data',
         ]
       case 'dispatcher':
         return [
@@ -164,7 +169,7 @@ export function toolsForRole(role: string): ToolDef[] {
           'query_data',
         ]
       case 'accountant':
-        return ['search_customers', 'search_loads', 'dashboard_recap', 'weekly_report', 'query_data']
+        return ['search_customers', 'search_loads', 'dashboard_recap', 'weekly_report', 'bank_balance', 'query_data']
       case 'driver':
         return ['my_loads', 'my_load_detail', 'update_my_load_status', 'query_data']
       case 'maintenance':
@@ -278,6 +283,19 @@ export async function readTool(user: Sb, name: string, args: Record<string, unkn
     const { data, error } = await user.rpc('trux_query', { p_sql: String(args.sql ?? '') })
     if (error) throw new Error(error.message)
     return data
+  }
+  if (name === 'bank_balance') {
+    // Fresh QBO pull. Exposure is role-gated in toolsForRole (admin/accountant
+    // only); server-side the call rides qbo-sync's cron door — the user's JWT
+    // never needs QBO scope and no tokens leave qbo-sync.
+    const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/qbo-sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-cron-key': Deno.env.get('CRON_SECRET') ?? '' },
+      body: JSON.stringify({ mode: 'bank_balances' }),
+    })
+    const out = await res.json()
+    if (!res.ok) throw new Error(String(out?.error ?? `qbo-sync ${res.status}`))
+    return out
   }
   if (name === 'system_status') {
     // RLS limits this table to admins; the tool is only offered to admins.

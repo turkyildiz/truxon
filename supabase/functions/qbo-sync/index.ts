@@ -7,6 +7,7 @@
 //   GET  ?mode=connect&token=<jwt>   admin only → 302 to Intuit consent
 //   GET  ?mode=callback&code&state   Intuit redirect → exchange + save tokens
 //   POST {mode:'pull'}               cron (anon bearer) or admin → backfill/CDC
+//   POST {mode:'bank_balances'}      cron or admin → live bank balances (Forest)
 //   POST {mode:'push', invoice_id}   admin + QBO_PUSH_ENABLED → create in QBO
 //
 // Intuit OAuth notes: refresh tokens ROTATE on every refresh — the new one is
@@ -532,6 +533,44 @@ Deno.serve(withCors(async (req) => {
       sent_twin_total_match: sent.filter((r) => r.twin && Number(r.twin.total) === Number(r.total)).length,
       sample_sent: sent.slice(0, 12),
     })
+  }
+
+  if (body.mode === 'bank_balances') {
+    // Live bank-account balances straight from QBO Account records — a fresh
+    // pull at ask time (Forest's bank_balance tool), not the nightly GL mirror.
+    // Read-only; same gate as pull/pnl: cron key or an admin session.
+    const ok = requireCron(req)
+    if (!ok) {
+      const caller = await getCaller(req)
+      if (caller instanceof Response) return caller
+      if (caller.role !== 'admin') return json({ error: 'Admin only' }, 403)
+    }
+    const at = await accessToken(s)
+    if (!at) return json({ error: 'QBO not connected' }, 409)
+    try {
+      // Explicit field lists are rejected for some entities (see syncCustomers) — SELECT *.
+      const q = "select * from Account where AccountType = 'Bank'"
+      const out = await qboGet(at.token, `/v3/company/${at.realm}/query?query=${encodeURIComponent(q)}&minorversion=75`)
+      // deno-lint-ignore no-explicit-any
+      const accounts = (((out.QueryResponse as any)?.Account ?? []) as any[])
+        .filter((a) => a.Active !== false)
+        .map((a) => ({
+          name: String(a.Name),
+          subtype: String(a.AccountSubType ?? ''),
+          balance: Number(a.CurrentBalance ?? 0),
+          currency: String(a.CurrencyRef?.value ?? 'USD'),
+          qbo_last_updated: String(a.MetaData?.LastUpdatedTime ?? ''),
+        }))
+      return json({
+        ok: true,
+        accounts,
+        total: accounts.reduce((sum, a) => sum + a.balance, 0),
+        fetched_at: new Date().toISOString(),
+        basis: 'QBO register balance (bank-feed matched books), not the bank site',
+      })
+    } catch (e) {
+      return json({ error: String(e).slice(0, 300) }, 502)
+    }
   }
 
   if (body.mode === 'push') {
