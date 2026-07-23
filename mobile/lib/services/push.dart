@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'alarms.dart';
 import 'api.dart';
 import 'diag.dart';
+import 'push_prefs.dart';
 
 /// Feature 6 (delivery side) — receive urgent dispatch pushes and turn the
 /// ones flagged `alarm=1` (see the `notify` edge function) into DND-piercing
@@ -27,7 +28,8 @@ Future<void> firebaseBgHandler(RemoteMessage message) async {
     Diag.log('push: bg handler init failed: $e');
     return;
   }
-  if (message.data['alarm'] == '1') {
+  if (message.data['alarm'] == '1' &&
+      await PushPrefs.allowed(message.data['type'] as String?)) {
     await Alarms.showAlarm(_title(message), _body(message), payload: jsonEncode(message.data));
   }
 }
@@ -49,8 +51,9 @@ class PushService {
     final messaging = FirebaseMessaging.instance;
     await messaging.requestPermission(alert: true, sound: true, badge: false);
 
-    FirebaseMessaging.onMessage.listen((m) {
-      if (m.data['alarm'] == '1') {
+    FirebaseMessaging.onMessage.listen((m) async {
+      if (m.data['alarm'] == '1' &&
+          await PushPrefs.allowed(m.data['type'] as String?)) {
         Alarms.showAlarm(_title(m), _body(m), payload: jsonEncode(m.data));
       }
     });

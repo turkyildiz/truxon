@@ -8,6 +8,7 @@ import '../services/alarms.dart';
 import '../services/api.dart';
 import '../services/diag.dart';
 import '../services/push.dart';
+import '../services/push_prefs.dart';
 import '../services/nps_service.dart';
 import '../services/radio_rx.dart';
 import '../services/tracking_service.dart';
@@ -445,6 +446,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             label: const Text('Run diagnostics'),
           ),
           const SizedBox(height: 8),
+          // R9 #146: quiet the optional pushes; dispatch alarms always ring.
+          const _NotificationPrefs(),
+          const SizedBox(height: 8),
           // Read-only field log (Diag ring buffer) so tracking/upload problems
           // can be diagnosed on the driver's own device. Newest first.
           Text(tr('diagnostics'), style: Theme.of(context).textTheme.titleSmall),
@@ -478,6 +482,52 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// R9 #146 — toggles for the optional push categories. New-assignment and
+/// breakdown alarms are deliberately absent: those always ring.
+class _NotificationPrefs extends StatefulWidget {
+  const _NotificationPrefs();
+
+  @override
+  State<_NotificationPrefs> createState() => _NotificationPrefsState();
+}
+
+class _NotificationPrefsState extends State<_NotificationPrefs> {
+  final Map<String, bool> _values = {};
+
+  @override
+  void initState() {
+    super.initState();
+    for (final type in PushPrefs.optional.keys) {
+      PushPrefs.get(type).then((v) {
+        if (mounted) setState(() => _values[type] = v);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      title: Text('Notifications',
+          style: Theme.of(context).textTheme.titleSmall),
+      subtitle: const Text('Dispatch alarms always ring',
+          style: TextStyle(fontSize: 11)),
+      children: [
+        for (final e in PushPrefs.optional.entries)
+          SwitchListTile(
+            dense: true,
+            title: Text(e.value),
+            value: _values[e.key] ?? true,
+            onChanged: (v) {
+              setState(() => _values[e.key] = v);
+              PushPrefs.set(e.key, v);
+            },
+          ),
+      ],
     );
   }
 }
