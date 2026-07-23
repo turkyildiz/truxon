@@ -2591,6 +2591,26 @@ export interface DwellFacility {
   detention_dollars: number
 }
 
+export interface EtaRiskLoad {
+  load_id: number
+  load_number: string
+  customer: string
+  driver: string | null
+  unit: string | null
+  appointment: string
+  miles_to_go: number
+  eta: string
+  slack_h: number
+  hos_drive_h: number
+  risk: 'late' | 'hos_short' | 'tight' | 'ok'
+}
+
+/** ETA vs appointment for rolling loads, while still fixable (R9 #52/#53). */
+export async function loadEtaRisk(): Promise<EtaRiskLoad[]> {
+  const d = unwrap(await supabase.rpc('load_eta_risk')) as unknown as { loads: EtaRiskLoad[] } | null
+  return d?.loads ?? []
+}
+
 /** Dock-time league: GPS-measured dwell per facility (R9 #51/#61). */
 export async function facilityDwellLeague(days = 45): Promise<DwellFacility[]> {
   const d = unwrap(await supabase.rpc('facility_dwell_league', { p_days: days })) as unknown as { facilities: DwellFacility[] } | null

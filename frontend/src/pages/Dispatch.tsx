@@ -3,7 +3,7 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Button, Card, Field, Input, money, Select, Textarea } from '../components/ui'
-import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, eldFleetLive, estimateLoadMargin, extractPdf, fleetCostBasis, laneRateForRoute, type EldFleetRow, type ExtractedStop } from '../data'
+import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, eldFleetLive, estimateLoadMargin, extractPdf, fleetCostBasis, laneRateForRoute, loadEtaRisk, type EldFleetRow, type ExtractedStop } from '../data'
 import { errorMessage } from '../supabase'
 import { ReferenceDataBanner, useReferenceData } from '../useReferenceData'
 import FleetMap from './FleetMap'
@@ -39,6 +39,37 @@ function routeOf(stops: StopForm[]): { origin: string; destination: string; wayp
   const ordered = [...stops.filter((s) => s.stop_type === 'pickup'), ...stops.filter((s) => s.stop_type === 'delivery')].filter(stopLine)
   const lines = ordered.map(stopLine)
   return { origin: lines[0] ?? '', destination: lines.at(-1) ?? '', waypoints: lines.slice(1, -1) }
+}
+
+/** Loads that will miss their appointment while it's still fixable. */
+function LateRiskCard() {
+  const q = useQuery({ queryKey: ['eta-risk'], queryFn: loadEtaRisk, refetchInterval: 5 * 60_000, retry: false })
+  const risky = (q.data ?? []).filter((l) => l.risk !== 'ok')
+  if (q.isError || risky.length === 0) return null
+  const label: Record<string, string> = { late: '🔴 LATE', hos_short: '🟠 HOS short', tight: '🟡 tight' }
+  return (
+    <Card title={`⏰ Late risk — ${risky.length} rolling load${risky.length === 1 ? '' : 's'}`}>
+      <p className="mb-2 text-xs text-muted">
+        Straight-line ×1.25 at 47 mph net vs the appointment — an estimate to act on, not a promise.
+        Call the broker before they call you.
+      </p>
+      <table className="w-full text-sm">
+        <tbody>
+          {risky.map((l) => (
+            <tr key={l.load_id} className="border-t border-line">
+              <td className="px-2 py-1.5 font-medium">{l.load_number}</td>
+              <td className="px-2 py-1.5 text-muted">{l.customer}</td>
+              <td className="px-2 py-1.5">{l.driver ?? '—'}{l.unit ? ` · #${l.unit}` : ''}</td>
+              <td className="px-2 py-1.5">{Math.round(Number(l.miles_to_go))} mi to go</td>
+              <td className="px-2 py-1.5">appt {new Date(l.appointment).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</td>
+              <td className="px-2 py-1.5 font-semibold">{label[l.risk]}</td>
+              <td className="px-2 py-1.5 text-muted">{l.risk === 'hos_short' ? `${l.hos_drive_h}h drive left` : `${l.slack_h}h slack`}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  )
 }
 
 export default function Dispatch() {
@@ -251,6 +282,7 @@ export default function Dispatch() {
   return (
     <div className="space-y-4">
       <FleetMap />
+      <LateRiskCard />
       <Card title="AI-Assisted Dispatch">
         <div
           onDragOver={(e) => {
