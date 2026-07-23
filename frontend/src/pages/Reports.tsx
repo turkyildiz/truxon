@@ -92,7 +92,7 @@ function DriverCards({ weekOffset }: { weekOffset: number }) {
   if (q.isError || !s || s.drivers.length === 0) return null
   return (
     <Card title="🧑‍✈️ Driver Scorecards">
-      <Table headers={['Driver', 'Loads', 'Miles', 'Revenue', '$/mi', 'Pay', 'On-time', 'Detention hrs', 'Violations', 'DVIR']}>
+      <Table headers={['Driver', 'Loads', 'Miles', 'Revenue', '$/mi', 'Pay', 'On-time', 'Detention hrs', 'Violations', 'DVIR', 'Harsh']}>
         {s.drivers.map((d) => (
           <tr key={d.driver}>
             <td className="px-3 py-2 font-medium">{d.driver}</td>
@@ -109,12 +109,15 @@ function DriverCards({ weekOffset }: { weekOffset: number }) {
             <td className={`px-3 py-2 ${d.dvir_pct != null && d.dvir_pct < 100 ? 'font-semibold text-amber-600 dark:text-amber-400' : ''}`}>
               {d.dvir_pct != null ? `${d.dvir_pct}%` : '—'}
             </td>
+            <td className={`px-3 py-2 ${d.harsh_brakes > 0 ? 'font-semibold text-rose-600 dark:text-rose-400' : ''}`}>
+              {d.harsh_brakes > 0 ? d.harsh_brakes : '—'}
+            </td>
           </tr>
         ))}
       </Table>
       <p className="mt-1 text-[11px] text-muted">
         On-time is measured from ELD arrival vs appointment (+2h grace) where GPS coverage exists; detention from measured dwell on the driver&rsquo;s loads.
-        DVIR is pre-trip inspection days over ELD driving days (&mdash; when the ELD tracked no driving).
+        DVIR is pre-trip inspection days over ELD driving days (&mdash; when the ELD tracked no driving). Harsh is a GPS-decel proxy (25+ mph lost in ~10s), not OEM accelerometer events.
       </p>
     </Card>
   )

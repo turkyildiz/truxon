@@ -2238,6 +2238,8 @@ export interface DriverCard {
   violations: number
   /** Pre-trip DVIR days ÷ ELD driving days; null when ELD tracked nothing. */
   dvir_pct: number | null
+  /** GPS-decel proxy events on the driver's trucks this week. */
+  harsh_brakes: number
 }
 
 export interface DriverScorecard {
