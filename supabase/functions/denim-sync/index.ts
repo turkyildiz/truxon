@@ -14,28 +14,9 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { corsResponse, getCaller, json, requireCron, withCors } from '../_shared/auth.ts'
+import { buildInvoiceIndex, type DenimJob, type InvoiceRow, jobPatch, matchJob } from '../_shared/denim.ts'
 
 const BASE = (Deno.env.get('DENIM_BASE_URL') ?? 'https://app.denim.com').replace(/\/$/, '')
-
-interface DenimObligation {
-  type?: string
-  total_amount?: number            // cents
-  payment_status?: string
-  line_items?: Array<{ amount?: number; type?: string }>
-}
-interface DenimJob {
-  id?: string | number
-  uuid?: string
-  job_id?: string | number
-  reference_number?: string | null
-  status?: string
-  created_at?: string
-  obligations?: DenimObligation[]
-  receivable?: DenimObligation
-  fees?: DenimObligation[]
-}
-
-const digits = (s: string) => s.replace(/\D+/g, '')
 
 async function denim(path: string, key: string): Promise<Response> {
   return await fetch(`${BASE}${path}`, {
@@ -77,16 +58,7 @@ Deno.serve(withCors(async (req) => {
   // invoice lookup: number + qbo doc number, digits-normalized
   const { data: invs } = await svc.from('invoices')
     .select('id, invoice_number, qbo_doc_number, factored_at, factoring_fee, source, status')
-  const byRef = new Map<string, Record<string, unknown>>()
-  for (const i of invs ?? []) {
-    for (const k of [i.invoice_number, i.qbo_doc_number]) {
-      const s = String(k ?? '').trim()
-      if (!s) continue
-      byRef.set(s.toLowerCase(), i)
-      const d = digits(s)
-      if (d.length >= 3 && !byRef.has(d)) byRef.set(d, i)
-    }
-  }
+  const byRef = buildInvoiceIndex((invs ?? []) as InvoiceRow[])
 
   for (let page = 1; page <= maxPages; page++) {
     if (Date.now() - t0 > 100_000) break
@@ -102,26 +74,12 @@ Deno.serve(withCors(async (req) => {
       stats.jobs++
       const ref = String(j.reference_number ?? '').trim()
       if (!ref) continue
-      const inv = byRef.get(ref.toLowerCase()) ?? byRef.get(digits(ref))
+      const inv = matchJob(byRef, ref)
       if (!inv) { if (stats.unmatched.length < 20) stats.unmatched.push(ref); continue }
       stats.matched++
 
-      // fee = sum of fee-type obligations (cents -> dollars)
-      const obls: DenimObligation[] = [
-        ...(Array.isArray(j.obligations) ? j.obligations : []),
-        ...(Array.isArray(j.fees) ? j.fees : []),
-      ]
-      const feeCents = obls
-        .filter((o) => /fee/i.test(String(o.type ?? '')))
-        .reduce((s, o) => s + (Number(o.total_amount) || 0), 0)
-      const fee = feeCents > 0 ? Math.round(feeCents) / 100 : null
-
-      // live pull showed 350 matches but denim_job_id stayed '' — the payload
-      // doesn't use `id`; accept the known aliases before giving up
-      const jobId = j.id ?? j.uuid ?? j.job_id ?? ''
-      const patch: Record<string, unknown> = { denim_job_id: String(jobId), factor_name: 'Denim' }
-      if (!inv.factored_at) patch.factored_at = j.created_at ?? new Date().toISOString()
-      if (fee != null && Number(inv.factoring_fee ?? 0) !== fee) { patch.factoring_fee = fee; stats.fees_set++ }
+      const { patch, feeChanged } = jobPatch(j, inv)
+      if (feeChanged) stats.fees_set++
       const { error } = await svc.from('invoices').update(patch).eq('id', inv.id)
       if (!error) stats.updated++
     }
