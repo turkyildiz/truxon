@@ -15,6 +15,7 @@
 - [Finish before next](finish-before-next.md) — clean your plate: commit→push→deploy→verify each task before starting the next
 - [Week standard](week-standard.md) — Mon–Sun, Week 0 = partial year start; use trux_week_* / lib/week.ts, never reinvent week math
 - [One-app radio](one-app-radio.md) — PTT over Supabase Realtime replaces Mumla+Tailscale; Forest answers on air; field smoke test gates side-app removal
+- [Forest speaker fleet](forest-speaker.md) — 5× HA Voice PE ordered; "Hey Forest" wake word + NAS voice gateway → trux-agent; tablet Forest Screens next; multi-tenant-ready
 - [Offline voice](offline-voice.md) — dead-zone voice SHIPPED: sherpa STT + Piper TTS on-device, models from NAS Funnel /models, store-and-forward brain; fleet OTA publish awaits owner
 - [Android emulator](android-emulator.md) — headless Pixel-Tablet AVD on dev box; verify ALL tablet UI visually before publishing (standard loop since 2026-07-21)
 - [Northstar project](northstar-project.md) — Truxon PREDICTIVE (Level 5); forecasts #1/#2/#3/#5 live, playbook 171/1000, not_captured down to harsh-braking + driver NPS; #4 breakdown ML awaits data
