@@ -2487,3 +2487,18 @@ export interface DenimRecon {
 export async function denimReconciliation(): Promise<DenimRecon | null> {
   return (unwrap(await supabase.rpc('denim_reconciliation')) as unknown as DenimRecon) ?? null
 }
+
+export interface FactoringCost {
+  face_total: number
+  fees_total: number
+  effective_rate_pct: number | null
+  book_days_to_pay: number | null
+  days_of_float_gained: number
+  annualized_cost_pct: number | null
+  months: { month: string; invoices: number; face: number; fees: number; rate_pct: number | null }[]
+}
+
+/** What factoring costs and what it buys. */
+export async function factoringCostSummary(): Promise<FactoringCost | null> {
+  return (unwrap(await supabase.rpc('factoring_cost_summary')) as unknown as FactoringCost) ?? null
+}

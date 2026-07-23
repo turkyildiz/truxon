@@ -4298,6 +4298,7 @@ export type Database = {
           unit_number: string
         }[]
       }
+      factoring_cost_summary: { Args: never; Returns: Json }
       factoring_overview: { Args: never; Returns: Json }
       finance_extras: { Args: never; Returns: Json }
       finance_march: { Args: never; Returns: Json }

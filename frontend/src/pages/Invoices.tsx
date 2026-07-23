@@ -16,7 +16,7 @@ import {
   createInvoice, decideAccessorial, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
   listAccessorials, proposeDetentionAccessorials,
   glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
-  denimReconciliation, qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
+  denimReconciliation, factoringCostSummary, qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
 } from '../data'
 import { downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
 import { errorMessage } from '../supabase'
@@ -682,6 +682,43 @@ function WriteoffCard() {
   )
 }
 
+/** What factoring costs (true fees ÷ face) and what it buys (days of float). */
+function FactoringCostCard() {
+  const q = useQuery({ queryKey: ['factoring-cost'], queryFn: factoringCostSummary, retry: false })
+  const d = q.data
+  if (q.isError || !d || d.fees_total === 0) return null
+  const recent = d.months.slice(-6)
+  return (
+    <Card title="💸 Cost of factoring">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Effective rate" value={d.effective_rate_pct != null ? `${d.effective_rate_pct}%` : '—'} sub={`${money(d.fees_total)} on ${money(d.face_total)}`} />
+        <Kpi label="Book pay speed" value={d.book_days_to_pay != null ? `${d.book_days_to_pay}d` : '—'} sub="brokers, on the books" />
+        <Kpi label="Float gained" value={`~${d.days_of_float_gained}d`} sub="advance in ~2 days instead" tone="good" />
+        <Kpi label="Annualized cost" value={d.annualized_cost_pct != null ? `${d.annualized_cost_pct}%` : '—'} sub="compare to any other money" tone={d.annualized_cost_pct != null && d.annualized_cost_pct > 25 ? 'warn' : undefined} />
+      </div>
+      {recent.length > 0 && (
+        <table className="mt-3 w-full text-sm">
+          <thead><tr className="text-left text-xs uppercase tracking-wide text-muted">
+            <th className="px-2 py-1">Month</th><th className="px-2 py-1">Invoices</th>
+            <th className="px-2 py-1">Face</th><th className="px-2 py-1">Fees</th><th className="px-2 py-1">Rate</th>
+          </tr></thead>
+          <tbody>
+            {recent.map((m) => (
+              <tr key={m.month} className="border-t border-line">
+                <td className="px-2 py-1 font-medium">{m.month}</td>
+                <td className="px-2 py-1">{m.invoices}</td>
+                <td className="px-2 py-1">{money(m.face)}</td>
+                <td className="px-2 py-1">{money(m.fees)}</td>
+                <td className="px-2 py-1">{m.rate_pct != null ? `${m.rate_pct}%` : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Card>
+  )
+}
+
 /** Denim's statement vs our books — agreement or the exact disagreements. */
 function DenimReconCard() {
   const q = useQuery({ queryKey: ['denim-recon'], queryFn: denimReconciliation, retry: false })
@@ -754,6 +791,7 @@ function FactoringTab() {
   return (
     <div className="space-y-4">
       <WriteoffCard />
+      <FactoringCostCard />
       <DenimReconCard />
       <p className="text-sm text-muted">
         Factored invoices are financed by <strong>{rows[0]?.factor ?? 'your factor'}</strong>: you get the
