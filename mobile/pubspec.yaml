@@ -82,6 +82,7 @@ dependencies:
   sherpa_onnx: ^1.13.4
   archive: ^4.0.9
   connectivity_plus: ^7.3.0
+  flutter_image_compress: ^2.5.0
 
 dev_dependencies:
   flutter_test:

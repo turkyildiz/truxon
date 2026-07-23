@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -37,7 +38,24 @@ class DocScan {
       path = shot.path;
     }
 
-    final bytes = await File(path).readAsBytes();
+    // R9 #150 — compress before upload: the scanner returns full-resolution
+    // frames (5-10 MB) that crawl over cell data. 2200px @ q70 keeps every
+    // POD/receipt legible (OCR runs on the ORIGINAL below, so no text is
+    // lost to compression). Fall back to raw bytes if the codec fails.
+    Uint8List bytes;
+    try {
+      bytes = await FlutterImageCompress.compressWithFile(
+            path,
+            quality: 70,
+            minWidth: 2200,
+            minHeight: 2200,
+            keepExif: false,
+          ) ??
+          await File(path).readAsBytes();
+    } catch (e) {
+      Diag.log('scan: compress failed, uploading original: $e');
+      bytes = await File(path).readAsBytes();
+    }
     var ocr = '';
     try {
       final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
