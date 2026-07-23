@@ -1,0 +1,40 @@
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: forest-ha
+    restart: unless-stopped
+    network_mode: host          # HA discovery + ESPHome adoption need mDNS
+    environment:
+      - TZ=America/Chicago
+    volumes:
+      - /volume1/docker/forest-voice/ha-config:/config
+
+  whisper:
+    image: rhasspy/wyoming-whisper:latest
+    container_name: forest-whisper
+    restart: unless-stopped
+    command: --model small-int8 --language en --beam-size 2
+    ports:
+      - "10300:10300"
+    volumes:
+      - /volume1/docker/forest-voice/whisper-data:/data
+
+  piper:
+    image: rhasspy/wyoming-piper:latest
+    container_name: forest-piper
+    restart: unless-stopped
+    command: --voice en_US-ryan-high
+    ports:
+      - "10200:10200"
+    volumes:
+      - /volume1/docker/forest-voice/piper-data:/data
+
+  openwakeword:
+    image: rhasspy/wyoming-openwakeword:latest
+    container_name: forest-openwakeword
+    restart: unless-stopped
+    command: --preload-model hey_jarvis --custom-model-dir /custom
+    ports:
+      - "10400:10400"
+    volumes:
+      - /volume1/docker/forest-voice/oww-data/custom:/custom

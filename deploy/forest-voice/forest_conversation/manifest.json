@@ -1,0 +1,11 @@
+{
+  "domain": "forest_conversation",
+  "name": "Forest (Truxon)",
+  "version": "0.1.0",
+  "documentation": "https://truxon.com",
+  "dependencies": ["conversation"],
+  "codeowners": [],
+  "iot_class": "cloud_polling",
+  "config_flow": true,
+  "requirements": []
+}
