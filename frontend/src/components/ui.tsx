@@ -202,19 +202,54 @@ export function Badge({ status }: { status: string }) {
 export type TableHeader = string | { label: string; key: string }
 export interface SortState { key: string; dir: 'asc' | 'desc' }
 
+/** Serialize the RENDERED table to CSV — works for every Table with zero
+ * per-page wiring (R9 #158). Reads what the user sees, footers included. */
+function tableToCsv(root: HTMLElement | null): string | null {
+  const table = root?.querySelector('table')
+  if (!table) return null
+  const esc = (v: string) => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
+  const rows: string[] = []
+  for (const tr of table.querySelectorAll('tr')) {
+    const cells = [...tr.querySelectorAll('th,td')].map((c) => esc((c.textContent ?? '').trim().replace(/\s+/g, ' ')))
+    if (cells.some((c) => c.length > 0)) rows.push(cells.join(','))
+  }
+  return rows.length > 1 ? rows.join('\n') : null
+}
+
 export function Table({
   headers,
   children,
   sort,
   onSort,
+  exportName = 'export',
 }: {
   headers: TableHeader[]
   children: ReactNode
   sort?: SortState
   onSort?: (key: string) => void
+  /** CSV download filename (default 'export'); pass '' to hide the button. */
+  exportName?: string
 }) {
+  const rootRef = useRef<HTMLDivElement>(null)
+  const download = () => {
+    const csv = tableToCsv(rootRef.current)
+    if (!csv) return
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+    a.download = `${exportName}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
   return (
-    <div className="overflow-x-auto">
+    <div ref={rootRef} className="group/table relative overflow-x-auto">
+      {exportName && (
+        <button
+          type="button"
+          onClick={download}
+          title="Download this table as CSV"
+          className="absolute right-0 top-0 z-10 rounded-bl-lg px-2 py-1 text-[11px] text-muted opacity-0 transition-opacity hover:text-body group-hover/table:opacity-100"
+        >⬇ CSV</button>
+      )}
       <table className="w-full text-sm text-body">
         <thead>
           <tr className="border-b border-line text-left">
