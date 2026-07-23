@@ -2579,6 +2579,24 @@ export interface DepreciationSchedule {
   rows: { unit: string; purchase_price: number; purchase_date: string; monthly: number; months_elapsed: number; book_value: number }[]
 }
 
+export interface DwellFacility {
+  customer: string
+  stop_state: string | null
+  stop_type: string
+  stops: number
+  avg_dwell_h: number
+  p50_h: number
+  p90_h: number
+  detention_hours: number
+  detention_dollars: number
+}
+
+/** Dock-time league: GPS-measured dwell per facility (R9 #51/#61). */
+export async function facilityDwellLeague(days = 45): Promise<DwellFacility[]> {
+  const d = unwrap(await supabase.rpc('facility_dwell_league', { p_days: days })) as unknown as { facilities: DwellFacility[] } | null
+  return d?.facilities ?? []
+}
+
 /** Owner-view straight-line depreciation (not the tax books). */
 export async function depreciationSchedule(): Promise<DepreciationSchedule | null> {
   return (unwrap(await supabase.rpc('depreciation_schedule')) as unknown as DepreciationSchedule) ?? null

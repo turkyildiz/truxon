@@ -16,7 +16,7 @@ import {
   createInvoice, decideAccessorial, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
   listAccessorials, proposeDetentionAccessorials,
   glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
-  creditMemoSummary, denimReconciliation, factoringCostSummary, fleetCostBasis, paymentApplicationAudit, qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, revRecDrift, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
+  creditMemoSummary, denimReconciliation, facilityDwellLeague, factoringCostSummary, fleetCostBasis, paymentApplicationAudit, qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, revRecDrift, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
 } from '../data'
 import { downloadCustomerStatement, downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
 import { errorMessage } from '../supabase'
@@ -1063,6 +1063,35 @@ function UnbilledTab({ onBill }: { onBill: (customerId: number) => void }) {
 }
 
 // ── Detention (Northstar: ELD dwell vs free time) ────────────────────────────
+/** Which docks hold our trucks — the exhibit for rate conversations. */
+function DwellLeagueCard() {
+  const q = useQuery({ queryKey: ['dwell-league'], queryFn: () => facilityDwellLeague(45), retry: false })
+  const rows = (q.data ?? []).slice(0, 12)
+  if (q.isError || rows.length === 0) return null
+  return (
+    <Card title="🏭 Dock-time league — worst facilities, last 45 days">
+      <p className="mb-2 text-xs text-muted">
+        GPS-measured dwell per facility (customer + state + side). P90 is what to quote when a broker
+        says &ldquo;our dock is fast&rdquo;; detention $ is what their dock actually cost you.
+      </p>
+      <Table headers={['Facility', 'Side', 'Stops', 'Avg', 'P50', 'P90', 'Detention', '$']}>
+        {rows.map((r) => (
+          <tr key={`${r.customer}-${r.stop_state}-${r.stop_type}`}>
+            <td className="px-3 py-2 font-medium">{r.customer}{r.stop_state ? ` (${r.stop_state})` : ''}</td>
+            <td className="px-3 py-2 text-muted">{r.stop_type}</td>
+            <td className="px-3 py-2">{r.stops}</td>
+            <td className="px-3 py-2">{r.avg_dwell_h}h</td>
+            <td className="px-3 py-2">{r.p50_h}h</td>
+            <td className={`px-3 py-2 ${Number(r.p90_h) >= 3 ? 'font-semibold text-rose-600 dark:text-rose-400' : ''}`}>{r.p90_h}h</td>
+            <td className="px-3 py-2">{Number(r.detention_hours) > 0 ? `${r.detention_hours}h` : '—'}</td>
+            <td className="px-3 py-2">{Number(r.detention_dollars) > 0 ? money(Number(r.detention_dollars)) : '—'}</td>
+          </tr>
+        ))}
+      </Table>
+    </Card>
+  )
+}
+
 function DetentionTab() {
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['detention'], queryFn: () => detentionEvents(45), retry: false })
@@ -1087,6 +1116,7 @@ function DetentionTab() {
   const hrs = (m: number) => `${Math.floor(m / 60)}h ${m % 60}m`
   return (
     <>
+      <DwellLeagueCard />
       <p className="mb-3 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
         {rows.length === 0
           ? 'No detention detected in the last 45 days (needs ELD coverage over the stop window). As breadcrumb history grows, held-up loads will surface here.'

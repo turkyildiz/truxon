@@ -1572,6 +1572,56 @@ export type Database = {
         }
         Relationships: []
       }
+      harsh_events: {
+        Row: {
+          created_at: string
+          from_mph: number | null
+          id: number
+          kind: string
+          lat: number | null
+          lng: number | null
+          seconds: number | null
+          to_mph: number | null
+          truck_id: number | null
+          ts: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          from_mph?: number | null
+          id?: number
+          kind: string
+          lat?: number | null
+          lng?: number | null
+          seconds?: number | null
+          to_mph?: number | null
+          truck_id?: number | null
+          ts: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          from_mph?: number | null
+          id?: number
+          kind?: string
+          lat?: number | null
+          lng?: number | null
+          seconds?: number | null
+          to_mph?: number | null
+          truck_id?: number | null
+          ts?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "harsh_events_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_payments: {
         Row: {
           amount: number
@@ -4185,6 +4235,7 @@ export type Database = {
       }
       denim_reconciliation: { Args: never; Returns: Json }
       depreciation_schedule: { Args: never; Returns: Json }
+      detect_harsh_events: { Args: { p_day?: string }; Returns: number }
       detention_events: {
         Args: {
           p_days?: number
@@ -4313,6 +4364,14 @@ export type Database = {
           mpg: number
         }[]
       }
+      eld_gap_days: {
+        Args: { p_back?: number }
+        Returns: {
+          day: string
+          truck_id: number
+          vehicle_id: string
+        }[]
+      }
       eld_link_drivers: { Args: never; Returns: number }
       eld_link_vehicles: { Args: never; Returns: number }
       enqueue_doc_search: {
@@ -4336,6 +4395,7 @@ export type Database = {
           unit_number: string
         }[]
       }
+      facility_dwell_league: { Args: { p_days?: number }; Returns: Json }
       factoring_cost_summary: { Args: never; Returns: Json }
       factoring_overview: { Args: never; Returns: Json }
       finance_extras: { Args: never; Returns: Json }
