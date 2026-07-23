@@ -1238,6 +1238,19 @@ export async function financeMarch(): Promise<FinanceMarch> {
   return unwrap(await supabase.rpc('finance_march')) as unknown as FinanceMarch
 }
 
+export interface LoadRoute {
+  points: [number, number][]
+  from?: string
+  to?: string
+  total_pings?: number
+  reason?: string
+}
+
+/** GPS breadcrumb trail the load actually drove (downsampled server-side). */
+export async function loadRoute(loadId: number): Promise<LoadRoute> {
+  return unwrap(await supabase.rpc('load_route', { p_load_id: loadId })) as unknown as LoadRoute
+}
+
 /** IFTA rollup per jurisdiction over the range. */
 export async function fuelIftaSummary(start: string, end: string): Promise<FuelIftaRow[]> {
   const data = unwrap(await supabase.rpc('fuel_ifta_summary', { p_start: start, p_end: end }))

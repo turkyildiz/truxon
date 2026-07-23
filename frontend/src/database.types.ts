@@ -4286,6 +4286,7 @@ export type Database = {
           variance: number
         }[]
       }
+      load_route: { Args: { p_load_id: number }; Returns: Json }
       loads_missing_pod: {
         Args: { p_days?: number }
         Returns: {

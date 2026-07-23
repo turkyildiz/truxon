@@ -4,7 +4,10 @@ import { useParams } from 'react-router-dom'
 import DocsNotes from '../components/DocsNotes'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Badge, Button, Card, Field, formatDateTime, Input, LoadError, money, Select, Textarea } from '../components/ui'
-import { cancelLoad, changeLoadStatus, getLoad, listStops, nextLoadSuggestions, replaceStops, setLoadPaperwork, uncancelLoad, updateLoad } from '../data'
+import { cancelLoad, changeLoadStatus, getLoad, listStops, loadRoute, nextLoadSuggestions, replaceStops, setLoadPaperwork, uncancelLoad, updateLoad } from '../data'
+import { useEffect, useRef } from 'react'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { Link } from 'react-router-dom'
 
 /** Deadhead assist: once a load is moving/done, show the closest open pickups. */
@@ -69,6 +72,33 @@ function StatusStepper({ load, onAdvance, busy }: { load: Load; onAdvance: (stat
         </Button>
       )}
     </div>
+  )
+}
+
+/** The trail the truck actually drove — ELD breadcrumbs on a map. Renders
+ * nothing for loads before the GPS bank started (2026-06-29). */
+function RouteReplayCard({ loadId }: { loadId: number }) {
+  const q = useQuery({ queryKey: ['load-route', loadId], queryFn: () => loadRoute(loadId), retry: false })
+  const mapRef = useRef<HTMLDivElement>(null)
+  const points = q.data?.points ?? []
+  useEffect(() => {
+    if (!mapRef.current || points.length < 2) return
+    const map = L.map(mapRef.current, { zoomControl: true, attributionControl: false })
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 17 }).addTo(map)
+    const line = L.polyline(points as [number, number][], { color: '#6366f1', weight: 3, opacity: 0.85 }).addTo(map)
+    L.circleMarker(points[0], { radius: 6, color: '#16a34a', fillOpacity: 0.9 }).addTo(map).bindTooltip('Start')
+    L.circleMarker(points[points.length - 1], { radius: 6, color: '#dc2626', fillOpacity: 0.9 }).addTo(map).bindTooltip('End')
+    map.fitBounds(line.getBounds(), { padding: [24, 24] })
+    return () => { map.remove() }
+  }, [points])
+  if (q.isError || points.length < 2) return null
+  return (
+    <Card title="🛰️ Route replay — what the truck actually drove">
+      <p className="mb-2 text-xs text-muted">
+        {q.data?.total_pings?.toLocaleString()} GPS pings from the ELD, pickup −2h through delivery +4h.
+      </p>
+      <div ref={mapRef} className="h-72 w-full overflow-hidden rounded-xl" />
+    </Card>
   )
 }
 
@@ -412,6 +442,7 @@ export default function LoadDetail() {
 
       <NextLoadCard loadId={Number(id)} show={['in_transit', 'delivered', 'completed'].includes(load.status)} />
 
+      <RouteReplayCard loadId={Number(id)} />
       <DocsNotes entityType="load" entityId={id!} docTypes={['Rate Confirmation', 'BOL', 'POD', 'Photo', 'Other']} />
     </div>
   )
