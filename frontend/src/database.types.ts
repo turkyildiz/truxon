@@ -1912,6 +1912,38 @@ export type Database = {
           },
         ]
       }
+      load_checkcalls: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: number
+          load_id: number
+          note: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: number
+          load_id: number
+          note: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: number
+          load_id?: number
+          note?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "load_checkcalls_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "loads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       load_stops: {
         Row: {
           address: string
@@ -4263,6 +4295,29 @@ export type Database = {
           stop_type: string
         }[]
       }
+      detention_events_core: {
+        Args: {
+          p_days?: number
+          p_free_min?: number
+          p_radius_mi?: number
+          p_rate?: number
+        }
+        Returns: {
+          appointment: string
+          arrival: string
+          customer: string
+          departure: string
+          detention_min: number
+          dwell_min: number
+          est_pay: number
+          free_min: number
+          load_id: number
+          load_number: string
+          stop_state: string
+          stop_type: string
+        }[]
+      }
+      dispatch_productivity: { Args: { p_days?: number }; Returns: Json }
       dot_audit_pack: { Args: never; Returns: Json }
       draft_dunning_notices: { Args: never; Returns: number }
       drive_create_share: {
@@ -4337,6 +4392,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      driver_tenure_summary: { Args: never; Returns: Json }
       driver_turnover: {
         Args: { p_end: string; p_start: string }
         Returns: Json

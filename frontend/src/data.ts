@@ -2616,6 +2616,24 @@ export async function loadEtaRisk(): Promise<EtaRiskLoad[]> {
   return d?.loads ?? []
 }
 
+export interface CheckCall {
+  id: number
+  load_id: number
+  note: string
+  created_at: string
+}
+
+/** Timestamped dispatch timeline per load (R9 #121). */
+export async function listCheckCalls(loadId: number): Promise<CheckCall[]> {
+  return unwrap(await supabase.from('load_checkcalls')
+    .select('id, load_id, note, created_at')
+    .eq('load_id', loadId).order('created_at', { ascending: false })) as unknown as CheckCall[]
+}
+
+export async function addCheckCall(loadId: number, note: string): Promise<void> {
+  unwrap(await supabase.from('load_checkcalls').insert({ load_id: loadId, note } as never).select('id'))
+}
+
 /** Dock-time league: GPS-measured dwell per facility (R9 #51/#61). */
 export async function facilityDwellLeague(days = 45): Promise<DwellFacility[]> {
   const d = unwrap(await supabase.rpc('facility_dwell_league', { p_days: days })) as unknown as { facilities: DwellFacility[] } | null

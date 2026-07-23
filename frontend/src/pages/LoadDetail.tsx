@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom'
 import DocsNotes from '../components/DocsNotes'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Badge, Button, Card, Field, formatDateTime, Input, LoadError, money, Select, Textarea } from '../components/ui'
-import { cancelLoad, changeLoadStatus, getLoad, listStops, loadRoute, nextLoadSuggestions, replaceStops, setLoadPaperwork, uncancelLoad, updateLoad } from '../data'
+import { addCheckCall, cancelLoad, changeLoadStatus, getLoad, listCheckCalls, listStops, loadRoute, nextLoadSuggestions, replaceStops, setLoadPaperwork, uncancelLoad, updateLoad } from '../data'
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -98,6 +98,44 @@ function RouteReplayCard({ loadId }: { loadId: number }) {
         {q.data?.total_pings?.toLocaleString()} GPS pings from the ELD, pickup −2h through delivery +4h.
       </p>
       <div ref={mapRef} className="h-72 w-full overflow-hidden rounded-xl" />
+    </Card>
+  )
+}
+
+
+/** Timestamped dispatch timeline — check calls, append-only (R9 #121). */
+function CheckCallLog({ loadId }: { loadId: number }) {
+  const qc = useQueryClient()
+  const q = useQuery({ queryKey: ['checkcalls', loadId], queryFn: () => listCheckCalls(loadId), enabled: !!loadId, retry: false })
+  const [note, setNote] = useState('')
+  const add = useMutation({
+    mutationFn: () => addCheckCall(loadId, note.trim()),
+    onSuccess: () => { setNote(''); qc.invalidateQueries({ queryKey: ['checkcalls', loadId] }) },
+  })
+  if (q.isError) return null
+  const rows = q.data ?? []
+  return (
+    <Card title={`📞 Check calls${rows.length ? ` (${rows.length})` : ''}`}>
+      <form
+        className="mb-3 flex gap-2"
+        onSubmit={(e) => { e.preventDefault(); if (note.trim()) add.mutate() }}
+      >
+        <Input value={note} onChange={(e) => setNote(e.target.value)}
+          placeholder="e.g. 0930 driver loaded, 4 pallets short — broker notified" className="flex-1" />
+        <Button type="submit" disabled={add.isPending || !note.trim()}>Log</Button>
+      </form>
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted">No check calls yet — every broker call and status update belongs here, timestamped.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {rows.map((c) => (
+            <li key={c.id} className="flex gap-3 border-l-2 border-line pl-3 text-sm">
+              <span className="shrink-0 text-xs text-muted">{formatDateTime(c.created_at)}</span>
+              <span className="text-body">{c.note}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
   )
 }
@@ -443,6 +481,7 @@ export default function LoadDetail() {
       <NextLoadCard loadId={Number(id)} show={['in_transit', 'delivered', 'completed'].includes(load.status)} />
 
       <RouteReplayCard loadId={Number(id)} />
+      <CheckCallLog loadId={Number(id)} />
       <DocsNotes entityType="load" entityId={id!} docTypes={['Rate Confirmation', 'BOL', 'POD', 'Photo', 'Other']} />
     </div>
   )
