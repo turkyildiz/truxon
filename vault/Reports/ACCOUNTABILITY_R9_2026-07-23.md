@@ -102,5 +102,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **#105 Rate-con reconciliation** — `ratecon_recon_report()` (mismatch list ranked by |delta|, honest `not_extracted` count, fuel-surcharge capture stats for the pending G flip) + sentinel `ratecon_recon:` money-warn (>$1 drift, auto-resolves when booked rate matches the paper). Sentinel lineage head is now `20260723150003`.
 - Live-verified: migrations local=remote, anon → `permission denied` on the RPC (gate holds), extract-pdf redeployed.
 - **Suite: 930 pgTAP / 163 files** — one real test catch on the way: RLS assertions are no-ops as `postgres`; the driver-invisibility test needed `set local role authenticated`.
+- **G flips #14/#69 (fuel-surcharge revenue + recovery rate)** — `fuel_surcharge_recovery(days)`: FSC captured from line items ÷ net-of-discount fuel spend, extraction coverage printed in the payload (never implied 100%). **Playbook now 193 live.** Suite: **932 pgTAP**. Prod pushed, anon gate verified.
 
 *(Run continues; closeout will finalize the count.)*
