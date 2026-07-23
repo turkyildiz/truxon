@@ -156,6 +156,61 @@ Deno.serve(withCors(async (req) => {
       return json({ ok: true, mode: 'history', vehicles: vehicles.length, breadcrumbs: inserted, days })
     }
 
+    // ── gap fill (nightly, after the history sweep): re-fetch the exact
+    //    vehicle-days the miles bank missed. DriveHOS keeps history, so
+    //    skipped days are recoverable; a fetch that comes back near-empty
+    //    stamps a zero-marker row ("checked — truck sat") so gaps stop
+    //    looking identical to parked days. Bounded batch; converges nightly. ──
+    if (body.mode === 'gapfill') {
+      const { data: gaps } = await svc.rpc('eld_gap_days', { p_back: Number(body.back) || 14 })
+      const gapRows = (gaps ?? []) as { vehicle_id: string; truck_id: number; day: string }[]
+      const batch = gapRows.slice(0, Number(body.limit) || 40)
+      let fetched = 0
+      const daysTouched = new Set<string>()
+      const parked: { day: string; truck_id: number }[] = []
+      for (const g of batch) {
+        const d0 = new Date(`${g.day}T00:00:00Z`)
+        const d1 = new Date(d0.getTime() + 86400000)
+        let token = ''
+        let points = 0
+        for (let guard = 0; guard < 10; guard++) {
+          const qs = `start_date=${mmddyyyy(d0)}&end_date=${mmddyyyy(d1)}&limit=1000${token ? `&next_page_token=${encodeURIComponent(token)}` : ''}`
+          const j = await eld(`vehicle-location-history/${g.vehicle_id}?${qs}`)
+          const rows = Array.isArray(j?.data) ? j.data : []
+          if (rows.length) {
+            // deno-lint-ignore no-explicit-any
+            await svc.from('eld_location_history').upsert(rows.map((r: any) => ({
+              id: r.id, vehicle_id: g.vehicle_id, vehicle_number: r.vehicle_number ?? '',
+              vin: r.vin ?? '', lat: n(r.lat), lng: n(r.lng), speed: n(r.speed),
+              direction: n(r.direction), status: r.status ?? null, calc_location: r.calc_location ?? null,
+              ts: r.timestamp,
+            })), { onConflict: 'id', ignoreDuplicates: true })
+            points += rows.length
+            fetched += rows.length
+          }
+          token = j?.next_page_token ?? ''
+          if (!token || rows.length === 0) break
+        }
+        if (points >= 5) daysTouched.add(g.day)
+        else parked.push({ day: g.day, truck_id: g.truck_id })
+      }
+      let banked = 0
+      for (const day of daysTouched) {
+        const { data: nBanked } = await svc.rpc('rollup_eld_daily', { p_day: day })
+        banked += Number(nBanked) || 0
+        await svc.rpc('ifta_attribute_states', { p_day: day })
+      }
+      if (parked.length) {
+        await svc.from('eld_daily_miles').upsert(parked.map((p) => ({
+          day: p.day, truck_id: p.truck_id, state: '', miles: 0, points: 0, path: [],
+        })), { onConflict: 'day,truck_id,state', ignoreDuplicates: true })
+      }
+      return json({
+        ok: true, mode: 'gapfill', gaps_found: gapRows.length, checked: batch.length,
+        breadcrumbs: fetched, days_rebanked: daysTouched.size, banked, confirmed_parked: parked.length,
+      })
+    }
+
     // ── live status (default) ──
     const vstatus = dedupeBy(await pageAll('latest-vehicle-status'), (s) => s.vehicle_id)
     const dstatus = dedupeBy(await pageAll('latest-driver-status'), (s) => s.driver_id)
