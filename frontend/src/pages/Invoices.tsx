@@ -918,6 +918,20 @@ function CollectionsTab() {
               </td>
               <td className="px-3 py-2.5">
                 <Button variant="secondary" onClick={(e) => { e.stopPropagation(); setNoteFor(r) }}>+ Note</Button>
+                {r.email && (
+                  <a
+                    className="btn ml-1 px-2 py-0.5 text-xs"
+                    title="Open a pre-written statement email in your mail client — nothing sends until you hit send. Grab the statement PDF from the Aging tab to attach."
+                    onClick={(e) => e.stopPropagation()}
+                    href={`mailto:${r.email}?subject=${encodeURIComponent(`Statement of account — ${money(Number(r.overdue_total))} past due`)}&body=${encodeURIComponent(
+                      `Hi${r.contact_person ? ` ${r.contact_person}` : ''},\n\nOur records show ${money(Number(r.overdue_total))} past due across ${r.overdue_count} invoice${Number(r.overdue_count) === 1 ? '' : 's'}, the oldest now ${r.oldest_days} days. A detailed statement is attached.\n\nCould you let us know when we can expect payment?\n\nThank you`,
+                    )}`}
+                  >✉️ Draft</a>
+                )}
+                <button
+                  type="button" className="btn ml-1 px-2 py-0.5 text-xs" title="Download statement PDF to attach"
+                  onClick={(e) => { e.stopPropagation(); void downloadCustomerStatement(r.customer_id) }}
+                >PDF</button>
               </td>
             </tr>
             {open === r.customer_id && (
