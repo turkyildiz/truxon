@@ -1196,6 +1196,30 @@ export async function truckMpg(days = 30): Promise<TruckMpgSummary> {
   return unwrap(await supabase.rpc('truck_mpg', { p_days: days })) as unknown as TruckMpgSummary
 }
 
+export interface FuelReconRow {
+  truck_id: number
+  unit_number: string
+  loaded_miles: number
+  deadhead_miles: number
+  total_miles: number
+  gallons: number
+  implied_mpg: number | null
+  expected_gallons: number
+  gallon_variance_pct: number | null
+  diesel_spend: number
+  nonfuel_spend: number
+  nondiesel_gallons: number
+  eld_miles: number
+  miles_basis: 'eld' | 'booked'
+  gallons_untracked: number
+}
+
+/** Fuel-vs-miles reconciliation (the sentinel's diversion check, same math). */
+export async function fuelRecon(days = 45): Promise<FuelReconRow[]> {
+  const data = unwrap(await supabase.rpc('fuel_efficiency_by_truck', { p_days: days }))
+  return (data as unknown as FuelReconRow[]) ?? []
+}
+
 /** IFTA rollup per jurisdiction over the range. */
 export async function fuelIftaSummary(start: string, end: string): Promise<FuelIftaRow[]> {
   const data = unwrap(await supabase.rpc('fuel_ifta_summary', { p_start: start, p_end: end }))

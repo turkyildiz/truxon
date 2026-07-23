@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useRef, useState } from 'react'
 import { Badge, Button, Card, compareValues, Field, formatDateTime, Input, LoadError, money, StatCard, type SortState, Table, toggleSort } from '../components/ui'
 import { useAuth } from '../auth'
-import { fuelByTruck, fuelIftaSummary, iftaQuarter, importFuelCsv, listFuelTransactions, truckMpg } from '../data'
+import { fuelByTruck, fuelIftaSummary, fuelRecon, iftaQuarter, importFuelCsv, listFuelTransactions, truckMpg } from '../data'
 import { errorMessage } from '../supabase'
 import type { FuelImportResult } from '../types'
 
@@ -80,6 +80,61 @@ function MpgCard() {
             </p>
           )}
         </>
+      )}
+    </Card>
+  )
+}
+
+/** The sentinel's diversion check, visible: gallons vs. the miles that justify them. */
+function ReconCard() {
+  const q = useQuery({ queryKey: ['fuel', 'recon'], queryFn: () => fuelRecon(45), retry: false })
+  if (q.isError) return null
+  const rows = (q.data ?? []).filter((r) => Number(r.gallons) + Number(r.gallons_untracked) > 0)
+  const pill = (text: string, tone: 'red' | 'amber' | 'green' | 'blue' | 'slate') => {
+    const cls = {
+      red: 'bg-red-500/15 text-red-600 dark:text-red-300',
+      amber: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+      green: 'bg-green-500/15 text-green-700 dark:text-green-300',
+      blue: 'bg-blue-500/15 text-blue-600 dark:text-blue-300',
+      slate: 'bg-slate-500/15 text-slate-600 dark:text-slate-300',
+    }[tone]
+    return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${cls}`}>{text}</span>
+  }
+  const varianceBadge = (v: number | null) => {
+    if (v == null) return <span className="text-muted">—</span>
+    return pill(`${v > 0 ? '+' : ''}${Math.round(v)}%`, v >= 25 ? 'red' : v >= 10 ? 'amber' : 'green')
+  }
+  return (
+    <Card title="🕵️ Fuel vs. miles — 45d reconciliation">
+      <p className="mb-2 text-xs text-muted">
+        Same math as the fuel-diversion sentinel: gallons only count on days the truck banked GPS miles ("basis: eld"; booked dispatch miles for ELD-dark trucks).
+        Variance is purchased vs. expected gallons at 6.5 MPG — sustained +25% on clean coverage is worth a conversation.
+        "Off-day gal" is fuel bought while the ELD reported nothing; a dark ELD plus a full tank is its own red flag.
+      </p>
+      {q.isLoading ? (
+        <p className="py-8 text-center text-muted">Loading…</p>
+      ) : rows.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted">No fuel purchases in the window.</p>
+      ) : (
+        <Table headers={['Unit', 'Miles', 'Basis', 'Gallons', 'Off-day gal', 'MPG', 'Variance']}>
+          {rows.map((r) => (
+            <tr key={r.truck_id} className="hover:bg-surface-2">
+              <td className="px-3 py-2.5 font-medium">{r.unit_number}</td>
+              <td className="px-3 py-2.5">{Math.round(Number(r.total_miles)).toLocaleString()}</td>
+              <td className="px-3 py-2.5">
+                {pill(r.miles_basis, r.miles_basis === 'eld' ? 'blue' : 'slate')}
+              </td>
+              <td className="px-3 py-2.5">{Number(r.gallons).toLocaleString(undefined, { maximumFractionDigits: 1 })}</td>
+              <td className="px-3 py-2.5">
+                {Number(r.gallons_untracked) > 0
+                  ? <span className="font-medium text-amber-600 dark:text-amber-400">{Number(r.gallons_untracked).toLocaleString(undefined, { maximumFractionDigits: 1 })}</span>
+                  : <span className="text-muted">—</span>}
+              </td>
+              <td className="px-3 py-2.5">{r.implied_mpg != null ? Number(r.implied_mpg).toFixed(2) : '—'}</td>
+              <td className="px-3 py-2.5">{varianceBadge(r.gallon_variance_pct != null ? Number(r.gallon_variance_pct) : null)}</td>
+            </tr>
+          ))}
+        </Table>
       )}
     </Card>
   )
@@ -283,6 +338,7 @@ export default function Fuel() {
       </div>
 
       <MpgCard />
+      <ReconCard />
 
       <Card title="Fuel by Truck">
         {byTruckQ.isError ? (
