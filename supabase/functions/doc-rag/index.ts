@@ -33,6 +33,47 @@ Deno.serve(withCors(async (req) => {
     return json({ total, indexed, unindexed: total - indexed, chunks, drive_total: driveTotal, drive_indexed: driveIndexed })
   }
 
+  // ── classify_targets (R9 #101): 'Other' docs whose indexed text can carry a
+  //    label decision; the NAS 3B picks from the canonical set. Image-only
+  //    docs (no chunks) wait for the vision path. ──
+  if (body.mode === 'classify_targets') {
+    if (!cron) return json({ error: 'cron only' }, 403)
+    const limit = Math.min(Math.max(Number(body.limit) || 20, 1), 60)
+    const { data: docs } = await svc.from('documents')
+      .select('id, filename, entity_type').eq('doc_type', 'Other')
+      .order('id', { ascending: true }).limit(200)
+    const targets: Array<Record<string, unknown>> = []
+    for (const d of docs ?? []) {
+      if (targets.length >= limit) break
+      const { data: chunks } = await svc.from('document_embeddings')
+        .select('content').eq('document_id', d.id)
+        .order('chunk_index', { ascending: true }).limit(2)
+      const text = (chunks ?? []).map((c) => String(c.content ?? '')).join('\n').slice(0, 1800)
+      if (text.length < 60) continue
+      targets.push({ document_id: d.id, filename: d.filename, entity_type: d.entity_type, excerpt: text })
+    }
+    return json({ targets })
+  }
+
+  // ── classify_apply: write a validated label; logs to the extraction ledger ──
+  if (body.mode === 'classify_apply') {
+    if (!cron) return json({ error: 'cron only' }, 403)
+    const id = Number(body.document_id)
+    const label = String(body.doc_type ?? '')
+    const ALLOWED = ['POD', 'Rate Confirmation', 'BOL', 'Invoice', 'Registration', 'Insurance',
+      'Inspection', 'License', 'Medical Card', 'Receipt', 'Employment']
+    if (!id || !ALLOWED.includes(label)) return json({ error: 'bad label' }, 400)
+    const { error } = await svc.from('documents').update({ doc_type: label })
+      .eq('id', id).eq('doc_type', 'Other')
+    if (error) return json({ error: error.message }, 500)
+    await svc.from('llm_extractions').insert({
+      kind: 'classify', ref: `doc:${id}`, model: String(body.model ?? 'qwen2.5:3b'),
+      arm: 'local', ok: true, latency_ms: Number(body.latency_ms) || null,
+      output: { doc_type: label },
+    }).then(() => {}, () => {})
+    return json({ ok: true })
+  }
+
   // ── targets: docs needing embedding + signed URLs (NAS) ──
   if (body.mode === 'targets') {
     if (!cron) return json({ error: 'cron only' }, 403)
