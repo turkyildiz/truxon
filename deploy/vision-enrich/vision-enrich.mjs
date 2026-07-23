@@ -39,6 +39,13 @@ const CARRIER = env.CARRIER || 'Aida Logistics LLC'
 const MAX_CUSTOMERS = Number(env.MAX_CUSTOMERS || 1000)
 const DPI = Number(env.RASTER_DPI || 130)
 const PAGES = Number(env.MAX_PAGES || 2)
+// Tiling (R9 #2): whole pages are capped at 150 DPI because the vision
+// ENCODER's activations OOM the 8 GB card at 200. Overlapping half-page tiles
+// at TILE_DPI each carry roughly a full 150-DPI page's pixel budget, so the
+// model reads small print (reference #s, fine-print accessorials) without
+// touching the VRAM ceiling. VISION_TILING=0 reverts to whole-page.
+const TILING = env.VISION_TILING !== '0'
+const TILE_DPI = Number(env.TILE_DPI || 200)  // halves at 200 ≈ 2.06M px, just under the 150-DPI-full-page budget the encoder is proven to survive
 
 const STOP = new Set(['inc', 'llc', 'ltd', 'co', 'corp', 'company', 'group', 'the', 'and', 'of', 'logistics', 'transport', 'transportation', 'freight', 'trucking', 'carriers', 'carrier', 'services', 'service', 'brokerage', 'solutions', 'usa', 'dba'])
 const toks = (s) => new Set(String(s ?? '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((t) => t.length > 2 && !STOP.has(t)))
@@ -87,6 +94,47 @@ async function ollamaVision(images, prompt) {
   try { return JSON.parse(content) } catch { return JSON.parse((content.match(/\{[\s\S]*\}/) || ['{}'])[0]) }
 }
 
+/** Page size in px at a DPI, via pdfinfo (points × dpi / 72). */
+function pageSizePx(src, dpi) {
+  const out = execFileSync('pdfinfo', [src]).toString()
+  const m = out.match(/Page size:\s+([\d.]+) x ([\d.]+)/)
+  if (!m) return null
+  return { w: Math.round((Number(m[1]) * dpi) / 72), h: Math.round((Number(m[2]) * dpi) / 72) }
+}
+
+/** Render page 1..pages as overlapping half-page tiles at TILE_DPI. */
+function rasterTiles(src, dir, pages) {
+  const size = pageSizePx(src, TILE_DPI)
+  if (!size) return []
+  const half = Math.round(size.h * 0.55)          // 55% + 55% = 10% overlap
+  const yBottom = size.h - half
+  const tiles = []
+  for (let p = 1; p <= pages; p++) {
+    for (const [tag, y] of [['top', 0], ['bot', yBottom]]) {
+      const prefix = join(dir, `t${p}${tag}`)
+      execFileSync('pdftoppm', ['-jpeg', '-r', String(TILE_DPI), '-f', String(p), '-l', String(p),
+        '-x', '0', '-y', String(y), '-W', String(size.w), '-H', String(half), src, prefix], { stdio: 'ignore' })
+      const f = readdirSync(dir).find((n) => n.startsWith(`t${p}${tag}`) && n.endsWith('.jpg'))
+      if (f) tiles.push(readFileSync(join(dir, f)).toString('base64'))
+    }
+  }
+  return tiles
+}
+
+/** Merge per-tile extractions: first non-null wins, longest address wins. */
+function mergeFields(results) {
+  const out = {}
+  for (const r of results) {
+    if (!r) continue
+    for (const [k, v] of Object.entries(r)) {
+      if (v == null || v === '') continue
+      if (k === 'billing_address' && out[k] && String(v).length <= String(out[k]).length) continue
+      if (out[k] == null || k === 'billing_address') out[k] = v
+    }
+  }
+  return out
+}
+
 async function main() {
   if (!URL || !CRON) throw new Error('CUSTOMER_ENRICH_URL and CRON_SECRET required in vision.env')
   log(`model=${MODEL} ollama=${OLLAMA}`)
@@ -112,9 +160,27 @@ async function main() {
           // last resort: pdftocairo handles some PDFs poppler's pdftoppm chokes on
           execFileSync('pdftocairo', ['-jpeg', '-r', String(DPI), '-f', '1', '-l', String(PAGES), src, join(dir, 'p')], { stdio: 'ignore' })
         }
-        const imgs = readdirSync(dir).filter((f) => f.endsWith('.jpg')).sort().slice(0, PAGES).map((f) => readFileSync(join(dir, f)).toString('base64'))
+        const imgs = readdirSync(dir).filter((f) => f.endsWith('.jpg') && !f.startsWith('t')).sort().slice(0, PAGES).map((f) => readFileSync(join(dir, f)).toString('base64'))
         if (!imgs.length) { log(`0  ${t.company_name} (no pages)`); continue }
-        const f = await ollamaVision(imgs, buildPrompt(t.company_name))
+        let f
+        if (TILING) {
+          // High-DPI overlapping half-page tiles, one model call per tile,
+          // merged first-non-null. Falls back to the whole-page read when
+          // tiling renders nothing or finds nothing.
+          let tiles = []
+          try { tiles = rasterTiles(src, dir, PAGES) } catch { /* pdfinfo/crop failed */ }
+          if (tiles.length) {
+            const parts = []
+            for (const tile of tiles) {
+              try { parts.push(await ollamaVision([tile], buildPrompt(t.company_name))) }
+              catch (e) { log(`  tile err: ${String(e).slice(0, 60)}`) }
+            }
+            f = mergeFields(parts)
+          }
+          if (!f || Object.keys(f).length === 0) f = await ollamaVision(imgs, buildPrompt(t.company_name))
+        } else {
+          f = await ollamaVision(imgs, buildPrompt(t.company_name))
+        }
         // guard: reject only if the model clearly returned OUR carrier's block
         // instead of the broker's (the observed failure mode)
         if (f.company_name) {
