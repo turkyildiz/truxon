@@ -72,4 +72,11 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **Suite at checkpoint: 877 pgTAP / 148 files.**
 - **#45/46 Harsh-driving proxy** — breadcrumbs are dense (p90 gap 10s), so ≥25 mph lost in ≤12s is banked nightly as a hard-braking proxy (labeled a proxy everywhere). Live: 77 braking + 31 acceleration events in 2 days; real samples like 45→9 mph in 10s. On the driver scorecard as 'Harsh'; playbook harsh metric flipped with an honest source note.
 
+### Aug 1 sprint — day 1 afternoon (owner present)
+- **Gate-idiom audit merged** (owner-launched session): 22 gates converted to positive form; sentinel lineage head is now `20260723001001`; migration watermark moved to 20260723 (new stamps follow it).
+- **#101 complete** — doc types normalized + NAS-3B sweep: 46 relabeled (RCs/BOLs/receipts from opaque filenames), 49 honestly kept 'Other', 0 errors; 224 image-only docs queue for the vision path. Live catch: NAS model tag is `qwen2.5:3b-t8` and rag.env's OLLAMA_URL points at Lynx — classifier got its own target vars.
+- **#120 Load clone** (⧉ on Loads → Dispatch prefilled, dates/driver/truck cleared) · **#121 Check-call log** (append-only 📞 timeline per load) · **#122 Shift-handoff board** on Dispatch.
+- **#154 Keyboard shortcuts** (g+key nav, / search) · **#158 CSV export on every table** (one shared-component change) · **#164 print stylesheets** · **#167 monthly owner package PDF** · **#172 weekly flash v2** (pricing discipline + DOT readiness, snooze-aware).
+- **Suite: 888 pgTAP / 151 files.**
+
 *(Run continues; closeout will finalize the count.)*
