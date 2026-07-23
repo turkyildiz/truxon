@@ -6,6 +6,7 @@ import { Badge, Button, Card, Field, LoadError, Modal, PageHeader, formatDateTim
 import MfaCard from '../components/MfaCard'
 import {
   blessSecurityBaseline,
+  machineHeartbeats,
   securityConsole, securityScorecard, setLockdown, type SecurityConsole,
 } from '../data'
 import { errorMessage } from '../supabase'
@@ -32,6 +33,36 @@ const EVENT_META: Record<string, { label: string; icon: string }> = {
   lockdown_engaged: { label: 'Lockdown engaged', icon: '🔒' },
   lockdown_lifted: { label: 'Lockdown lifted', icon: '🔓' },
   security_baseline_blessed: { label: 'Baseline re-blessed', icon: '✅' },
+}
+
+/** Every machine reporting in: Lynx GPU box (with VRAM/temp from its own
+ * heartbeat detail), offsite NAS replication, nightly backups (R9-A #10). */
+function MachinesCard() {
+  const q = useQuery({ queryKey: ['machine-heartbeats'], queryFn: machineHeartbeats, refetchInterval: 60_000, retry: false })
+  const rows = q.data ?? []
+  if (q.isError || rows.length === 0) return null
+  const STALE_H: Record<string, number> = { lynx: 1, backup: 26, offsite: 26 }
+  return (
+    <Card title="🖥️ Machines">
+      <table className="w-full text-sm">
+        <tbody>
+          {rows.map((h) => {
+            const ageH = (Date.now() - new Date(h.last_seen).getTime()) / 3600_000
+            const stale = ageH > (STALE_H[h.source] ?? 26)
+            return (
+              <tr key={h.source} className="border-t border-line">
+                <td className="px-2 py-1.5 font-medium">{h.source}</td>
+                <td className={`px-2 py-1.5 ${stale ? 'font-semibold text-rose-600 dark:text-rose-400' : 'text-green-700 dark:text-green-300'}`}>
+                  {stale ? `⚠ silent ${Math.round(ageH)}h` : `✓ ${formatDateTime(h.last_seen)}`}
+                </td>
+                <td className="px-2 py-1.5 text-muted">{h.detail ?? ''}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </Card>
+  )
 }
 
 export default function Security() {
@@ -75,6 +106,7 @@ export default function Security() {
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
+      <MachinesCard />
       <PageHeader
         title="Security"
         subtitle="Intrusion posture, the tamper-evident audit log, and break-glass controls."

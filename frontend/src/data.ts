@@ -1567,6 +1567,19 @@ export interface SentinelSummary {
   top: { severity: string; title: string; detail: string }[]
 }
 
+export interface MachineHeartbeat {
+  source: string
+  last_seen: string
+  detail: string | null
+}
+
+/** Every machine's last heartbeat (lynx GPU box, offsite NAS, backups…). */
+export async function machineHeartbeats(): Promise<MachineHeartbeat[]> {
+  return unwrap(await supabase.from('watchdog_heartbeats')
+    .select('source, last_seen, detail')
+    .order('last_seen', { ascending: false })) as unknown as MachineHeartbeat[]
+}
+
 /** The open board in one call (snooze-aware). */
 export async function sentinelSummary(): Promise<SentinelSummary | null> {
   return (unwrap(await supabase.rpc('sentinel_open_summary')) as unknown as SentinelSummary) ?? null
