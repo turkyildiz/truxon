@@ -41,16 +41,16 @@ Ordered by risk. ✅ confirmed · ⬜ open (in our hands) · 🔶 needs Ilker / 
       staged in `deploy/backup/immutable/` but not deployed — capped value given
       the NAS login is in the docker group, so the off-site WORM copy is the
       backstop instead.)
-- ⬜ **Outbound email deliverability** — invoices + Forest replies send from the
-      domain. **DNS audited 2026-07-23: SPF ✓ (strict, M365) · MX ✓ · DKIM ✗ ·
-      DMARC ✗.** Owner fixes (both portals, ~10 min): (1) M365 Defender →
-      security.microsoft.com → Email authentication → DKIM → enable for
-      truxon.com, add the two selector CNAMEs it shows to GoDaddy DNS;
-      (2) after DKIM verifies, add TXT `_dmarc.truxon.com` =
-      `v=DMARC1; p=quarantine; rua=mailto:forest@truxon.com; fo=1` (use
-      `p=none` instead if DKIM can't be enabled before go-live). Then send a
-      test invoice to an external Gmail and check headers show
-      spf=pass dkim=pass dmarc=pass.
+- ✅ **Outbound email deliverability (2026-07-23)** — full stack now live:
+      SPF ✓ (strict, M365) · MX ✓ · **DKIM ✓ enabled** (selector1/2 CNAMEs in
+      GoDaddy, Defender toggle on, "Signing DKIM signatures for this domain") ·
+      **DMARC ✓ published** (`v=DMARC1; p=quarantine;
+      rua=mailto:forest@truxon.com; fo=1` — aggregate reports to forest@).
+      Done assisted via owner's Chrome (owner authenticated both portals).
+      **Remaining smoke test:** send any mail from forest@truxon.com to an
+      external Gmail → Show original → confirm spf=pass dkim=pass
+      (d=truxon.com) dmarc=pass. Note: DKIM signing can take ~15 min to
+      activate after the toggle.
 - ⬜ **Sentinel proactive push (#27)** — schedule + daily brief + push + in-app feed (below).
 - 🔶 **Fuel & tolls live feeds** — **fuel is LIVE (2026-07-19)**: the AtoB
       Playwright fetcher runs on the NAS via `truxon-scheduler` cron at
