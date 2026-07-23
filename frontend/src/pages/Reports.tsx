@@ -393,6 +393,12 @@ export default function Reports() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-body">Weekly Accounting Report</h1>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void import('../invoicePdf').then((m) => m.downloadMonthlyPackage())}
+            className="rounded-lg border border-edge px-3 py-1.5 text-sm font-medium text-muted hover:text-body"
+            title="One PDF: P&L, cash & AR, ops & safety MTD, playbook movers"
+          >📦 Owner package</button>
           <Link to="/reports/board" className="rounded-lg border border-edge px-3 py-1.5 text-sm font-medium text-muted hover:text-body">
             🏦 Lender pack
           </Link>

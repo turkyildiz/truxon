@@ -239,3 +239,87 @@ export async function downloadIftaPackage(
   )
   doc.save(`ifta-${quarter.replace(/\s+/g, '')}.pdf`)
 }
+
+/** Monthly owner package (R9 #167): one printable PDF — P&L from the books,
+ * receivables, ops, safety, and the playbook movers — composed entirely from
+ * the report functions the app already trusts. */
+export async function downloadMonthlyPackage(): Promise<void> {
+  const [company, { supabase }] = await Promise.all([getCompanySettings(), import('./supabase')])
+  const call = async (fn: string, args?: Record<string, unknown>) =>
+    (await supabase.rpc(fn as never, args as never)).data as unknown
+  const monthStart = new Date()
+  monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+  const [pnl, cfo, acct, score, trends] = await Promise.all([
+    call('gl_pnl_monthly', { p_months: 6 }) as Promise<Record<string, unknown>[] | null>,
+    call('gl_cfo_snapshot') as Promise<Record<string, unknown> | null>,
+    call('acct_summary') as Promise<Record<string, unknown> | null>,
+    call('company_scorecard', { p_start: monthStart.toISOString(), p_end: new Date().toISOString() }) as Promise<Record<string, unknown> | null>,
+    call('metric_trends', { p_prefix: null }) as Promise<Record<string, unknown>[] | null>,
+  ])
+
+  const money2 = (n: unknown) => n == null ? '—' : `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  const pct = (n: unknown) => n == null ? '—' : `${Number(n)}%`
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' })
+  const NAVY4 = '#1e3a5f'
+  doc.setTextColor(NAVY4).setFontSize(22).setFont('helvetica', 'bold')
+  doc.text(company.company_name, 54, 60)
+  doc.setFont('helvetica', 'bold').setFontSize(14)
+  doc.text(`OWNER PACKAGE — ${new Date().toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}`, 54, 84)
+  doc.setFontSize(8).setFont('helvetica', 'normal').setTextColor('#555555')
+  doc.text(`Prepared ${new Date().toLocaleString()} from the live books and telematics. Month-to-date where marked.`, 54, 98)
+
+  // P&L (GL mirror)
+  autoTable(doc, {
+    startY: 116,
+    head: [['Month', 'Income', 'Net income', 'Net %', 'Operating ratio']],
+    body: (pnl ?? []).map((m) => [
+      String(m.month), money2(m.income), money2(m.net_income), pct(m.net_margin_pct), pct(m.operating_ratio),
+    ]),
+    styles: { fontSize: 9 }, headStyles: { fillColor: NAVY4 },
+  })
+  let y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 16
+
+  // Cash + receivables strip
+  doc.setFontSize(11).setFont('helvetica', 'bold').setTextColor(NAVY4)
+  doc.text('Cash & receivables', 54, y)
+  doc.setFontSize(9).setFont('helvetica', 'normal').setTextColor('#000000')
+  const cashLines = [
+    `Cash on hand ${money2(cfo?.cash)} (${cfo?.days_of_cash ?? '—'} days of cost) · Current ratio ${cfo?.current_ratio ?? '—'}`,
+    `AR outstanding ${money2(acct?.ar_total)} · past due ${money2(acct?.past_due_total)} · DSO ${acct?.dso_days ?? '—'}d · unbilled ${money2(acct?.unbilled_total)}`,
+    `True operating ratio (equipment-adjusted) ${pct(cfo?.operating_ratio_equip_adj)}${Number(cfo?.equipment_gap_12m) > 0 ? ` — includes ${money2(cfo?.equipment_gap_12m)}/yr of payments the GL can't see` : ''}`,
+  ]
+  cashLines.forEach((l, i) => doc.text(l, 54, y + 14 + i * 13))
+  y += 14 + cashLines.length * 13 + 10
+
+  // Ops + safety (month to date)
+  const ops = (score as Record<string, Record<string, unknown>> | null)?.operations
+  const saf = (score as Record<string, Record<string, unknown>> | null)?.safety
+  doc.setFontSize(11).setFont('helvetica', 'bold').setTextColor(NAVY4)
+  doc.text('Operations & safety — month to date', 54, y)
+  doc.setFontSize(9).setFont('helvetica', 'normal').setTextColor('#000000')
+  const opsLines = [
+    `Loads ${ops?.loads ?? '—'} · miles ${ops?.total_miles ?? '—'} · on-time delivery ${pct(ops?.on_time_delivery_pct)} · empty miles ${ops?.empty_miles ?? '—'}`,
+    `Accidents ${saf?.accidents_in_window ?? 0} · HOS violations ${saf?.hos_violations ?? 0} · OOS rate ${pct(saf?.oos_rate_pct)}`,
+  ]
+  opsLines.forEach((l, i) => doc.text(l, 54, y + 14 + i * 13))
+  y += 14 + opsLines.length * 13 + 10
+
+  // Playbook movers (biggest WoW swings)
+  const movers = (trends ?? [])
+    .filter((t) => t.wow_pct != null && Math.abs(Number(t.wow_pct)) >= 10 && Number(t.points) >= 3)
+    .sort((a, b) => Math.abs(Number(b.wow_pct)) - Math.abs(Number(a.wow_pct)))
+    .slice(0, 8)
+  if (movers.length > 0) {
+    autoTable(doc, {
+      startY: y,
+      head: [['Metric mover', 'Latest', 'WoW change', '13-week slope']],
+      body: movers.map((t) => [
+        String(t.metric_key), String(Math.round(Number(t.latest) * 10) / 10),
+        `${Number(t.wow_pct) > 0 ? '+' : ''}${Math.round(Number(t.wow_pct))}%`,
+        t.slope_13w != null ? String(Math.round(Number(t.slope_13w) * 100) / 100) : '—',
+      ]),
+      styles: { fontSize: 8 }, headStyles: { fillColor: NAVY4 },
+    })
+  }
+  doc.save(`owner-package-${new Date().toISOString().slice(0, 7)}.pdf`)
+}
