@@ -41,6 +41,52 @@ void main() {
     });
   });
 
+  group('decide — DVIR nudge', () {
+    test('rolling without a pre-trip fires once', () {
+      final cues = ForestCopilot.decide(
+        alerts: const [],
+        said: {},
+        speedMps: 12,
+        dvirDoneToday: false,
+        today: '2026-07-22',
+      );
+      expect(cues.single.key, 'dvir:2026-07-22');
+      expect(cues.single.text.toLowerCase(), contains('pre-trip'));
+    });
+    test('already nudged today stays quiet', () {
+      final cues = ForestCopilot.decide(
+        alerts: const [],
+        said: {'dvir:2026-07-22'},
+        speedMps: 12,
+        dvirDoneToday: false,
+        today: '2026-07-22',
+      );
+      expect(cues, isEmpty);
+    });
+    test('parked, DVIR done, or unknown → no nudge', () {
+      for (final args in [
+        (speed: 0.0, done: false),  // not moving yet
+        (speed: 12.0, done: true),  // inspection is in
+      ]) {
+        expect(
+          ForestCopilot.decide(
+            alerts: const [],
+            said: {},
+            speedMps: args.speed,
+            dvirDoneToday: args.done,
+            today: '2026-07-22',
+          ),
+          isEmpty,
+        );
+      }
+      // unknown (query failed) must never nag
+      expect(
+        ForestCopilot.decide(alerts: const [], said: {}, speedMps: 12, today: '2026-07-22'),
+        isEmpty,
+      );
+    });
+  });
+
   group('decide — arrival', () {
     final del = {
       'id': 7, 'status': 'in_transit',

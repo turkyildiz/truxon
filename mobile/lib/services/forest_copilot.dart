@@ -32,6 +32,8 @@ class ForestCopilot {
   Timer? _timer;
   final Set<String> _said = {};
   bool _running = false;
+  String? _dvirDay;
+  bool _dvirDone = false;
 
   /// Arrival is announced within this radius of the active stop.
   static const arriveKm = 0.8;
@@ -55,8 +57,22 @@ class ForestCopilot {
     Map<String, dynamic>? load,
     required List<Map<String, dynamic>> alerts,
     required Set<String> said,
+    double? speedMps,
+    bool? dvirDoneToday,
+    String? today,
   }) {
     final cues = <CopilotCue>[];
+
+    // 0) Rolling without a pre-trip DVIR. Only when we positively know one is
+    //    missing (null = unknown → stay quiet) and the truck is actually
+    //    moving (> ~11 mph, not a lot repositioning creep). Once per day.
+    if (dvirDoneToday == false && today != null && (speedMps ?? 0) > 5) {
+      final key = 'dvir:$today';
+      if (!said.contains(key)) {
+        cues.add(CopilotCue(key,
+            "Before you get too far — I don't see a pre-trip inspection from you today. Next time you're stopped, pull up the DVIR checklist and knock it out."));
+      }
+    }
 
     // 1) Severe weather that reached this truck.
     for (final a in alerts) {
@@ -131,12 +147,32 @@ class ForestCopilot {
         alerts = await _api.myWeatherAlerts();
       } catch (_) {}
 
+      // DVIR check is cheap (RLS-scoped select limit 1) but only until it
+      // turns true — once today's pre-trip is in, stop asking the server.
+      final day = DateTime.now().toIso8601String().substring(0, 10);
+      if (_dvirDay != day) {
+        _dvirDay = day;
+        _dvirDone = false;
+      }
+      bool? dvirDone;
+      if (!_dvirDone) {
+        try {
+          _dvirDone = await _api.dvirDoneToday();
+          dvirDone = _dvirDone;
+        } catch (_) {} // unknown → decide() stays quiet
+      } else {
+        dvirDone = true;
+      }
+
       final cues = decide(
         lat: pos?.latitude,
         lon: pos?.longitude,
         load: active,
         alerts: alerts,
         said: _said,
+        speedMps: pos?.speed,
+        dvirDoneToday: dvirDone,
+        today: day,
       );
       for (final c in cues) {
         _said.add(c.key);

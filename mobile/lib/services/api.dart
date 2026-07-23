@@ -146,6 +146,20 @@ class CompanionApi {
     return (res as Map)['defect_flagged'] == true;
   }
 
+  /// Has this driver logged a pre-trip DVIR today (device-local day)?
+  /// RLS scopes the read to the driver's own reports.
+  Future<bool> dvirDoneToday() async {
+    final now = DateTime.now();
+    final dayStart = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
+    final rows = await _sb
+        .from('dvir')
+        .select('id')
+        .eq('inspection_type', 'pre_trip')
+        .gte('created_at', dayStart)
+        .limit(1);
+    return (rows as List).isNotEmpty;
+  }
+
   /// Current NPS quarter label, e.g. 2026-Q3.
   static String npsQuarter([DateTime? now]) {
     final d = now ?? DateTime.now();
