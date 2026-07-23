@@ -141,6 +141,14 @@ async function runChecks(svc: Svc): Promise<CheckResult[]> {
       detail: p.gpu_box_last_seen ? `last Lynx heartbeat ${p.gpu_box_last_seen}` : 'no Lynx heartbeat yet',
       severity: 'warn',
     })
+    // Offsite NAS mirror: warn-level — the local NAS + dr-vault copies still
+    // exist, but the second-site copy is drifting. Silent until first mirror.
+    results.push({
+      name: 'offsite_fresh',
+      ok: p.offsite_stale !== true,
+      detail: p.offsite_last_seen ? `last offsite mirror ${p.offsite_last_seen}` : 'no offsite mirror yet',
+      severity: 'warn',
+    })
     // Sentinel scans must LAND (findings' last_seen moves every 15-min scan).
     // pg_cron "succeeded" only means the HTTP call was queued — the 07-22
     // incident ran 20.5h dark that way (GoTrue canary 500 → no acting admin).

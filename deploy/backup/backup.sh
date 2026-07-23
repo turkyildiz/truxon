@@ -115,4 +115,31 @@ if [[ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
   done
 fi
 
+# Offsite NAS replication (3-2-1's second site): mirror the encrypted set to
+# the INDIANCREEK Synology over the tailnet. Key-based, rsync-over-SSH (the
+# DSM rsync service must be enabled or Synology's patched rsync rejects the
+# session AFTER ssh auth). Needs OFFSITE_HOST + OFFSITE_USER in the env file;
+# the dedicated key lives next to the backups, never in the repo.
+if [[ -n "${OFFSITE_HOST:-}" && -n "${OFFSITE_USER:-}" ]]; then
+  OFFSITE_KEY="${OFFSITE_KEY:-/volume1/docker/truxon-backup/.ssh/offsite_rsync}"
+  _rsh="ssh -i $OFFSITE_KEY -o IdentitiesOnly=yes -o ConnectTimeout=20"
+  offsite_ok=1
+  rsync -a --delete -e "$_rsh" --include='*.gpg' --exclude='*' \
+    "$BACKUP_DIR/" "${OFFSITE_USER}@${OFFSITE_HOST}:truxon-offsite/backups/" \
+    || { offsite_ok=0; echo "  WARNING: offsite backups rsync failed"; }
+  rsync -a -e "$_rsh" --include='*.gpg' --exclude='*' \
+    /volume1/docker/truxon-backup/release-signing/ \
+    "${OFFSITE_USER}@${OFFSITE_HOST}:truxon-offsite/release-signing/" \
+    || { offsite_ok=0; echo "  WARNING: offsite release-signing rsync failed"; }
+  if [[ "$offsite_ok" == 1 && -n "${WATCHDOG_REPORT_KEY:-}" && -n "${SUPABASE_ANON_KEY:-}" ]]; then
+    echo "  [offsite] mirrored to ${OFFSITE_HOST}"
+    curl -fsS -m 20 -X POST "${SUPABASE_URL}/functions/v1/watchdog" \
+      -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+      -H "apikey: ${SUPABASE_ANON_KEY}" \
+      -H 'Content-Type: application/json' \
+      -d "$(printf '{"heartbeat":"offsite","key":"%s","detail":"rsync db_%s"}' "$WATCHDOG_REPORT_KEY" "$STAMP")" \
+      >/dev/null 2>&1 || true
+  fi
+fi
+
 echo "Backup complete: $BACKUP_DIR (db_${STAMP}, documents_${STAMP})"
