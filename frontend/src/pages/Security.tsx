@@ -49,13 +49,17 @@ function MachinesCard() {
           {rows.map((h) => {
             const ageH = (Date.now() - new Date(h.last_seen).getTime()) / 3600_000
             const stale = ageH > (STALE_H[h.source] ?? 26)
+            // a fresh heartbeat can still carry bad news (drill-proven:
+            // 'ollama=inactive' arrived 24s after the service died)
+            const sick = /inactive|failed|error/i.test(h.detail ?? '')
+            const bad = stale || sick
             return (
               <tr key={h.source} className="border-t border-line">
                 <td className="px-2 py-1.5 font-medium">{h.source}</td>
-                <td className={`px-2 py-1.5 ${stale ? 'font-semibold text-rose-600 dark:text-rose-400' : 'text-green-700 dark:text-green-300'}`}>
-                  {stale ? `⚠ silent ${Math.round(ageH)}h` : `✓ ${formatDateTime(h.last_seen)}`}
+                <td className={`px-2 py-1.5 ${bad ? 'font-semibold text-rose-600 dark:text-rose-400' : 'text-green-700 dark:text-green-300'}`}>
+                  {stale ? `⚠ silent ${Math.round(ageH)}h` : sick ? `⚠ ${formatDateTime(h.last_seen)}` : `✓ ${formatDateTime(h.last_seen)}`}
                 </td>
-                <td className="px-2 py-1.5 text-muted">{h.detail ?? ''}</td>
+                <td className={`px-2 py-1.5 ${sick ? 'font-semibold text-rose-600 dark:text-rose-400' : 'text-muted'}`}>{h.detail ?? ''}</td>
               </tr>
             )
           })}
