@@ -29,12 +29,27 @@ signatures, not an MPG number.
 gallons, implied MPG, expected gal, variance %, non-diesel gallons, non-fuel spend.
 Office-gated (admin/accountant/dispatcher; coalesce-hardened fail-closed on null).
 
-**Data caveat (important):** absolute MPG is NOT trustworthy — odometer per fill is
-sparse/garbage and fuel-card capture is partial (implied MPG comes out 36–163). So
-`fuel_recon` only fires in the theft direction (bought > expected) and stays quiet
-otherwise. Real per-truck efficiency needs clean per-fill miles = the telematics
-feed ([[eld-drivehos]] / Motive). Also `fuel_transactions.amount` includes DEF/fees/
-cash, so $/gal is unreliable; use gallons + fuel_type, not amount, for consumption.
+**REBUILT ON ELD GPS TRUTH 2026-07-23** (migrations 20260722020001–020004, the
+telematics gap above is now closed): `fuel_efficiency_by_truck` miles basis =
+**ELD GPS actuals** when the truck has breadcrumb coverage (`miles_basis='eld'`),
+booked dispatch+deadhead fallback for dark trucks. Two hard-won correctness rules
+(each caught on a live read before the sentinel spammed):
+1. **Window-match**: the mileage bank starts 2026-06-29 — fuel summed over 45d vs
+   ~23d of miles inflated every variance 30–300%.
+2. **Day-match** (the real fix, same rule as `truck_mpg`): a gallon counts toward
+   the ratio ONLY on days that truck banked GPS miles; off-day fuel is reported
+   separately as `gallons_untracked` (dark ELD + full tank = its own red flag,
+   owned by the `eld_dark` sentinel).
+Calibration proof: well-tracked units read +2%/−7%; **unit 03 = +80% over with
+FULL coverage and zero untracked gallons — a genuine anomaly**. Fuel page now has
+a "Fuel vs. miles" ReconCard (same RPC, variance badges) so the owner sees why a
+truck flagged. `fuel_recon` sentinel reads the shared function (one source of truth).
 
-Verified live on prod: 15 real findings, 0 noise. 6 pgTAP (test 88). Related:
-[[northstar-project]], [[security-posture]] (null-role gate class).
+**Data caveat (softened but real):** fuel-card capture is still partial and
+`fuel_transactions.amount` includes DEF/fees/cash — use gallons + fuel_type, not
+amount, for consumption. The 6.5 MPG baseline vs. fleet's true ~6.4 tracked MPG
+keeps variance honest at fleet level.
+
+Verified live on prod: 15 real findings, 0 noise on v1; day-matched v2 verified
+against live table. pgTAP tests 88 + 114. Related: [[northstar-project]],
+[[eld-drivehos]], [[security-posture]] (null-role gate class).
