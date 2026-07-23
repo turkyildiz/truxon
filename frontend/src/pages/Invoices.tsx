@@ -46,7 +46,17 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'void', label: 'Void' },
 ]
 
-const isPastDue = (inv: Invoice) => inv.status === 'sent' && !!inv.due_date && new Date(inv.due_date) < new Date()
+/** Factored invoice whose only remaining "balance" is the factor's fee sliver
+ * left open on the books — Denim paid net; the customer owes nothing. Not
+ * receivable, not past due; the sliver clears when the fee is written off in
+ * QuickBooks. Threshold: ≤15% of total and ≤$500 (real fees run 2-6%). */
+const isFeeResidual = (inv: Invoice) =>
+  inv.status === 'sent' && !!inv.factored_at && inv.source === 'qbo' &&
+  inv.qbo_balance != null && inv.qbo_balance > 0 &&
+  inv.qbo_balance <= Math.min(0.15 * inv.total, 500)
+
+const isPastDue = (inv: Invoice) =>
+  inv.status === 'sent' && !!inv.due_date && new Date(inv.due_date) < new Date() && !isFeeResidual(inv)
 const daysOverdue = (inv: Invoice) => Math.floor((Date.now() - new Date(inv.due_date!).getTime()) / 86_400_000)
 
 /** QuickBooks mirror card (optional — Truxon works fully without it). */
@@ -363,6 +373,14 @@ export default function Invoices() {
                       {isPastDue(inv) && (
                         <span className="ml-1.5 rounded bg-red-500/15 px-1.5 py-0.5 text-xs font-semibold text-red-600 dark:text-red-300">
                           {daysOverdue(inv)}d late
+                        </span>
+                      )}
+                      {isFeeResidual(inv) && (
+                        <span
+                          className="ml-1.5 rounded bg-teal-500/15 px-1.5 py-0.5 text-xs font-semibold text-teal-600 dark:text-teal-300"
+                          title={`Paid by ${inv.factor_name ?? 'factor'} net of fee — the open ${money(inv.qbo_balance!)} is the factoring fee awaiting write-off in QuickBooks, not customer debt`}
+                        >
+                          settled · fee {money(inv.qbo_balance!)}
                         </span>
                       )}
                     </td>

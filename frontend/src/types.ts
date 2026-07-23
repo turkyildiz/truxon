@@ -266,6 +266,9 @@ export interface Invoice {
   paid_at: string | null
   sent_at: string | null
   sent_to: string | null
+  factored_at: string | null
+  factoring_fee: number | null
+  factor_name: string | null
 }
 
 // ── Accounting module ────────────────────────────────────────────────────────
