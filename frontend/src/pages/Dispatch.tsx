@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Button, Card, Field, Input, money, Select, Textarea } from '../components/ui'
 import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, eldFleetLive, estimateLoadMargin, extractPdf, fleetCostBasis, laneRateForRoute, loadEtaRisk, type EldFleetRow, type ExtractedStop } from '../data'
@@ -74,9 +74,24 @@ function LateRiskCard() {
 
 export default function Dispatch() {
   const navigate = useNavigate()
+  const location = useLocation()
   const qc = useQueryClient()
-  const [form, setForm] = useState({ ...EMPTY_FORM })
-  const [stops, setStops] = useState<StopForm[]>(() => EMPTY_STOPS.map((s) => ({ ...s })))
+  // (R9 #120) Clone: Loads' ⧉ button hands the lane over; dates, driver, and
+  // truck are deliberately cleared — a clone is a NEW run, not a copy.
+  const clone = (location.state as { clone?: Record<string, unknown> } | null)?.clone
+  const [form, setForm] = useState(() => clone ? {
+    ...EMPTY_FORM,
+    customer_id: String(clone.customer_id ?? ''),
+    equipment_type: String(clone.equipment_type ?? ''),
+    rate: clone.rate != null ? String(clone.rate) : '',
+    miles: clone.miles != null ? String(clone.miles) : '',
+    empty_miles: clone.empty_miles != null ? String(clone.empty_miles) : '',
+    special_terms: String(clone.special_terms ?? ''),
+  } : { ...EMPTY_FORM })
+  const [stops, setStops] = useState<StopForm[]>(() => clone ? [
+    { ...emptyStop('pickup'), address: String(clone.pickup_address ?? '') },
+    { ...emptyStop('delivery'), address: String(clone.delivery_address ?? '') },
+  ] : EMPTY_STOPS.map((s) => ({ ...s })))
   const [error, setError] = useState('')
   const [aiNote, setAiNote] = useState('')
   const [distError, setDistError] = useState('')

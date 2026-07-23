@@ -175,6 +175,7 @@ export default function Loads() {
             { label: 'Rate', key: 'rate' },
             { label: 'RPM', key: 'rpm' },
             { label: 'Status', key: 'status' },
+            '',
           ]}
           sort={sort}
           onSort={(k) => setSort((p) => toggleSort(p, k))}
@@ -208,6 +209,14 @@ export default function Loads() {
                         </span>
                       )}
                     </div>
+                  </td>
+                  <td className="px-3 py-3">
+                    <button
+                      type="button"
+                      title="Book this lane again — opens Dispatch prefilled (dates, driver, and truck cleared)"
+                      onClick={(e) => { e.stopPropagation(); navigate('/dispatch', { state: { clone: load } }) }}
+                      className="rounded-lg border border-line px-2 py-1 text-xs text-muted hover:text-body"
+                    >⧉ Clone</button>
                   </td>
             </tr>
           ))}
