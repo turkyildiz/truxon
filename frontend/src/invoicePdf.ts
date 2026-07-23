@@ -176,3 +176,66 @@ export async function downloadCustomerStatement(customerId: number): Promise<voi
   const stamp = new Date().toISOString().slice(0, 7)
   res.doc.save(`statement-${res.customerName.replace(/\W+/g, '-')}-${stamp}.pdf`)
 }
+
+/** IFTA quarterly close package: per-jurisdiction miles + gallons with the
+ * coverage honesty printed on the page (R9 #62). */
+export async function downloadIftaPackage(
+  quarter: string,
+  rows: { jurisdiction: string; miles: number; share_pct: number; gallons: number; fuel_spend: number }[],
+): Promise<void> {
+  const [company, { supabase }] = await Promise.all([getCompanySettings(), import('./supabase')])
+  const { data: status } = await supabase.rpc('ifta_miles_status')
+  const st = (status ?? {}) as { days_banked?: number; first_day?: string; trucks_covered?: number; state_attributed_pct?: number }
+
+  const money2 = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' })
+  const NAVY3 = '#1e3a5f'
+  doc.setTextColor(NAVY3).setFontSize(22).setFont('helvetica', 'bold')
+  doc.text(company.company_name, 54, 60)
+  doc.setFontSize(8).setFont('helvetica', 'normal').setTextColor('#555555')
+  const line = [company.address.replace(/\n/g, ', '), company.mc_number && `MC# ${company.mc_number}`].filter(Boolean).join('  ·  ')
+  if (line) doc.text(line, 54, 72)
+  doc.setTextColor(NAVY3).setFont('helvetica', 'bold').setFontSize(14)
+  doc.text(`IFTA CLOSE PACKAGE — ${quarter}`, 54, 94)
+  doc.setTextColor('#555555').setFontSize(8).setFont('helvetica', 'normal')
+  doc.text(
+    `Miles: GPS-banked ELD breadcrumbs attributed by state polygon (bank since ${st.first_day ?? '?'}, ` +
+      `${st.days_banked ?? '?'} days, ${st.trucks_covered ?? '?'} trucks, ${st.state_attributed_pct ?? '?'}% attributed). ` +
+      `Gallons/spend: card purchases in that state. Prepared ${new Date().toLocaleDateString()}.`,
+    54, 108, { maxWidth: 500 },
+  )
+
+  const totMiles = rows.reduce((s, r) => s + Number(r.miles), 0)
+  const totGal = rows.reduce((s, r) => s + Number(r.gallons), 0)
+  const totSpend = rows.reduce((s, r) => s + Number(r.fuel_spend), 0)
+  autoTable(doc, {
+    startY: 126,
+    head: [['Jurisdiction', 'Miles', 'Share %', 'Gallons bought', 'Fuel spend']],
+    body: rows.map((r) => [
+      r.jurisdiction || 'unattributed',
+      Math.round(Number(r.miles)).toLocaleString(),
+      Number(r.share_pct).toFixed(1),
+      Number(r.gallons) > 0 ? Number(r.gallons).toLocaleString(undefined, { maximumFractionDigits: 1 }) : '—',
+      Number(r.fuel_spend) > 0 ? money2(Number(r.fuel_spend)) : '—',
+    ]),
+    foot: [[
+      'TOTAL', Math.round(totMiles).toLocaleString(), '100.0',
+      totGal.toLocaleString(undefined, { maximumFractionDigits: 1 }), money2(totSpend),
+    ]],
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: NAVY3 },
+    footStyles: { fillColor: '#f0f4f8', textColor: '#000000', fontStyle: 'bold' },
+  })
+  const lastY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY
+  doc.setFontSize(9).setFont('helvetica', 'normal').setTextColor('#000000')
+  if (totGal > 0 && totMiles > 0) {
+    doc.text(`Fleet average: ${(totMiles / totGal).toFixed(2)} MPG over the covered window.`, 54, lastY + 20)
+  }
+  doc.setTextColor('#555555').setFontSize(8)
+  doc.text(
+    'File with your base jurisdiction; keep this package with the quarter’s fuel receipts. ' +
+      'Days before the GPS bank began are not represented in the miles column.',
+    54, lastY + 34, { maxWidth: 500 },
+  )
+  doc.save(`ifta-${quarter.replace(/\s+/g, '')}.pdf`)
+}

@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react'
 import { Badge, Button, Card, compareValues, Field, formatDateTime, Input, LoadError, money, StatCard, type SortState, Table, toggleSort } from '../components/ui'
 import { useAuth } from '../auth'
 import { fuelByTruck, fuelIftaSummary, fuelRecon, iftaQuarter, importFuelCsv, listFuelTransactions, truckMpg } from '../data'
+import { downloadIftaPackage } from '../invoicePdf'
 import { errorMessage } from '../supabase'
 import type { FuelImportResult } from '../types'
 
@@ -164,6 +165,14 @@ function IftaQuarterCard() {
               {lbl}
             </button>
           ))}
+          {rows.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void downloadIftaPackage(quarter, rows)}
+              className="rounded-lg bg-brand px-2 py-1 text-xs font-medium text-white"
+              title="Printable close package with the coverage note on the page"
+            >🖨️ Package</button>
+          )}
         </div>
       </div>
       {rows.length === 0 ? (
