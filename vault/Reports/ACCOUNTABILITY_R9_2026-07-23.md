@@ -1,4 +1,6 @@
-# Accountability — R9 "200 blocks" run (2026-07-22 → 23, in progress)
+# Accountability — R9 "200 blocks" run (2026-07-22 → Aug 1 target)
+
+**Deadline set 2026-07-23:** table clean by Aug 1; build through ~Jul 27, testing (section N) + perf Jul 28–30, closeout Jul 31. Testing time is protected.
 
 **Directive:** "give another 200" → "go for 200, see you tomorro." Same discipline per block: build → full pgTAP from clean reset → prod push → live verify → commit+push.
 
