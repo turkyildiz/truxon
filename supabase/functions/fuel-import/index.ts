@@ -11,6 +11,7 @@
 // Body: raw CSV (Content-Type text/csv) or JSON { csv: "<text>" }.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { gmtToIso, money, parseCsv } from '../_shared/fuel_csv.ts'
 import { corsResponse, getCaller, json, timingSafeEqualStr, withCors } from '../_shared/auth.ts'
 
 // AtoB header → our field. Unmapped columns are ignored but preserved in raw.
@@ -43,40 +44,6 @@ const MONEY = new Set(['amount', 'net_of_discount', 'discount', 'price_per_gallo
 const NUM = new Set(['gallons'])
 const INT = new Set(['prompted_odometer', 'telematics_odometer'])
 const TS = new Set(['transaction_time', 'posted_date'])
-
-/** RFC-4180-ish CSV split: handles quoted fields, embedded commas, "" escapes. */
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = []
-  let row: string[] = [], field = '', inQuotes = false
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i]
-    if (inQuotes) {
-      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++ } else inQuotes = false }
-      else field += c
-    } else if (c === '"') inQuotes = true
-    else if (c === ',') { row.push(field); field = '' }
-    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = '' }
-    else if (c === '\r') { /* skip */ }
-    else field += c
-  }
-  if (field.length || row.length) { row.push(field); rows.push(row) }
-  return rows.filter((r) => r.length > 1 || (r.length === 1 && r[0] !== ''))
-}
-
-function money(v: string): number | null {
-  const s = v.replace(/[$,\s]/g, '')
-  if (!s) return null
-  const n = Number(s)
-  return Number.isFinite(n) ? n : null
-}
-
-/** "07/19/2026 12:19:25" (GMT) → ISO 8601 UTC. Empty → null. */
-function gmtToIso(v: string): string | null {
-  const m = v.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})[ T](\d{2}):(\d{2}):(\d{2})$/)
-  if (!m) return null
-  const [, mo, d, y, h, mi, s] = m
-  return `${y}-${mo}-${d}T${h}:${mi}:${s}Z`
-}
 
 function toRow(header: string[], cols: string[]): Record<string, unknown> | null {
   const raw: Record<string, string> = {}
