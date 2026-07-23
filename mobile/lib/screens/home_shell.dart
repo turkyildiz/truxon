@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../i18n.dart';
 import '../services/alarms.dart';
 import '../services/api.dart';
@@ -62,6 +63,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     FlutterForegroundTask.addTaskDataCallback(_onTrackingData);
     _keepFresh = Timer.periodic(
         const Duration(minutes: 3), (_) => _api.pushFreshTokenToTracker());
+    applyKioskPref(); // R9 #148: re-arm cab-mount wakelock across restarts
     _bootstrap();
   }
 
@@ -448,6 +450,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           const SizedBox(height: 8),
           // R9 #146: quiet the optional pushes; dispatch alarms always ring.
           const _NotificationPrefs(),
+          // R9 #148: cab-mount mode — the tablet screen never sleeps.
+          const _KioskToggle(),
           const SizedBox(height: 8),
           // Read-only field log (Diag ring buffer) so tracking/upload problems
           // can be diagnosed on the driver's own device. Newest first.
@@ -465,7 +469,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                 }
                 return Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    // surface-relative so the log panel is visible in dark cabs too
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   padding: const EdgeInsets.all(8),
@@ -482,6 +487,64 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// R9 #148 — cab-mount ("kiosk") mode: keep the screen awake so a mounted
+/// tablet stays on Forest all shift. Persisted; re-applied on app start by
+/// [applyKioskPref].
+class _KioskToggle extends StatefulWidget {
+  const _KioskToggle();
+
+  @override
+  State<_KioskToggle> createState() => _KioskToggleState();
+}
+
+const kKioskPref = 'kiosk_keep_awake';
+
+/// Re-apply the stored wakelock preference (called from app start).
+Future<void> applyKioskPref() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(kKioskPref) ?? false) await WakelockPlus.enable();
+  } catch (_) {/* cosmetic — never block startup */}
+}
+
+class _KioskToggleState extends State<_KioskToggle> {
+  bool _on = false;
+
+  @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((p) {
+      if (mounted) setState(() => _on = p.getBool(kKioskPref) ?? false);
+    });
+  }
+
+  Future<void> _set(bool v) async {
+    setState(() => _on = v);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(kKioskPref, v);
+    try {
+      if (v) {
+        await WakelockPlus.enable();
+      } else {
+        await WakelockPlus.disable();
+      }
+    } catch (_) {/* device may not support it — the toggle stays honest */}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: const Text('Cab-mount mode'),
+      subtitle: const Text('Screen stays awake while the app is open',
+          style: TextStyle(fontSize: 11)),
+      value: _on,
+      onChanged: _set,
     );
   }
 }

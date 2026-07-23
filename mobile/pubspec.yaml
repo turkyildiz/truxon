@@ -83,6 +83,7 @@ dependencies:
   archive: ^4.0.9
   connectivity_plus: ^7.3.0
   flutter_image_compress: ^2.5.0
+  wakelock_plus: ^1.7.0
 
 dev_dependencies:
   flutter_test:
