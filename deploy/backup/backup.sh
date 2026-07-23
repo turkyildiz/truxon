@@ -120,21 +120,39 @@ fi
 # DSM rsync service must be enabled or Synology's patched rsync rejects the
 # session AFTER ssh auth). Needs OFFSITE_HOST + OFFSITE_USER in the env file;
 # the dedicated key lives next to the backups, never in the repo.
+#
+# This runs INSIDE the docker:cli (Alpine) scheduler container, which ships ssh
+# but not rsync — so we shell out to a pinned sibling rsync image (built from
+# deploy/backup/offsite-rsync/), exactly like pg_dump (postgres:17-alpine) and
+# the B2 upload (amazon/aws-cli). Host key is PINNED via offsite_known_hosts
+# next to the key (the container has no ~/.ssh trust store of its own) — seed it
+# once with:  ssh-keyscan -H "$OFFSITE_HOST" > .ssh/offsite_known_hosts
 if [[ -n "${OFFSITE_HOST:-}" && -n "${OFFSITE_USER:-}" ]]; then
-  OFFSITE_KEY="${OFFSITE_KEY:-/volume1/docker/truxon-backup/.ssh/offsite_rsync}"
-  _rsh="ssh -i $OFFSITE_KEY -o IdentitiesOnly=yes -o ConnectTimeout=20"
+  OFFSITE_SSH_DIR="${OFFSITE_SSH_DIR:-/volume1/docker/truxon-backup/.ssh}"
+  OFFSITE_IMG="${OFFSITE_IMG:-truxon-offsite-rsync:1}"
+  # run the sibling as the key's owner (host turkyildiz, uid 1000) — ssh rejects
+  # a private key not owned by the running uid or root; HOME=/tmp so ssh doesn't
+  # warn about a missing ~/.ssh (we pin UserKnownHostsFile explicitly anyway).
+  OFFSITE_UID="${OFFSITE_UID:-1000}"
   # --bwlimit: an uncapped bulk rsync saturated the office uplink so hard the
   # NAS's OWN tailscale keepalives starved and it dropped off the tailnet
   # (2026-07-23 incident — Funnel/Valhalla/prodsql all dark mid-transfer).
   # Cap leaves the link breathable; nightly deltas are small anyway.
   OFFSITE_BWLIMIT="${OFFSITE_BWLIMIT:-3m}"
+  # ssh inside the sibling container: mounted key + pinned known_hosts, strict.
+  _rsh="ssh -i /ssh/offsite_rsync -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/ssh/offsite_known_hosts -o ConnectTimeout=20"
   offsite_ok=1
-  rsync -a --delete --bwlimit="$OFFSITE_BWLIMIT" -e "$_rsh" --include='*.gpg' --exclude='*' \
-    "$BACKUP_DIR/" "${OFFSITE_USER}@${OFFSITE_HOST}:truxon-offsite/backups/" \
+  docker run --rm --user "${OFFSITE_UID}:${OFFSITE_UID}" -e HOME=/tmp \
+    -v "$BACKUP_DIR:/backups:ro" -v "$OFFSITE_SSH_DIR:/ssh:ro" \
+    "$OFFSITE_IMG" \
+    rsync -a --delete --bwlimit="$OFFSITE_BWLIMIT" -e "$_rsh" --include='*.gpg' --exclude='*' \
+      /backups/ "${OFFSITE_USER}@${OFFSITE_HOST}:truxon-offsite/backups/" \
     || { offsite_ok=0; echo "  WARNING: offsite backups rsync failed"; }
-  rsync -a --bwlimit="$OFFSITE_BWLIMIT" -e "$_rsh" --include='*.gpg' --exclude='*' \
-    /volume1/docker/truxon-backup/release-signing/ \
-    "${OFFSITE_USER}@${OFFSITE_HOST}:truxon-offsite/release-signing/" \
+  docker run --rm --user "${OFFSITE_UID}:${OFFSITE_UID}" -e HOME=/tmp \
+    -v "/volume1/docker/truxon-backup/release-signing:/signing:ro" -v "$OFFSITE_SSH_DIR:/ssh:ro" \
+    "$OFFSITE_IMG" \
+    rsync -a --bwlimit="$OFFSITE_BWLIMIT" -e "$_rsh" --include='*.gpg' --exclude='*' \
+      /signing/ "${OFFSITE_USER}@${OFFSITE_HOST}:truxon-offsite/release-signing/" \
     || { offsite_ok=0; echo "  WARNING: offsite release-signing rsync failed"; }
   if [[ "$offsite_ok" == 1 && -n "${WATCHDOG_REPORT_KEY:-}" && -n "${SUPABASE_ANON_KEY:-}" ]]; then
     echo "  [offsite] mirrored to ${OFFSITE_HOST}"

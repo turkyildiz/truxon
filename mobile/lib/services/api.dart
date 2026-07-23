@@ -146,6 +146,37 @@ class CompanionApi {
     return (res as Map)['defect_flagged'] == true;
   }
 
+  /// File a breakdown: unplanned MX item + critical insight server-side, then
+  /// ring the office through DND via the notify function. The push is
+  /// best-effort — the report itself is already on the books if it fails.
+  Future<int?> reportBreakdown({
+    required int truckId,
+    required String unit,
+    required String description,
+    bool drivable = false,
+    double? lat,
+    double? lon,
+  }) async {
+    final res = await _sb.rpc('report_breakdown', params: {
+      'p_truck_id': truckId,
+      'p_description': description,
+      'p_drivable': drivable,
+      'p_lat': ?lat,
+      'p_lon': ?lon,
+    });
+    try {
+      await _sb.functions.invoke('notify', body: {
+        'action': 'breakdown',
+        'unit': unit,
+        'description': description,
+        'drivable': drivable,
+        if (lat != null && lon != null) 'lat': lat,
+        if (lat != null && lon != null) 'lon': lon,
+      });
+    } catch (_) {/* push is best-effort */}
+    return (res as Map?)?['maintenance_id'] as int?;
+  }
+
   /// Has this driver logged a pre-trip DVIR today (device-local day)?
   /// RLS scopes the read to the driver's own reports.
   Future<bool> dvirDoneToday() async {

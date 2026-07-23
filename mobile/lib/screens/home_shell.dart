@@ -12,6 +12,7 @@ import '../services/nps_service.dart';
 import '../services/radio_rx.dart';
 import '../services/tracking_service.dart';
 import '../services/update_service.dart';
+import 'breakdown_screen.dart';
 import 'dvir_screen.dart';
 import 'settlement_screen.dart';
 import 'loads_screen.dart';
@@ -277,6 +278,14 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         appBar: AppBar(
           title: Text(isDriver ? 'Forest Companion' : 'Forest'),
           actions: [
+            if (isDriver)
+              IconButton(
+                tooltip: 'Report breakdown',
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => BreakdownScreen(api: _api)),
+                ),
+                icon: const Icon(Icons.report_problem_outlined),
+              ),
             IconButton(
               tooltip: tr('signOut'),
               onPressed: _signOut,

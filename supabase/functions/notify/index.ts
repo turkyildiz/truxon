@@ -185,6 +185,57 @@ Deno.serve(withCors(async (req) => {
     return json({ ok: true })
   }
 
+  // ---------- breakdown (driver JWT) — ring the office through DND ----------
+  if (action === 'breakdown') {
+    const caller = await getCaller(req)
+    if (caller instanceof Response) return caller
+    if (caller.role !== 'driver') return json({ error: 'Unauthorized' }, 401)
+
+    const admin = adminClient()
+    const unit = String(body.unit ?? '').slice(0, 40)
+    const desc = String(body.description ?? '').slice(0, 200)
+    if (!desc) return json({ error: 'description required' }, 422)
+    const drivable = body.drivable === true || body.drivable === 'true'
+    const data: Record<string, string> = { type: 'breakdown' }
+    if (body.lat != null && body.lon != null) {
+      data.lat = String(body.lat)
+      data.lon = String(body.lon)
+      data.maps = `https://maps.google.com/?q=${Number(body.lat)},${Number(body.lon)}`
+    }
+
+    const { data: office, error: oErr } = await admin
+      .from('profiles')
+      .select('id')
+      .in('role', ['admin', 'dispatcher'])
+      .eq('is_active', true)
+    if (oErr) return json({ error: oErr.message }, 400)
+    const ids = (office ?? []).map((p) => p.id)
+    if (!ids.length) return json({ ok: true, sent: 0, note: 'no office users' })
+
+    const { data: devices } = await admin
+      .from('push_devices')
+      .select('id, token, platform')
+      .in('user_id', ids)
+    if (!devices?.length) return json({ ok: true, sent: 0, note: 'no devices' })
+
+    const fcmRaw = Deno.env.get('FCM_SERVICE_ACCOUNT_JSON')
+    let projectId = ''
+    try {
+      projectId = fcmRaw ? JSON.parse(fcmRaw).project_id : ''
+    } catch { /* ignore */ }
+    const accessToken = await getFcmAccessToken()
+    const title = `🔴 Breakdown${unit ? ` — unit ${unit}` : ''}`
+    const message = `${desc}${drivable ? ' (drivable)' : ' (NOT drivable)'}`
+    let sent = 0
+    for (const dev of devices) {
+      if (!accessToken || !projectId) break
+      const result = await sendFcm(projectId, accessToken, dev.token, title, message, data, true)
+      if (result.ok) sent++
+      else if (result.invalid) await admin.from('push_devices').delete().eq('id', dev.id)
+    }
+    return json({ ok: true, sent })
+  }
+
   // ---------- send / notify_load (service, webhook, or staff JWT for notify_load) ----------
   if (action === 'send' || action === 'notify_load') {
     const staffCaller = action === 'notify_load' ? await getCaller(req) : null
