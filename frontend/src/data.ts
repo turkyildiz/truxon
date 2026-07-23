@@ -2233,6 +2233,8 @@ export interface DriverCard {
   on_time_pct: number | null
   detention_hours: number
   violations: number
+  /** Pre-trip DVIR days ÷ ELD driving days; null when ELD tracked nothing. */
+  dvir_pct: number | null
 }
 
 export interface DriverScorecard {
