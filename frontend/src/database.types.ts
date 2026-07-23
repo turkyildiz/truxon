@@ -2615,11 +2615,15 @@ export type Database = {
           in_service_date: string | null
           make: string
           model: string
-          monthly_cost: number
+          monthly_cost: number | null
+          monthly_payment: number | null
           notes: string
           out_of_service_date: string | null
+          ownership: string | null
           plate_expiry: string | null
           plate_number: string
+          purchase_date: string | null
+          purchase_price: number | null
           status: Database["public"]["Enums"]["equipment_status"]
           unit_number: string
           updated_at: string
@@ -2633,11 +2637,15 @@ export type Database = {
           in_service_date?: string | null
           make?: string
           model?: string
-          monthly_cost?: number
+          monthly_cost?: number | null
+          monthly_payment?: number | null
           notes?: string
           out_of_service_date?: string | null
+          ownership?: string | null
           plate_expiry?: string | null
           plate_number?: string
+          purchase_date?: string | null
+          purchase_price?: number | null
           status?: Database["public"]["Enums"]["equipment_status"]
           unit_number: string
           updated_at?: string
@@ -2651,11 +2659,15 @@ export type Database = {
           in_service_date?: string | null
           make?: string
           model?: string
-          monthly_cost?: number
+          monthly_cost?: number | null
+          monthly_payment?: number | null
           notes?: string
           out_of_service_date?: string | null
+          ownership?: string | null
           plate_expiry?: string | null
           plate_number?: string
+          purchase_date?: string | null
+          purchase_price?: number | null
           status?: Database["public"]["Enums"]["equipment_status"]
           unit_number?: string
           updated_at?: string
@@ -2770,11 +2782,15 @@ export type Database = {
           in_service_date: string | null
           make: string
           model: string
-          monthly_cost: number
+          monthly_cost: number | null
+          monthly_payment: number | null
           notes: string
           out_of_service_date: string | null
+          ownership: string | null
           plate_expiry: string | null
           plate_number: string
+          purchase_date: string | null
+          purchase_price: number | null
           status: Database["public"]["Enums"]["equipment_status"]
           unit_number: string
           updated_at: string
@@ -2788,11 +2804,15 @@ export type Database = {
           in_service_date?: string | null
           make?: string
           model?: string
-          monthly_cost?: number
+          monthly_cost?: number | null
+          monthly_payment?: number | null
           notes?: string
           out_of_service_date?: string | null
+          ownership?: string | null
           plate_expiry?: string | null
           plate_number?: string
+          purchase_date?: string | null
+          purchase_price?: number | null
           status?: Database["public"]["Enums"]["equipment_status"]
           unit_number: string
           updated_at?: string
@@ -2806,11 +2826,15 @@ export type Database = {
           in_service_date?: string | null
           make?: string
           model?: string
-          monthly_cost?: number
+          monthly_cost?: number | null
+          monthly_payment?: number | null
           notes?: string
           out_of_service_date?: string | null
+          ownership?: string | null
           plate_expiry?: string | null
           plate_number?: string
+          purchase_date?: string | null
+          purchase_price?: number | null
           status?: Database["public"]["Enums"]["equipment_status"]
           unit_number?: string
           updated_at?: string
@@ -3967,6 +3991,7 @@ export type Database = {
           stop_type: string
         }[]
       }
+      dot_audit_pack: { Args: never; Returns: Json }
       draft_dunning_notices: { Args: never; Returns: number }
       drive_create_share: {
         Args: { p_expires_at?: string; p_file_id: number }

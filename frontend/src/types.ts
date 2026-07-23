@@ -59,7 +59,11 @@ export interface Equipment {
   plate_expiry: string | null
   in_service_date: string | null
   out_of_service_date: string | null
-  monthly_cost: number
+  monthly_cost: number | null
+  ownership: 'owned' | 'financed' | 'leased' | null
+  monthly_payment: number | null
+  purchase_price: number | null
+  purchase_date: string | null
   notes: string
   status: 'available' | 'in_use' | 'maintenance' | 'retired'
 }

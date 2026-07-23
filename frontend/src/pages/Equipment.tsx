@@ -69,6 +69,12 @@ function EnrichmentConflicts({ entityType }: { entityType: 'truck' | 'trailer' }
   )
 }
 
+const OWNERSHIP_OPTIONS = [
+  { value: 'owned', label: 'Owned (paid off)' },
+  { value: 'financed', label: 'Financed' },
+  { value: 'leased', label: 'Leased' },
+]
+
 const STATUS_OPTIONS = [
   { value: 'available', label: 'Available' },
   { value: 'in_use', label: 'In Use' },
@@ -92,7 +98,7 @@ function EquipmentPage({ title, api, queryKey, entityType }: { title: string; ap
         { header: 'VIN', sortKey: 'vin', sortValue: (t) => t.vin, render: (t) => t.vin || '—' },
         { header: 'Plate', sortKey: 'plate', sortValue: (t) => t.plate_number, render: (t) => (t.plate_number ? `${t.plate_number}${t.plate_expiry ? ` (exp ${formatDate(t.plate_expiry)})` : ''}` : '—') },
         { header: 'In Service', sortKey: 'in_service', sortValue: (t) => (t.in_service_date ? new Date(t.in_service_date).getTime() : null), render: (t) => formatDate(t.in_service_date) },
-        { header: 'Monthly Cost', sortKey: 'monthly_cost', sortValue: (t) => Number(t.monthly_cost), render: (t) => money(t.monthly_cost) },
+        { header: 'Payment /mo', sortKey: 'monthly_payment', sortValue: (t) => Number(t.monthly_payment ?? 0), render: (t) => (t.monthly_payment ? money(t.monthly_payment) : '—') },
         { header: 'Status', sortKey: 'status', sortValue: (t) => t.status, render: (t) => <Badge status={t.status} /> },
       ]}
       fields={[
@@ -103,13 +109,17 @@ function EquipmentPage({ title, api, queryKey, entityType }: { title: string; ap
         { name: 'vin', label: 'VIN' },
         { name: 'plate_number', label: 'Plate Number' },
         { name: 'plate_expiry', label: 'Plate Expiry', type: 'date' },
-        { name: 'monthly_cost', label: 'Monthly Cost ($)', type: 'number', step: '0.01' },
+        { name: 'ownership', label: 'Ownership', type: 'select', options: OWNERSHIP_OPTIONS },
+        { name: 'monthly_payment', label: 'Monthly Payment ($ — loan/lease)', type: 'number', step: '0.01' },
+        { name: 'purchase_price', label: 'Purchase Price ($)', type: 'number', step: '0.01' },
+        { name: 'purchase_date', label: 'Purchase Date', type: 'date' },
+        { name: 'monthly_cost', label: 'Other Fixed ($/mo, excl. payment)', type: 'number', step: '0.01' },
         { name: 'in_service_date', label: 'In-Service Date', type: 'date' },
         { name: 'out_of_service_date', label: 'Out-of-Service Date', type: 'date' },
         { name: 'status', label: 'Status', type: 'select', required: true, options: STATUS_OPTIONS },
         { name: 'notes', label: 'Notes', type: 'textarea', full: true },
       ]}
-      defaults={{ unit_number: '', make: '', model: '', year: '', vin: '', plate_number: '', plate_expiry: '', monthly_cost: '0', in_service_date: '', out_of_service_date: '', status: 'available', notes: '' }}
+      defaults={{ unit_number: '', make: '', model: '', year: '', vin: '', plate_number: '', plate_expiry: '', ownership: '', monthly_payment: '', purchase_price: '', purchase_date: '', monthly_cost: '', in_service_date: '', out_of_service_date: '', status: 'available', notes: '' }}
       toForm={(t) => ({
         unit_number: t.unit_number,
         make: t.make,
@@ -118,7 +128,11 @@ function EquipmentPage({ title, api, queryKey, entityType }: { title: string; ap
         vin: t.vin,
         plate_number: t.plate_number,
         plate_expiry: t.plate_expiry ?? '',
-        monthly_cost: t.monthly_cost,
+        ownership: t.ownership ?? '',
+        monthly_payment: t.monthly_payment ?? '',
+        purchase_price: t.purchase_price ?? '',
+        purchase_date: t.purchase_date ?? '',
+        monthly_cost: t.monthly_cost ?? '',
         in_service_date: t.in_service_date ?? '',
         out_of_service_date: t.out_of_service_date ?? '',
         status: t.status,

@@ -251,7 +251,7 @@ function equipmentApi(table: 'trucks' | 'trailers') {
       // %/_ wildcards can't leak into the .ilike pattern (review LOW).
       const s = q ? sanitizeSearchTerm(q) : ''
       if (s) query = query.ilike('unit_number', `%${s}%`)
-      return unwrap(await query)
+      return unwrap(await query) as unknown as Equipment[]
     },
     async create(payload: Row): Promise<Equipment> {
       return unwrap(await supabase.from(table).insert(payload as TablesInsert<'trucks'>).select().single())
@@ -264,6 +264,16 @@ function equipmentApi(table: 'trucks' | 'trailers') {
 
 export const trucksApi = equipmentApi('trucks')
 export const trailersApi = equipmentApi('trailers')
+
+/** Documents-on-file per record, for the Docs (n) badges on resource lists. */
+export async function docCounts(entityType: string): Promise<Record<string, number>> {
+  const data = unwrap(
+    await supabase.from('documents').select('entity_id').eq('entity_type', entityType),
+  ) as { entity_id: number | string }[]
+  const counts: Record<string, number> = {}
+  for (const d of data ?? []) counts[String(d.entity_id)] = (counts[String(d.entity_id)] ?? 0) + 1
+  return counts
+}
 
 // ---------- Maintenance ----------
 

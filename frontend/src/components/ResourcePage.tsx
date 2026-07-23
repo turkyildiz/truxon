@@ -7,6 +7,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { docCounts } from '../data'
 import { errorMessage } from '../supabase'
 import DocsNotes from './DocsNotes'
 import { Button, Card, compareValues, Field, Input, LoadError, Modal, Select, type SortState, Table, Textarea, toggleSort } from './ui'
@@ -90,6 +91,13 @@ export default function ResourcePage<T extends { id: number | string }>({
   const [editing, setEditing] = useState<T | null>(null)
   const [creating, setCreating] = useState(false)
   const [docsFor, setDocsFor] = useState<T | null>(null)
+  // Docs-on-file counts so the button reads "📄 Docs (3)" instead of hiding
+  const { data: docCountMap } = useQuery({
+    queryKey: ['doc-counts', docs?.entityType],
+    queryFn: () => docCounts(docs!.entityType),
+    enabled: !!docs,
+    staleTime: 30_000,
+  })
   const [form, setForm] = useState<Record<string, unknown>>({})
   const [error, setError] = useState('')
   const [dynamicOptions, setDynamicOptions] = useState<Record<string, { value: string; label: string }[]>>({})
@@ -240,7 +248,7 @@ export default function ResourcePage<T extends { id: number | string }>({
               <td className="px-3 py-3 text-right whitespace-nowrap">
                 {docs && (
                   <button onClick={() => setDocsFor(item)} className="mr-3 text-sm font-medium text-brand hover:underline">
-                    Docs
+                    📄 Docs{(docCountMap?.[String(item.id)] ?? 0) > 0 ? ` (${docCountMap![String(item.id)]})` : ''}
                   </button>
                 )}
                 <button onClick={() => openEdit(item)} className="text-sm font-medium text-brand hover:underline">
@@ -312,6 +320,12 @@ export default function ResourcePage<T extends { id: number | string }>({
             </div>
           </div>
         </form>
+        {editing && docs && (
+          <div className="mt-5 border-t border-line pt-4">
+            <div className="mb-2 text-sm font-semibold text-muted">📄 Documents & Notes</div>
+            <DocsNotes entityType={docs.entityType} entityId={editing.id} docTypes={docs.docTypes} className="space-y-4" />
+          </div>
+        )}
       </Modal>
     </Card>
   )
