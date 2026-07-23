@@ -1559,6 +1559,19 @@ export async function listInsights(includeResolved = false): Promise<TruxInsight
   return unwrap(await supabase.rpc('trux_insights_feed', { p_include_resolved: includeResolved })) as unknown as TruxInsight[]
 }
 
+export interface SentinelSummary {
+  open: number
+  critical: number
+  warn: number
+  snoozed: number
+  top: { severity: string; title: string; detail: string }[]
+}
+
+/** The open board in one call (snooze-aware). */
+export async function sentinelSummary(): Promise<SentinelSummary | null> {
+  return (unwrap(await supabase.rpc('sentinel_open_summary')) as unknown as SentinelSummary) ?? null
+}
+
 /** Snooze: stays open in the feed but brief/digest/pushes skip it (R9 #87). */
 export async function snoozeInsight(id: number, days = 7): Promise<void> {
   unwrap(await supabase.rpc('snooze_insight', { p_id: id, p_days: days }))

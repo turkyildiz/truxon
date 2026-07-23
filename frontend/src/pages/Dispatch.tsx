@@ -3,7 +3,7 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Button, Card, Field, Input, money, Select, Textarea } from '../components/ui'
-import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, eldFleetLive, estimateLoadMargin, extractPdf, fleetCostBasis, laneRateForRoute, loadEtaRisk, type EldFleetRow, type ExtractedStop } from '../data'
+import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, eldFleetLive, estimateLoadMargin, extractPdf, fleetCostBasis, laneRateForRoute, listLoads, loadEtaRisk, sentinelSummary, type EldFleetRow, type ExtractedStop } from '../data'
 import { errorMessage } from '../supabase'
 import { ReferenceDataBanner, useReferenceData } from '../useReferenceData'
 import FleetMap from './FleetMap'
@@ -39,6 +39,56 @@ function routeOf(stops: StopForm[]): { origin: string; destination: string; wayp
   const ordered = [...stops.filter((s) => s.stop_type === 'pickup'), ...stops.filter((s) => s.stop_type === 'delivery')].filter(stopLine)
   const lines = ordered.map(stopLine)
   return { origin: lines[0] ?? '', destination: lines.at(-1) ?? '', waypoints: lines.slice(1, -1) }
+}
+
+/** Shift handoff: what's rolling, what's booked-but-unassigned, what's hot —
+ * the one screen the next person reads before touching anything (R9 #122). */
+function HandoffCard() {
+  const rollingQ = useQuery({
+    queryKey: ['handoff-loads'],
+    queryFn: () => listLoads({ statuses: ['assigned', 'in_transit'] }),
+    refetchInterval: 5 * 60_000, retry: false,
+  })
+  const sentQ = useQuery({ queryKey: ['handoff-sentinel'], queryFn: sentinelSummary, retry: false })
+  const [open, setOpen] = useState(false)
+  const rolling = rollingQ.data ?? []
+  if (rollingQ.isError || rolling.length === 0) return null
+  const unassigned = rolling.filter((l) => !l.driver_id)
+  const s = sentQ.data
+  return (
+    <Card title={`🤝 Shift handoff — ${rolling.length} rolling${unassigned.length ? `, ${unassigned.length} unassigned` : ''}${s?.critical ? ` · ${s.critical} critical alert${s.critical === 1 ? '' : 's'}` : ''}`}>
+      {!open ? (
+        <button type="button" className="text-sm font-medium text-brand" onClick={() => setOpen(true)}>
+          Show the board →
+        </button>
+      ) : (
+        <>
+          <table className="w-full text-sm">
+            <tbody>
+              {rolling.map((l) => (
+                <tr key={l.id} className="border-t border-line">
+                  <td className="px-2 py-1.5 font-medium">{l.load_number}</td>
+                  <td className="px-2 py-1.5 text-muted">{l.customer_name}</td>
+                  <td className="px-2 py-1.5">{l.driver_name ?? <span className="font-semibold text-amber-600 dark:text-amber-400">unassigned</span>}</td>
+                  <td className="px-2 py-1.5 capitalize">{l.status.replace('_', ' ')}</td>
+                  <td className="px-2 py-1.5 text-muted">
+                    {l.status === 'assigned'
+                      ? `PU ${l.pickup_time ? new Date(l.pickup_time).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '?'}`
+                      : `DEL ${l.delivery_time ? new Date(l.delivery_time).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '?'}`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {s && s.top.length > 0 && (
+            <p className="mt-2 text-xs text-muted">
+              Hot: {s.top.slice(0, 3).map((t) => t.title).join(' · ')}
+            </p>
+          )}
+        </>
+      )}
+    </Card>
+  )
 }
 
 /** Loads that will miss their appointment while it's still fixable. */
@@ -297,6 +347,7 @@ export default function Dispatch() {
   return (
     <div className="space-y-4">
       <FleetMap />
+      <HandoffCard />
       <LateRiskCard />
       <Card title="AI-Assisted Dispatch">
         <div
