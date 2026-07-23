@@ -37,6 +37,8 @@ export interface Driver {
   state: string
   license_number: string
   license_expiration: string | null
+  medical_card_number: string | null
+  medical_card_expiry: string | null
   date_of_birth: string | null
   hire_date: string | null
   pay_per_mile: number

@@ -867,6 +867,8 @@ export type Database = {
           id: number
           license_expiration: string | null
           license_number: string
+          medical_card_expiry: string | null
+          medical_card_number: string | null
           notes: string
           pay_per_empty_mile: number
           pay_per_mile: number
@@ -889,6 +891,8 @@ export type Database = {
           id?: never
           license_expiration?: string | null
           license_number?: string
+          medical_card_expiry?: string | null
+          medical_card_number?: string | null
           notes?: string
           pay_per_empty_mile?: number
           pay_per_mile?: number
@@ -911,6 +915,8 @@ export type Database = {
           id?: never
           license_expiration?: string | null
           license_number?: string
+          medical_card_expiry?: string | null
+          medical_card_number?: string | null
           notes?: string
           pay_per_empty_mile?: number
           pay_per_mile?: number
@@ -1639,6 +1645,48 @@ export type Database = {
           id?: number
           monthly_cap_cents?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      llm_extractions: {
+        Row: {
+          arm: string
+          created_at: string
+          id: number
+          kind: string
+          latency_ms: number | null
+          model: string
+          ok: boolean
+          output: Json | null
+          prompt_len: number | null
+          prompt_sha: string | null
+          ref: string | null
+        }
+        Insert: {
+          arm: string
+          created_at?: string
+          id?: number
+          kind?: string
+          latency_ms?: number | null
+          model: string
+          ok?: boolean
+          output?: Json | null
+          prompt_len?: number | null
+          prompt_sha?: string | null
+          ref?: string | null
+        }
+        Update: {
+          arm?: string
+          created_at?: string
+          id?: number
+          kind?: string
+          latency_ms?: number | null
+          model?: string
+          ok?: boolean
+          output?: Json | null
+          prompt_len?: number | null
+          prompt_sha?: string | null
+          ref?: string | null
         }
         Relationships: []
       }
@@ -4047,6 +4095,7 @@ export type Database = {
       }
       driver_owns_load: { Args: { p_load_id: number }; Returns: boolean }
       driver_owns_load_path: { Args: { p_name: string }; Returns: boolean }
+      driver_qual_files: { Args: never; Returns: Json }
       driver_scorecard: { Args: { p_week_offset?: number }; Returns: Json }
       driver_set_duty: {
         Args: { p_on_duty: boolean }
@@ -4288,6 +4337,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      llm_eval_summary: { Args: { p_days?: number }; Returns: Json }
       llm_reserve_spend: {
         Args: { p_cents: number; p_provider: string }
         Returns: boolean

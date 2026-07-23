@@ -2374,3 +2374,21 @@ export async function mfaUnenroll(factorId: string): Promise<void> {
   const { error } = await supabase.auth.mfa.unenroll({ factorId })
   if (error) throw new Error(error.message)
 }
+
+export interface QualFileRow {
+  driver_id: number
+  driver: string
+  cdl_number_on_record: boolean
+  cdl_expiry: string | null
+  cdl_ok: boolean | null
+  medcard_expiry: string | null
+  medcard_ok: boolean | null
+  license_doc_on_file: boolean
+  medcard_doc_on_file: boolean
+  complete: boolean
+}
+
+/** DOT driver-qualification-file completeness (records + paper on file). */
+export async function driverQualFiles(): Promise<{ drivers: QualFileRow[]; complete_count: number; total: number }> {
+  return unwrap(await supabase.rpc('driver_qual_files')) as unknown as { drivers: QualFileRow[]; complete_count: number; total: number }
+}
