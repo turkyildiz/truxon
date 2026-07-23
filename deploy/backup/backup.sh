@@ -123,11 +123,16 @@ fi
 if [[ -n "${OFFSITE_HOST:-}" && -n "${OFFSITE_USER:-}" ]]; then
   OFFSITE_KEY="${OFFSITE_KEY:-/volume1/docker/truxon-backup/.ssh/offsite_rsync}"
   _rsh="ssh -i $OFFSITE_KEY -o IdentitiesOnly=yes -o ConnectTimeout=20"
+  # --bwlimit: an uncapped bulk rsync saturated the office uplink so hard the
+  # NAS's OWN tailscale keepalives starved and it dropped off the tailnet
+  # (2026-07-23 incident — Funnel/Valhalla/prodsql all dark mid-transfer).
+  # Cap leaves the link breathable; nightly deltas are small anyway.
+  OFFSITE_BWLIMIT="${OFFSITE_BWLIMIT:-3m}"
   offsite_ok=1
-  rsync -a --delete -e "$_rsh" --include='*.gpg' --exclude='*' \
+  rsync -a --delete --bwlimit="$OFFSITE_BWLIMIT" -e "$_rsh" --include='*.gpg' --exclude='*' \
     "$BACKUP_DIR/" "${OFFSITE_USER}@${OFFSITE_HOST}:truxon-offsite/backups/" \
     || { offsite_ok=0; echo "  WARNING: offsite backups rsync failed"; }
-  rsync -a -e "$_rsh" --include='*.gpg' --exclude='*' \
+  rsync -a --bwlimit="$OFFSITE_BWLIMIT" -e "$_rsh" --include='*.gpg' --exclude='*' \
     /volume1/docker/truxon-backup/release-signing/ \
     "${OFFSITE_USER}@${OFFSITE_HOST}:truxon-offsite/release-signing/" \
     || { offsite_ok=0; echo "  WARNING: offsite release-signing rsync failed"; }
