@@ -82,10 +82,12 @@ log "Deno"
 
 log "Supabase CLI → ~/.local/bin"
 mkdir -p ~/.local/bin
-if [ ! -x ~/.local/bin/supabase ]; then
+if [ ! -x ~/.local/bin/supabase-go ]; then
+  # the tarball ships TWO binaries — `supabase` (shim) + `supabase-go` (real CLI);
+  # extracting only the shim breaks `supabase start` (learned 2026-07-23)
   v=$(curl -fsSL https://api.github.com/repos/supabase/cli/releases/latest | grep -oP '"tag_name": "\K[^"]+')
   curl -fsSL "https://github.com/supabase/cli/releases/download/$v/supabase_linux_amd64.tar.gz" \
-    | tar xzf - -C ~/.local/bin supabase
+    | tar xzf - -C ~/.local/bin
 fi
 ~/.local/bin/supabase --version
 
