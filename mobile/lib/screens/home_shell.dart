@@ -16,6 +16,7 @@ import 'breakdown_screen.dart';
 import 'dvir_screen.dart';
 import 'fuel_receipt_screen.dart';
 import 'settlement_screen.dart';
+import 'wallet_screen.dart';
 import 'loads_screen.dart';
 import 'voice_screen.dart';
 import 'radio_screen.dart';
@@ -355,6 +356,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             _quickAction(Icons.local_gas_station, 'Fuel',
                 () => Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => FuelReceiptScreen(api: _api)))),
+            // R9 #145: the paper a roadside stop asks for.
+            _quickAction(Icons.folder_shared_outlined, 'Wallet',
+                () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => WalletScreen(api: _api)))),
           ]),
         ),
         if (_locationDenied)

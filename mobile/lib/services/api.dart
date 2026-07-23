@@ -302,6 +302,14 @@ class CompanionApi {
     return Map<String, dynamic>.from(data as Map);
   }
 
+  /// R9 #145 — document wallet: the driver's own filed docs (CDL, med card)
+  /// plus truck road paperwork (registration, insurance, permits, IFTA).
+  Future<Map<String, dynamic>?> myWalletDocuments() async {
+    final data = await _sb.rpc('my_wallet_documents');
+    if (data == null) return null;
+    return Map<String, dynamic>.from(data as Map);
+  }
+
   /// R9 #142 — fuel receipt at the pump: upload under the driver's own
   /// `fuel/<driver_id>/` prefix, then register it against the TRUCK so fuel
   /// paperwork lives with the unit (IFTA/audit trail + cash buys the card
