@@ -19,6 +19,7 @@ function EntityLink({ m }: { m: DocSearchMatch }) {
 export default function DocSearch() {
   const [q, setQ] = useState('')
   const [entity, setEntity] = useState('')
+  const [docType, setDocType] = useState('')
   const [results, setResults] = useState<DocSearchMatch[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
@@ -30,6 +31,7 @@ export default function DocSearch() {
     setBusy(true); setError(null); setResults(null)
     try {
       setResults(await searchDocuments(q.trim(), entity || undefined))
+      // doc-type narrows client-side — matches already carry their label
     } catch (err) {
       setError(err)
     } finally {
@@ -44,6 +46,9 @@ export default function DocSearch() {
       else if (m.document_id != null) await downloadDocumentById(m.document_id)
     } catch (err) { setError(err) } finally { setDownloading(null) }
   }
+
+  const shown = (results ?? []).filter((m) => !docType || m.doc_type === docType)
+  const typesInResults = [...new Set((results ?? []).map((m) => m.doc_type).filter(Boolean))] as string[]
 
   return (
     <div className="space-y-4">
@@ -70,6 +75,14 @@ export default function DocSearch() {
               <option value="team_drive">Team Drive</option>
             </Select>
           </Field>
+          {typesInResults.length > 1 && (
+            <Field label="Type">
+              <Select value={docType} onChange={(e) => setDocType(e.target.value)}>
+                <option value="">All types</option>
+                {typesInResults.map((t) => <option key={t} value={t}>{t}</option>)}
+              </Select>
+            </Field>
+          )}
           <Button type="submit" disabled={busy || q.trim().length < 2}>
             {busy ? 'Searching…' : 'Search'}
           </Button>
@@ -82,11 +95,12 @@ export default function DocSearch() {
       {error ? <LoadError error={error} /> : null}
 
       {results && !error && (
-        results.length === 0 ? (
-          <Card><p className="text-muted">No matching documents.</p></Card>
+        shown.length === 0 ? (
+          <Card><p className="text-muted">{results.length === 0 ? 'No matching documents.' : `No ${docType} documents in these results — clear the type filter.`}</p></Card>
         ) : (
           <div className="space-y-3">
-            {results.map((m, i) => (
+            {docType && <p className="text-xs text-muted">{shown.length} of {results.length} results are {docType}.</p>}
+            {shown.map((m, i) => (
               <Card key={`${m.document_id ?? 'd'}-${m.drive_file_id ?? 'f'}-${i}`}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
