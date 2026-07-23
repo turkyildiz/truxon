@@ -2522,6 +2522,17 @@ export interface CreditMemoSummary {
   recent: { doc: string; date: string; total: number; customer: string | null; memo: string | null }[]
 }
 
+export interface PaymentAudit {
+  paid_but_open_in_qbo: { invoice: string; customer: string | null; total: number; qbo_balance: number }[]
+  settled_in_qbo_but_open: { invoice: string; customer: string | null; total: number; days_open: number }[]
+  overpaid: { invoice: string; customer: string | null; total: number; payments: number }[]
+}
+
+/** Payments that landed wrong: paid-vs-QBO mismatches + overpayments. */
+export async function paymentApplicationAudit(): Promise<PaymentAudit | null> {
+  return (unwrap(await supabase.rpc('payment_application_audit')) as unknown as PaymentAudit) ?? null
+}
+
 /** Credit memos from the QBO mirror — the billing-error ledger. */
 export async function creditMemoSummary(months = 12): Promise<CreditMemoSummary | null> {
   return (unwrap(await supabase.rpc('credit_memo_summary', { p_months: months })) as unknown as CreditMemoSummary) ?? null

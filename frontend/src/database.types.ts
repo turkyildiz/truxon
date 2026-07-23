@@ -4708,6 +4708,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      payment_application_audit: { Args: never; Returns: Json }
       playbook_coverage: { Args: never; Returns: Json }
       playbook_metrics_list: {
         Args: { p_owner?: string; p_search?: string; p_status?: string }

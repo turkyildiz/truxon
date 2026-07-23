@@ -16,7 +16,7 @@ import {
   createInvoice, decideAccessorial, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
   listAccessorials, proposeDetentionAccessorials,
   glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
-  creditMemoSummary, denimReconciliation, factoringCostSummary, qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, revRecDrift, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
+  creditMemoSummary, denimReconciliation, factoringCostSummary, paymentApplicationAudit, qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, revRecDrift, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
 } from '../data'
 import { downloadCustomerStatement, downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
 import { errorMessage } from '../supabase'
@@ -1251,6 +1251,45 @@ function GlSection() {
 }
 
 // ── Reports ──────────────────────────────────────────────────────────────────
+/** Payments that landed wrong — the mismatch lists an auditor would build. */
+function PaymentAuditCard() {
+  const q = useQuery({ queryKey: ['payment-audit'], queryFn: paymentApplicationAudit, retry: false })
+  const d = q.data
+  if (q.isError || !d) return null
+  const total = d.paid_but_open_in_qbo.length + d.settled_in_qbo_but_open.length + d.overpaid.length
+  if (total === 0) {
+    return (
+      <div className="rounded-2xl border border-line bg-surface p-4">
+        <h3 className="text-sm font-semibold text-body">Payment application audit</h3>
+        <p className="mt-1 text-sm text-green-700 dark:text-green-300">Every payment agrees with the books ✓</p>
+      </div>
+    )
+  }
+  const section = (title: string, rows: { invoice: string; customer: string | null }[], extra: (r: never) => string) => rows.length > 0 && (
+    <div className="mt-2">
+      <div className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">{title} ({rows.length})</div>
+      <ul className="text-sm">
+        {rows.slice(0, 8).map((r) => (
+          <li key={r.invoice} className="text-muted">
+            <span className="font-medium text-body">{r.invoice}</span> {r.customer ?? ''} — {extra(r as never)}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-4">
+      <h3 className="text-sm font-semibold text-body">Payment application audit — {total} mismatch{total === 1 ? '' : 'es'}</h3>
+      {section('Marked paid here, still open in QBO', d.paid_but_open_in_qbo,
+        (r: { qbo_balance: number }) => `QBO balance ${money(Number(r.qbo_balance))}`)}
+      {section('Collected in QBO, still open here', d.settled_in_qbo_but_open,
+        (r: { days_open: number }) => `mark it paid — open ${r.days_open}d`)}
+      {section('Payments exceed invoice total', d.overpaid,
+        (r: { total: number; payments: number }) => `${money(Number(r.payments))} on a ${money(Number(r.total))} invoice`)}
+    </div>
+  )
+}
+
 /** Credit memos = revenue walked back. The invoice-accuracy scoreboard. */
 function CreditMemoCard() {
   const q = useQuery({ queryKey: ['credit-memos'], queryFn: () => creditMemoSummary(12), retry: false })
@@ -1333,6 +1372,7 @@ function ReportsTab() {
       <GlSection />
       <RevRecCard />
       <CreditMemoCard />
+      <PaymentAuditCard />
       {margins.length > 0 && (
         <div className="rounded-2xl border border-line bg-surface p-4">
           <h3 className="mb-2 text-sm font-semibold text-body">Revenue vs direct-cost margin (fuel + tolls + maintenance)</h3>
