@@ -2392,3 +2392,27 @@ export interface QualFileRow {
 export async function driverQualFiles(): Promise<{ drivers: QualFileRow[]; complete_count: number; total: number }> {
   return unwrap(await supabase.rpc('driver_qual_files')) as unknown as { drivers: QualFileRow[]; complete_count: number; total: number }
 }
+
+export interface ComplianceEvent {
+  id: number
+  driver_id: number
+  kind: 'mvr_review' | 'drug_test' | 'alcohol_test' | 'clearinghouse_query'
+  occurred_on: string
+  result: 'ok' | 'follow_up' | 'fail'
+  reviewer: string | null
+  notes: string | null
+}
+
+/** Compliance log (MVR reviews, drug/alcohol tests, Clearinghouse queries). */
+export async function listComplianceEvents(): Promise<ComplianceEvent[]> {
+  return unwrap(
+    await supabase
+      .from('driver_compliance_events')
+      .select('id, driver_id, kind, occurred_on, result, reviewer, notes')
+      .order('occurred_on', { ascending: false }),
+  ) as unknown as ComplianceEvent[]
+}
+
+export async function addComplianceEvent(e: Omit<ComplianceEvent, 'id'>): Promise<void> {
+  unwrap(await supabase.from('driver_compliance_events').insert(e as never).select('id'))
+}

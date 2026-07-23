@@ -39,6 +39,8 @@ export interface Driver {
   license_expiration: string | null
   medical_card_number: string | null
   medical_card_expiry: string | null
+  drug_consortium: string | null
+  drug_pool_enrolled_on: string | null
   date_of_birth: string | null
   hire_date: string | null
   pay_per_mile: number

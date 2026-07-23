@@ -1,8 +1,111 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import ResourcePage from '../components/ResourcePage'
 import { Badge, Card, formatDate } from '../components/ui'
-import { createDriver, driverQualFiles, listDrivers, listLinkableDriverProfiles, updateDriver } from '../data'
+import { addComplianceEvent, createDriver, driverQualFiles, listComplianceEvents, listDrivers, listLinkableDriverProfiles, updateDriver } from '../data'
+import type { ComplianceEvent } from '../data'
 import type { Driver } from '../types'
+
+const EVENT_KINDS: { value: ComplianceEvent['kind']; label: string }[] = [
+  { value: 'mvr_review', label: 'MVR review' },
+  { value: 'drug_test', label: 'Drug test' },
+  { value: 'alcohol_test', label: 'Alcohol test' },
+  { value: 'clearinghouse_query', label: 'Clearinghouse query' },
+]
+
+/** Annual-cadence compliance log (49 CFR 391.25 MVR reviews, part 382 testing,
+ * 382.701 Clearinghouse queries). The sentinel nags until events land here. */
+function ComplianceCard() {
+  const qc = useQueryClient()
+  const drivers = useQuery({ queryKey: ['drivers'], queryFn: () => listDrivers() })
+  const events = useQuery({ queryKey: ['compliance-events'], queryFn: listComplianceEvents, retry: false })
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState({ driver_id: '', kind: 'mvr_review' as ComplianceEvent['kind'], occurred_on: new Date().toISOString().slice(0, 10), result: 'ok' as ComplianceEvent['result'], reviewer: '', notes: '' })
+  const add = useMutation({
+    mutationFn: () => addComplianceEvent({
+      driver_id: Number(form.driver_id), kind: form.kind, occurred_on: form.occurred_on,
+      result: form.result, reviewer: form.reviewer || null, notes: form.notes || null,
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['compliance-events'] }); setOpen(false) },
+  })
+  if (events.isError || !drivers.data) return null
+  const active = drivers.data.filter((d) => d.status === 'active')
+  if (active.length === 0) return null
+  const last = (driverId: number, kind: ComplianceEvent['kind']) =>
+    (events.data ?? []).find((e) => e.driver_id === driverId && e.kind === kind)?.occurred_on ?? null
+  const yearMs = 365 * 864e5
+  const cell = (d: string | null) => (
+    <td className={`px-3 py-2 ${!d || Date.now() - new Date(d).getTime() > yearMs ? 'font-semibold text-red-600 dark:text-red-300' : 'text-green-700 dark:text-green-300'}`}>
+      {d ? formatDate(d) : '✗'}
+    </td>
+  )
+  return (
+    <Card title="🛡️ Compliance log — annual MVR / testing / Clearinghouse">
+      <p className="mb-2 text-xs text-muted">
+        Red = never logged or over a year old. Pull the MVR / run the Clearinghouse query, then log it here.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead><tr className="text-left text-xs uppercase tracking-wide text-muted">
+            <th className="px-3 py-2">Driver</th><th className="px-3 py-2">MVR review</th>
+            <th className="px-3 py-2">Drug test</th><th className="px-3 py-2">Alcohol test</th>
+            <th className="px-3 py-2">Clearinghouse</th><th className="px-3 py-2">Testing pool</th>
+          </tr></thead>
+          <tbody>
+            {active.map((d) => (
+              <tr key={d.id} className="border-t border-line">
+                <td className="px-3 py-2 font-medium">{d.full_name}</td>
+                {cell(last(d.id, 'mvr_review'))}
+                {cell(last(d.id, 'drug_test'))}
+                {cell(last(d.id, 'alcohol_test'))}
+                {cell(last(d.id, 'clearinghouse_query'))}
+                <td className={`px-3 py-2 ${d.drug_pool_enrolled_on ? 'text-green-700 dark:text-green-300' : 'font-semibold text-red-600 dark:text-red-300'}`}>
+                  {d.drug_pool_enrolled_on ? (d.drug_consortium || 'enrolled') : '✗ not enrolled'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {open ? (
+        <form
+          className="mt-3 flex flex-wrap items-end gap-2 text-sm"
+          onSubmit={(e) => { e.preventDefault(); if (form.driver_id) add.mutate() }}
+        >
+          <label className="flex flex-col gap-1">Driver
+            <select className="input" required value={form.driver_id} onChange={(e) => setForm({ ...form, driver_id: e.target.value })}>
+              <option value="">Select…</option>
+              {active.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">Event
+            <select className="input" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as ComplianceEvent['kind'] })}>
+              {EVENT_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">Date
+            <input className="input" type="date" required value={form.occurred_on} onChange={(e) => setForm({ ...form, occurred_on: e.target.value })} />
+          </label>
+          <label className="flex flex-col gap-1">Result
+            <select className="input" value={form.result} onChange={(e) => setForm({ ...form, result: e.target.value as ComplianceEvent['result'] })}>
+              <option value="ok">OK / negative</option>
+              <option value="follow_up">Needs follow-up</option>
+              <option value="fail">Fail / positive</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">Reviewer
+            <input className="input" value={form.reviewer} onChange={(e) => setForm({ ...form, reviewer: e.target.value })} />
+          </label>
+          <button type="submit" className="btn btn-primary" disabled={add.isPending}>Log it</button>
+          <button type="button" className="btn" onClick={() => setOpen(false)}>Cancel</button>
+          {add.isError ? <span className="text-red-600">{(add.error as Error).message}</span> : null}
+        </form>
+      ) : (
+        <button type="button" className="btn mt-3" onClick={() => setOpen(true)}>+ Log compliance event</button>
+      )}
+    </Card>
+  )
+}
 
 /** The screen a DOT auditor walks in with: per-driver CDL / med-card record
  * completeness AND whether the paper is actually on file. */
@@ -55,6 +158,7 @@ export default function Drivers() {
   return (
     <>
     <QualFilesCard />
+    <ComplianceCard />
     <ResourcePage<Driver>
       title="Drivers"
       queryKey="drivers"
@@ -97,6 +201,8 @@ export default function Drivers() {
         { name: 'license_expiration', label: 'License Expiration', type: 'date' },
         { name: 'medical_card_number', label: 'Medical Card #' },
         { name: 'medical_card_expiry', label: 'Medical Card Expiry', type: 'date' },
+        { name: 'drug_consortium', label: 'Drug/Alcohol Consortium' },
+        { name: 'drug_pool_enrolled_on', label: 'Pool Enrolled On', type: 'date' },
         { name: 'date_of_birth', label: 'Date of Birth', type: 'date' },
         { name: 'hire_date', label: 'Hire Date', type: 'date' },
         { name: 'pay_per_mile', label: 'Pay Per Mile ($)', type: 'number', step: '0.001' },
@@ -117,7 +223,7 @@ export default function Drivers() {
         { name: 'notes', label: 'Notes (medical, drug tests…)', type: 'textarea', full: true },
       ]}
       docs={{ entityType: 'driver', docTypes: ['License', 'Medical Card', 'Employment', 'Other'], label: (d) => d.full_name }}
-      defaults={{ full_name: '', phone: '', email: '', address: '', city: '', state: '', license_number: '', license_expiration: '', medical_card_number: '', medical_card_expiry: '', date_of_birth: '', hire_date: '', pay_per_mile: '0', empty_miles_paid: false, pay_per_empty_mile: '0', status: 'active', user_id: '', notes: '' }}
+      defaults={{ full_name: '', phone: '', email: '', address: '', city: '', state: '', license_number: '', license_expiration: '', medical_card_number: '', medical_card_expiry: '', drug_consortium: '', drug_pool_enrolled_on: '', date_of_birth: '', hire_date: '', pay_per_mile: '0', empty_miles_paid: false, pay_per_empty_mile: '0', status: 'active', user_id: '', notes: '' }}
       toForm={(d) => ({
         full_name: d.full_name,
         phone: d.phone,
@@ -129,6 +235,8 @@ export default function Drivers() {
         license_expiration: d.license_expiration ?? '',
         medical_card_number: d.medical_card_number ?? '',
         medical_card_expiry: d.medical_card_expiry ?? '',
+        drug_consortium: d.drug_consortium ?? '',
+        drug_pool_enrolled_on: d.drug_pool_enrolled_on ?? '',
         date_of_birth: d.date_of_birth ?? '',
         hire_date: d.hire_date ?? '',
         pay_per_mile: d.pay_per_mile,
