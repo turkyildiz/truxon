@@ -302,6 +302,38 @@ class CompanionApi {
     return Map<String, dynamic>.from(data as Map);
   }
 
+  /// R9 #142 — fuel receipt at the pump: upload under the driver's own
+  /// `fuel/<driver_id>/` prefix, then register it against the TRUCK so fuel
+  /// paperwork lives with the unit (IFTA/audit trail + cash buys the card
+  /// import never sees).
+  Future<Map<String, dynamic>> uploadFuelReceipt(
+    int truckId,
+    Uint8List bytes, {
+    String? filename,
+    String contentType = 'image/jpeg',
+    String? ocrText,
+  }) async {
+    final driverId = await _sb.rpc('my_driver_id');
+    if (driverId == null) throw Exception('No driver record linked to this login');
+    final safeName = (filename == null || filename.isEmpty) ? 'receipt.jpg' : filename;
+    final unique = DateTime.now().microsecondsSinceEpoch;
+    final path = 'fuel/$driverId/${unique}_$safeName';
+    await _sb.storage.from('documents').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: false),
+        );
+    final data = await _sb.rpc('driver_add_fuel_receipt', params: {
+      'p_truck_id': truckId,
+      'p_storage_path': path,
+      'p_filename': safeName,
+      'p_content_type': contentType,
+      'p_size_bytes': bytes.length,
+      if (ocrText != null && ocrText.isNotEmpty) 'p_ocr_text': ocrText,
+    });
+    return Map<String, dynamic>.from(data as Map);
+  }
+
   /// Feature 2 — send a message to the Trux agent (edge fn `trux-agent`,
   /// propose mode). Returns the raw response (reply text + optional confirm
   /// card). Pass [sessionId] to keep a conversation, or a confirm/reject token.

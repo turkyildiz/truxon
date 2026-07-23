@@ -14,6 +14,7 @@ import '../services/tracking_service.dart';
 import '../services/update_service.dart';
 import 'breakdown_screen.dart';
 import 'dvir_screen.dart';
+import 'fuel_receipt_screen.dart';
 import 'settlement_screen.dart';
 import 'loads_screen.dart';
 import 'voice_screen.dart';
@@ -303,6 +304,29 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     );
   }
 
+  /// Compact tap target for the driver-home top row (bounded width, unlike a
+  /// ListTile in a Row).
+  Widget _quickAction(IconData icon, String label, VoidCallback onTap) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: scheme.primary),
+              const SizedBox(height: 2),
+              Text(label, style: const TextStyle(fontSize: 11)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _loadsTab() {
     final scheme = Theme.of(context).colorScheme;
     final content = Column(
@@ -324,17 +348,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                 ),
               ),
             ),
-            // R9 #143: their pay, their history — one tap.
-            Card(
-              child: ListTile(
-                leading: Icon(Icons.payments_outlined, color: scheme.primary),
-                title: const Text('My Pay',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => SettlementScreen(api: _api)),
-                ),
-              ),
-            ),
+            // R9 #143/#142: pay statement + fuel receipt, one tap each.
+            _quickAction(Icons.payments_outlined, 'My Pay',
+                () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => SettlementScreen(api: _api)))),
+            _quickAction(Icons.local_gas_station, 'Fuel',
+                () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => FuelReceiptScreen(api: _api)))),
           ]),
         ),
         if (_locationDenied)

@@ -1,11 +1,15 @@
 ---
 name: disaster-recovery
 description: "What survives if the dev box dies — production is cloud-safe; the one residual single-point-of-failure is the app signing key (NAS-only, not offsite)"
-metadata:
+metadata: 
+  node_type: memory
   type: reference
+  originSessionId: 7541d708-7353-4f10-878c-db1e3485f192
 ---
 
 DR map, audited 2026-07-22 ("what happens if this computer dies?").
+
+**LIVE DR + cyber-recovery DRILL 2026-07-23 — results:** (1) **DB restore drill PASSED** — newest encrypted dump (`db_20260723`) decrypted with `BACKUP_PASSPHRASE` + restored into a throwaway Postgres, asserting real rows (11 profiles / 984 loads / 232 customers / 2498 documents / 10861 storage objects; the ~150 pg_restore errors are expected role/extension noise). (2) **Signing-key DR PROVEN** — decrypted all three copies (dev box, NAS, Supabase `dr-vault`) → keystore sha256 `4541d893…` **byte-identical across all three**, each bundle has `.jks` + `key.properties`. SPOF genuinely closed. (3) **Security posture strong** — `security_audit_verify` hash-chain intact (11/11), `security_console` `guard_armed:true / lockdown:false`, all ransomware guards armed on every crown-jewel table (DDL-drop, per-table truncate, bulk-delete/update), profiles last-admin protection now covers DELETE too. NOTE: verified guards read-only (never live-fired on prod — the OOB dblink alarm survives rollback and pages). (4) **Found + FIXED the one real gap:** offsite INDIANCREEK rsync was broken — see [[offsite-nas]] (pinned sibling rsync image). Remaining follow-up: the `offsite_fresh` watchdog check didn't fire during the outage (monitoring gap).
 
 **Production is unaffected.** Truxon runs on **Supabase (cloud)** + **Vercel (cloud)**, deployed from GitHub — none of it runs on the dev box. The prod DB has 3-copy backups (Supabase / NAS 30-day GPG pull / Backblaze B2). So a dead dev box does **not** take the business down.
 
