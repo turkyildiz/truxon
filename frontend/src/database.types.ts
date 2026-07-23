@@ -539,6 +539,47 @@ export type Database = {
         }
         Relationships: []
       }
+      denim_jobs: {
+        Row: {
+          created_at: string
+          denim_job_id: string
+          fee: number | null
+          invoice_id: number | null
+          last_seen: string
+          receivable: number | null
+          reference_number: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string
+          denim_job_id: string
+          fee?: number | null
+          invoice_id?: number | null
+          last_seen?: string
+          receivable?: number | null
+          reference_number?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string
+          denim_job_id?: string
+          fee?: number | null
+          invoice_id?: number | null
+          last_seen?: string
+          receivable?: number | null
+          reference_number?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "denim_jobs_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       doc_search_requests: {
         Row: {
           claimed_at: string | null
@@ -4105,6 +4146,7 @@ export type Database = {
         Args: { p_payment_id: number }
         Returns: undefined
       }
+      denim_reconciliation: { Args: never; Returns: Json }
       detention_events: {
         Args: {
           p_days?: number

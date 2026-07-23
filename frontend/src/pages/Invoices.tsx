@@ -16,7 +16,7 @@ import {
   createInvoice, decideAccessorial, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
   listAccessorials, proposeDetentionAccessorials,
   glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
-  qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
+  denimReconciliation, qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
 } from '../data'
 import { downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
 import { errorMessage } from '../supabase'
@@ -682,6 +682,41 @@ function WriteoffCard() {
   )
 }
 
+/** Denim's statement vs our books — agreement or the exact disagreements. */
+function DenimReconCard() {
+  const q = useQuery({ queryKey: ['denim-recon'], queryFn: denimReconciliation, retry: false })
+  const d = q.data
+  if (q.isError || !d || d.jobs_seen === 0) return null
+  const clean = d.fee_mismatches.length === 0 && d.unmatched_jobs.length === 0
+  return (
+    <Card title="🔎 Denim ↔ books reconciliation">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Denim jobs" value={String(d.jobs_seen)} sub={`${d.jobs_matched} matched to invoices`} />
+        <Kpi label="Denim fees" value={money(d.denim_fees_total)} sub="per their statement" />
+        <Kpi label="Captured fees" value={money(d.captured_fees_total)} sub="on our books" tone={Math.abs(d.denim_fees_total - d.captured_fees_total) < 1 ? 'good' : 'warn'} />
+        <Kpi label="Factored, no Denim job" value={String(d.factored_without_job)} sub="pre-Denim history or other factor" />
+      </div>
+      {clean ? (
+        <p className="mt-2 text-sm text-green-700 dark:text-green-300">Every Denim job matches an invoice and every fee agrees ✓</p>
+      ) : (
+        <div className="mt-2 space-y-1 text-sm">
+          {d.fee_mismatches.map((m) => (
+            <p key={m.invoice} className="text-amber-700 dark:text-amber-300">
+              {m.invoice}: Denim says {money(m.denim_fee)}, books say {m.captured_fee != null ? money(m.captured_fee) : '—'}
+            </p>
+          ))}
+          {d.unmatched_jobs.length > 0 && (
+            <p className="text-muted">
+              {d.unmatched_jobs.length} Denim job{d.unmatched_jobs.length > 1 ? 's' : ''} with no matching invoice:{' '}
+              {d.unmatched_jobs.slice(0, 6).map((u) => u.ref ?? u.job).join(', ')}{d.unmatched_jobs.length > 6 ? '…' : ''}
+            </p>
+          )}
+        </div>
+      )}
+    </Card>
+  )
+}
+
 function FactoringTab() {
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['factoring'], queryFn: factoringOverview, retry: false })
@@ -719,6 +754,7 @@ function FactoringTab() {
   return (
     <div className="space-y-4">
       <WriteoffCard />
+      <DenimReconCard />
       <p className="text-sm text-muted">
         Factored invoices are financed by <strong>{rows[0]?.factor ?? 'your factor'}</strong>: you get the
         advance up front and the <strong>reserve</strong> later, when the broker pays the factor. These are

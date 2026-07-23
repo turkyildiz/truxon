@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/denim.test.ts
 import { assertEquals } from 'jsr:@std/assert@1'
-import { buildInvoiceIndex, type InvoiceRow, jobFee, jobPatch, matchJob } from './denim.ts'
+import { buildInvoiceIndex, type InvoiceRow, jobFee, jobPatch, jobReceivable, matchJob } from './denim.ts'
 
 const inv = (id: number, num: string, extra: Partial<InvoiceRow> = {}): InvoiceRow =>
   ({ id, invoice_number: num, qbo_doc_number: null, factored_at: null, factoring_fee: null, ...extra })
@@ -54,4 +54,19 @@ Deno.test('fee only patched on change', () => {
   const same = jobPatch(job, inv(7, 'B', { factoring_fee: 50 }))
   assertEquals(same.feeChanged, false)
   assertEquals('factoring_fee' in same.patch, false)
+})
+
+Deno.test('receivable: obligation-typed, top-level fallback, cents to dollars', () => {
+  assertEquals(jobReceivable({ obligations: [{ type: 'receivable', total_amount: 120_000 }] }), 1200)
+  assertEquals(jobReceivable({ receivable: { total_amount: 95_050 } }), 950.5)
+  assertEquals(jobReceivable({ obligations: [{ type: 'fee', total_amount: 5_000 }] }), null)
+  assertEquals(jobReceivable({}), null)
+})
+
+Deno.test('live payload shape: earnings-type fees found via subtype', () => {
+  const j = { obligations: [
+    { type: 'earnings', subtype: 'factoring_fee', total_amount: 10_540 },
+    { type: 'earnings', subtype: 'servicing_fee', total_amount: 295 },
+  ] }
+  assertEquals(jobFee(j), 108.35)
 })

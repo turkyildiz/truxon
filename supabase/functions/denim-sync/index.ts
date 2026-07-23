@@ -14,7 +14,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { corsResponse, getCaller, json, requireCron, withCors } from '../_shared/auth.ts'
-import { buildInvoiceIndex, type DenimJob, type InvoiceRow, jobPatch, matchJob } from '../_shared/denim.ts'
+import { buildInvoiceIndex, type DenimJob, type InvoiceRow, jobFee, jobPatch, jobReceivable, matchJob } from '../_shared/denim.ts'
 
 const BASE = (Deno.env.get('DENIM_BASE_URL') ?? 'https://app.denim.com').replace(/\/$/, '')
 
@@ -73,8 +73,17 @@ Deno.serve(withCors(async (req) => {
     for (const j of jobs) {
       stats.jobs++
       const ref = String(j.reference_number ?? '').trim()
+      const inv = ref ? matchJob(byRef, ref) : undefined
+      // bank Denim's side of the ledger for reconciliation, matched or not
+      const jobId = String(j.id ?? j.uuid ?? j.job_id ?? '')
+      if (jobId) {
+        await svc.from('denim_jobs').upsert({
+          denim_job_id: jobId, reference_number: ref || null, status: j.status ?? null,
+          fee: jobFee(j), receivable: jobReceivable(j),
+          invoice_id: inv?.id ?? null, last_seen: new Date().toISOString(),
+        }, { onConflict: 'denim_job_id' })
+      }
       if (!ref) continue
-      const inv = matchJob(byRef, ref)
       if (!inv) { if (stats.unmatched.length < 20) stats.unmatched.push(ref); continue }
       stats.matched++
 

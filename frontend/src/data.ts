@@ -2471,3 +2471,19 @@ export async function qboWriteoffList(): Promise<WriteoffList | null> {
 export async function qboWriteoffDecide(id: number, approve: boolean): Promise<void> {
   unwrap(await supabase.rpc('qbo_writeoff_decide', { p_id: id, p_approve: approve }))
 }
+
+export interface DenimRecon {
+  jobs_seen: number
+  jobs_matched: number
+  denim_fees_total: number
+  captured_fees_total: number
+  fee_mismatches: { invoice: string; denim_fee: number; captured_fee: number | null }[]
+  unmatched_jobs: { job: string; ref: string | null; fee: number | null }[]
+  factored_without_job: number
+  as_of: string
+}
+
+/** Denim statement mirror vs our books. */
+export async function denimReconciliation(): Promise<DenimRecon | null> {
+  return (unwrap(await supabase.rpc('denim_reconciliation')) as unknown as DenimRecon) ?? null
+}

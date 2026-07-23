@@ -4,6 +4,7 @@
 
 export interface DenimObligation {
   type?: string
+  subtype?: string                 // live payloads: type 'earnings' + subtype 'factoring_fee'/'servicing_fee'
   total_amount?: number            // cents
   payment_status?: string
   line_items?: Array<{ amount?: number; type?: string }>
@@ -50,16 +51,28 @@ export function matchJob(byRef: Map<string, InvoiceRow>, ref: string): InvoiceRo
   return byRef.get(ref.toLowerCase()) ?? byRef.get(digits(ref))
 }
 
-/** Fee dollars = sum of fee-TYPE obligations only (Denim sends cents). */
+/** Fee dollars (Denim sends cents). Live payloads carry fees as
+ * type 'earnings' + subtype 'factoring_fee'/'servicing_fee', so match on
+ * either field — type-only missed every real fee. */
 export function jobFee(j: DenimJob): number | null {
   const obls: DenimObligation[] = [
     ...(Array.isArray(j.obligations) ? j.obligations : []),
     ...(Array.isArray(j.fees) ? j.fees : []),
   ]
   const feeCents = obls
-    .filter((o) => /fee/i.test(String(o.type ?? '')))
+    .filter((o) => /fee/i.test(String(o.type ?? '')) || /fee/i.test(String(o.subtype ?? '')))
     .reduce((s, o) => s + (Number(o.total_amount) || 0), 0)
   return feeCents > 0 ? Math.round(feeCents) / 100 : null
+}
+
+/** Receivable dollars (the invoice face Denim is financing); cents in. */
+export function jobReceivable(j: DenimJob): number | null {
+  const obls: DenimObligation[] = Array.isArray(j.obligations) ? j.obligations : []
+  let cents = obls
+    .filter((o) => /receivable|invoice/i.test(String(o.type ?? '')) || /receivable|invoice/i.test(String(o.subtype ?? '')))
+    .reduce((s, o) => s + (Number(o.total_amount) || 0), 0)
+  if (!cents && j.receivable) cents = Number(j.receivable.total_amount) || 0
+  return cents > 0 ? Math.round(cents) / 100 : null
 }
 
 /** The metadata-only invoice patch. Never rewrites an existing factored_at;
