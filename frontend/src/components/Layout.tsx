@@ -213,7 +213,8 @@ function GlobalSearch() {
         aria-controls="global-search-listbox"
         aria-autocomplete="list"
         aria-activedescendant={active >= 0 ? optionId(active) : undefined}
-        placeholder="Search loads, customers, drivers, trucks…"
+        placeholder="Search loads, customers, drivers, trucks…  ( / )"
+        data-global-search
         className="w-full rounded-lg border border-line bg-surface px-4 py-2 text-sm text-body placeholder:text-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
       />
       {failed && (
@@ -255,7 +256,43 @@ function GlobalSearch() {
   )
 }
 
+
+/** g-then-key navigation + / to focus search (R9 #154). Skips inputs. */
+function useKeyboardShortcuts() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    let pendingG = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const GOTO: Record<string, string> = {
+      l: '/loads', i: '/invoices', d: '/dispatch', c: '/customers',
+      m: '/maintenance', r: '/reports', f: '/fuel', t: '/trux', e: '/trucks',
+    }
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key === '/') {
+        e.preventDefault()
+        document.querySelector<HTMLInputElement>('input[data-global-search]')?.focus()
+        return
+      }
+      if (pendingG && GOTO[e.key]) {
+        e.preventDefault()
+        navigate(GOTO[e.key])
+        pendingG = false
+        return
+      }
+      pendingG = e.key === 'g'
+      if (timer) clearTimeout(timer)
+      if (pendingG) timer = setTimeout(() => { pendingG = false }, 1200)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('keydown', onKey); if (timer) clearTimeout(timer) }
+  }, [navigate])
+}
+
 export default function Layout() {
+  useKeyboardShortcuts()
   const { user, logout } = useAuth()
   const { theme, toggle } = useTheme()
   const location = useLocation()
