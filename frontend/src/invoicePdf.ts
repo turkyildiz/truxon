@@ -323,3 +323,49 @@ export async function downloadMonthlyPackage(): Promise<void> {
   }
   doc.save(`owner-package-${new Date().toISOString().slice(0, 7)}.pdf`)
 }
+
+/** Broker packet (R9 #131): merge every PDF the office drops into the Team
+ * Drive folder "Broker Packet" (W9, COI, authority letter, references…) into
+ * one file, cover page first. The folder IS the configuration. */
+export async function downloadBrokerPacket(): Promise<string | null> {
+  const [{ PDFDocument, StandardFonts, rgb }, company, { supabase }] = await Promise.all([
+    import('pdf-lib'), getCompanySettings(), import('./supabase'),
+  ])
+  const { data: files } = await supabase
+    .from('drive_files')
+    .select('id, filename, storage_path, content_type')
+    .eq('drive', 'team').eq('folder', 'Broker Packet').eq('is_folder', false)
+    .order('filename')
+  const pdfs = (files ?? []).filter((f) => /pdf/i.test(f.content_type ?? '') || /\.pdf$/i.test(f.filename))
+  if (pdfs.length === 0) return 'empty'
+
+  const out = await PDFDocument.create()
+  const font = await out.embedFont(StandardFonts.HelveticaBold)
+  const fontN = await out.embedFont(StandardFonts.Helvetica)
+  const cover = out.addPage([612, 792])
+  cover.drawText(company.company_name, { x: 54, y: 700, size: 26, font, color: rgb(0.12, 0.23, 0.37) })
+  cover.drawText('CARRIER PACKET', { x: 54, y: 668, size: 16, font, color: rgb(0.12, 0.23, 0.37) })
+  const lines = [
+    company.mc_number ? `MC# ${company.mc_number}` : '', company.address.replace(/\n/g, ', '),
+    company.phone ?? '', `Prepared ${new Date().toLocaleDateString()}`,
+    '', 'Contents:', ...pdfs.map((f) => `  •  ${f.filename.replace(/\.pdf$/i, '')}`),
+  ].filter((l) => l !== null)
+  lines.forEach((l, i) => cover.drawText(String(l), { x: 54, y: 630 - i * 18, size: 11, font: fontN }))
+
+  for (const f of pdfs) {
+    const { data: blob, error } = await supabase.storage.from('team').download(f.storage_path)
+    if (error || !blob) continue
+    try {
+      const src = await PDFDocument.load(await blob.arrayBuffer(), { ignoreEncryption: true })
+      const pages = await out.copyPages(src, src.getPageIndices())
+      pages.forEach((p) => out.addPage(p))
+    } catch { /* a corrupt member shouldn't sink the packet */ }
+  }
+  const bytes = await out.save()
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([bytes as unknown as BlobPart], { type: 'application/pdf' }))
+  a.download = `carrier-packet-${new Date().toISOString().slice(0, 10)}.pdf`
+  a.click()
+  URL.revokeObjectURL(a.href)
+  return null
+}

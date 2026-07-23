@@ -115,6 +115,17 @@ export default function Customers() {
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-muted hover:text-body"
+          title='Merges every PDF in the Team Drive folder "Broker Packet" (W9, COI, authority…) into one carrier packet with a cover page'
+          onClick={() => void import('../invoicePdf').then(async (m) => {
+            const r = await m.downloadBrokerPacket()
+            if (r === 'empty') setNote('Broker Packet folder is empty — drop your W9, COI, and authority PDFs into Team Drive → "Broker Packet" first.')
+          })}
+        >📎 Carrier packet</button>
+      </div>
       <PdfDrop
         title="Quick Add from Paperwork"
         hint="Drop a rate confirmation or broker setup packet here to add the customer"
