@@ -14,8 +14,10 @@ const env = loadEnv(join(HERE, 'rag.env'))
 const URL = env.DOC_RAG_URL
 const JWT = env.SUPABASE_ANON_JWT
 const CRON = env.CRON_SECRET || ''
-const OLLAMA = (env.OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/$/, '')
-const MODEL = env.CLASSIFY_MODEL || 'qwen2.5:3b'
+// classify runs on the NAS-LOCAL 3B by design (bulk work stays free/private);
+// rag.env's OLLAMA_URL points at Lynx for embeddings, so use a dedicated var.
+const OLLAMA = (env.CLASSIFY_OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/$/, '')
+const MODEL = env.CLASSIFY_MODEL || 'qwen2.5:3b-t8'
 
 const LABELS = ['POD', 'Rate Confirmation', 'BOL', 'Invoice', 'Registration', 'Insurance',
   'Inspection', 'License', 'Medical Card', 'Receipt', 'Employment']

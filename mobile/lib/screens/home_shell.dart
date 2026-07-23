@@ -13,6 +13,7 @@ import '../services/radio_rx.dart';
 import '../services/tracking_service.dart';
 import '../services/update_service.dart';
 import 'dvir_screen.dart';
+import 'settlement_screen.dart';
 import 'loads_screen.dart';
 import 'voice_screen.dart';
 import 'radio_screen.dart';
@@ -300,17 +301,32 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         // Tablet day: pre/post-trip inspection one tap from the day's start.
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-          child: Card(
-            child: ListTile(
-              leading: Icon(Icons.fact_check_outlined, color: scheme.primary),
-              title: Text(tr('dvirTitle'),
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => DvirScreen(api: _api)),
+          child: Row(children: [
+            Expanded(
+              child: Card(
+                child: ListTile(
+                  leading: Icon(Icons.fact_check_outlined, color: scheme.primary),
+                  title: Text(tr('dvirTitle'),
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => DvirScreen(api: _api)),
+                  ),
+                ),
               ),
             ),
-          ),
+            // R9 #143: their pay, their history — one tap.
+            Card(
+              child: ListTile(
+                leading: Icon(Icons.payments_outlined, color: scheme.primary),
+                title: const Text('My Pay',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => SettlementScreen(api: _api)),
+                ),
+              ),
+            ),
+          ]),
         ),
         if (_locationDenied)
           Padding(

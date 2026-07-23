@@ -198,6 +198,14 @@ class CompanionApi {
     return Map<String, dynamic>.from(data as Map);
   }
 
+  /// The driver's own pay, itemized per load for a week (0 = this week).
+  /// Estimated from their per-mile rate; the office settlement is final.
+  Future<Map<String, dynamic>?> mySettlement(int weekOffset) async {
+    final data = await _sb.rpc('my_settlement', params: {'p_week_offset': weekOffset});
+    if (data == null) return null;
+    return Map<String, dynamic>.from(data as Map);
+  }
+
   Future<List<DriverLoad>> myLoads() async {
     final data = await _sb.rpc('driver_my_loads');
     final list = (data as List?) ?? [];

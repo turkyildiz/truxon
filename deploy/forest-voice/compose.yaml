@@ -38,3 +38,13 @@ services:
       - "10400:10400"
     volumes:
       - /volume1/docker/forest-voice/oww-data/custom:/custom
+
+  esphome:
+    image: ghcr.io/esphome/esphome:stable
+    container_name: forest-esphome
+    restart: unless-stopped
+    network_mode: host          # dashboard :6052; host mode for mDNS device discovery
+    environment:
+      - TZ=America/Chicago
+    volumes:
+      - /volume1/docker/forest-voice/esphome-config:/config
