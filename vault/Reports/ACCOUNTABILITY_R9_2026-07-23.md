@@ -78,5 +78,8 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **#120 Load clone** (⧉ on Loads → Dispatch prefilled, dates/driver/truck cleared) · **#121 Check-call log** (append-only 📞 timeline per load) · **#122 Shift-handoff board** on Dispatch.
 - **#154 Keyboard shortcuts** (g+key nav, / search) · **#158 CSV export on every table** (one shared-component change) · **#164 print stylesheets** · **#167 monthly owner package PDF** · **#172 weekly flash v2** (pricing discipline + DOT readiness, snooze-aware).
 - **Suite: 888 pgTAP / 151 files.**
+- **#173 anomaly digest** (honest readiness while snapshots are young) · **#49 fuel-stop analysis** (live: TA Parowan +$195 premium/8 visits) · **#50 idle heat-map** (two live precision fixes: breadcrumb holes ≠ parked time; edited-migration trap reaffirmed — new file every time) · **#110 doc retention** (live truth: POD 38%, BOL 1%, driver docs 0%) · **#131 carrier packet generator** (pdf-lib merge of the 'Broker Packet' Drive folder) · **#107 doc-search type filter** · **#121-122 already logged** · **A#10 Machines card** (Lynx GPU heartbeat live).
+- **A#12 failover drill EXECUTED**: stopped Ollama on Lynx → heartbeat flipped to 'ollama=inactive' in 24 seconds, VRAM freed; restarted, recovery confirmed; drill finding shipped — the Machines card now goes red on a sick heartbeat, not just a silent one.
+- **Suite: 896 pgTAP / 155 files.**
 
 *(Run continues; closeout will finalize the count.)*
