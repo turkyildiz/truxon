@@ -42,7 +42,8 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 6. **INDIANCREEK ~99% full** — prune before nightly replication grows.
 7. MVR / Clearinghouse / testing-pool: 33 warns live; log events in the new Compliance log as you do them.
 8. **Possible duplicate load entry**: loads #24/#27 look keyed twice (same broker/day/addresses/rate) — cancel one if so.
-9. **TQL delivery docks**: P90 dwell 14.8h, $672 detention in 45 days — the dock-time league card is your exhibit.
+9. **Driver hire dates**: 6 of 11 active drivers have none — tenure metrics run thin until entered.
+10. **TQL delivery docks**: P90 dwell 14.8h, $672 detention in 45 days — the dock-time league card is your exhibit.
 
 ### F/D. Sentinels v3 + ELD (76–84/88, 45/46, 57)
 - **#76 Pickup detention** — premise was real (8 pickup events measured, 0 proposals banked); the proposer covers pickups, the imbalance was historic. Catch-up run banked 13 pickup proposals with evidence.
@@ -65,6 +66,8 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **#87 Sentinel snooze** — 😴 7d on the feed: finding stays open and truthful, but brief/digest/pushes skip it until the date passes; brief reports how many are sleeping.
 - Section F is effectively complete (75 covered by the sliver-aging nag; 79 needs payroll data — honest gap; 83's pre-book guard already existed).
 - **Suite at checkpoint: 874 pgTAP / 147 files.**
+- **Section G start** — playbook flips 70/241/434/515/516 (accessorial capture, dispatch productivity 2.25 loads/dispatcher/working-day, invoice-dispute proxy, tenure avg/median). **Playbook now 191 live.** Tenure is thin: 6/11 drivers missing hire_date (office entry item).
+- **Suite at checkpoint: 877 pgTAP / 148 files.**
 - **#45/46 Harsh-driving proxy** — breadcrumbs are dense (p90 gap 10s), so ≥25 mph lost in ≤12s is banked nightly as a hard-braking proxy (labeled a proxy everywhere). Live: 77 braking + 31 acceleration events in 2 days; real samples like 45→9 mph in 10s. On the driver scorecard as 'Harsh'; playbook harsh metric flipped with an honest source note.
 
 *(Run continues; closeout will finalize the count.)*
