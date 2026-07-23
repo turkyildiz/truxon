@@ -1,9 +1,57 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import ResourcePage from '../components/ResourcePage'
-import { Badge, formatDate, money } from '../components/ui'
-import { listEquipmentConflicts, resolveEquipmentConflict, trailersApi, trucksApi } from '../data'
+import { Badge, Card, formatDate, money } from '../components/ui'
+import { listEquipmentConflicts, perTruckPnl, resolveEquipmentConflict, trailersApi, trucksApi } from '../data'
 import type { Equipment } from '../types'
+
+/** Each unit judged on its own ledger: revenue on its loads minus its fuel,
+ * tolls, maintenance, driver pay, and payment. ROI appears once payments are
+ * entered on the truck form — no fake numbers before that. */
+function TruckPnlCard() {
+  const q = useQuery({ queryKey: ['per-truck-pnl'], queryFn: () => perTruckPnl(3), retry: false })
+  const d = q.data
+  if (q.isError || !d || d.trucks.length === 0) return null
+  return (
+    <Card title={`💰 Per-truck P&L — last ${d.months} months`}>
+      {d.payments_entered < d.trucks_total && (
+        <p className="mb-2 text-xs text-amber-700 dark:text-amber-300">
+          Payments entered for {d.payments_entered}/{d.trucks_total} trucks — until the rest are on their
+          forms (Edit → Monthly Payment), &ldquo;net&rdquo; overstates those units and ROI stays blank.
+        </p>
+      )}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead><tr className="text-left text-xs uppercase tracking-wide text-muted">
+            <th className="px-2 py-1.5">Unit</th><th className="px-2 py-1.5">Loads</th>
+            <th className="px-2 py-1.5">Revenue</th><th className="px-2 py-1.5">Fuel</th>
+            <th className="px-2 py-1.5">Tolls</th><th className="px-2 py-1.5">Maint</th>
+            <th className="px-2 py-1.5">Driver</th><th className="px-2 py-1.5">Payment</th>
+            <th className="px-2 py-1.5">Net</th><th className="px-2 py-1.5">ROI</th>
+          </tr></thead>
+          <tbody>
+            {d.trucks.map((t) => (
+              <tr key={t.unit} className="border-t border-line">
+                <td className="px-2 py-1.5 font-medium">{t.unit}</td>
+                <td className="px-2 py-1.5">{t.loads}</td>
+                <td className="px-2 py-1.5">{money(Number(t.revenue))}</td>
+                <td className="px-2 py-1.5 text-muted">{Number(t.fuel) > 0 ? money(Number(t.fuel)) : '—'}</td>
+                <td className="px-2 py-1.5 text-muted">{Number(t.tolls) > 0 ? money(Number(t.tolls)) : '—'}</td>
+                <td className="px-2 py-1.5 text-muted">{Number(t.maintenance) > 0 ? money(Number(t.maintenance)) : '—'}</td>
+                <td className="px-2 py-1.5 text-muted">{Number(t.driver_pay) > 0 ? money(Number(t.driver_pay)) : '—'}</td>
+                <td className="px-2 py-1.5 text-muted">{Number(t.payment) > 0 ? money(Number(t.payment)) : '—'}</td>
+                <td className={`px-2 py-1.5 font-semibold ${Number(t.net) < 0 ? 'text-red-600 dark:text-red-300' : 'text-green-700 dark:text-green-300'}`}>
+                  {money(Number(t.net))}
+                </td>
+                <td className="px-2 py-1.5">{t.roi_x != null ? `${t.roi_x}×` : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
 
 const FIELD_LABEL: Record<string, string> = {
   vin: 'VIN', plate_number: 'Plate number', plate_expiry: 'Plate expiration',
@@ -145,6 +193,7 @@ function EquipmentPage({ title, api, queryKey, entityType }: { title: string; ap
 export const Trucks = () => (
   <div>
     <EnrichmentConflicts entityType="truck" />
+    <TruckPnlCard />
     <EquipmentPage title="Trucks" api={trucksApi} queryKey="trucks" entityType="truck" />
   </div>
 )

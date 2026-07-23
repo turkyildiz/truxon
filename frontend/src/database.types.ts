@@ -4709,6 +4709,7 @@ export type Database = {
         }[]
       }
       payment_application_audit: { Args: never; Returns: Json }
+      per_truck_pnl: { Args: { p_months?: number }; Returns: Json }
       playbook_coverage: { Args: never; Returns: Json }
       playbook_metrics_list: {
         Args: { p_owner?: string; p_search?: string; p_status?: string }

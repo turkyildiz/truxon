@@ -2525,6 +2525,32 @@ export interface CreditMemoSummary {
   recent: { doc: string; date: string; total: number; customer: string | null; memo: string | null }[]
 }
 
+export interface TruckPnlRow {
+  unit: string
+  ownership: string | null
+  revenue: number
+  loads: number
+  fuel: number
+  tolls: number
+  maintenance: number
+  driver_pay: number
+  payment: number
+  net: number
+  roi_x: number | null
+}
+
+export interface PerTruckPnl {
+  months: number
+  payments_entered: number
+  trucks_total: number
+  trucks: TruckPnlRow[]
+}
+
+/** Each unit judged on its own ledger (R9 #42/#43). */
+export async function perTruckPnl(months = 3): Promise<PerTruckPnl | null> {
+  return (unwrap(await supabase.rpc('per_truck_pnl', { p_months: months })) as unknown as PerTruckPnl) ?? null
+}
+
 export interface PaymentAudit {
   paid_but_open_in_qbo: { invoice: string; customer: string | null; total: number; qbo_balance: number }[]
   settled_in_qbo_but_open: { invoice: string; customer: string | null; total: number; days_open: number }[]
