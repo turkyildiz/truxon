@@ -3,7 +3,7 @@
 -- and auto-resolves once the numbers agree, and drivers can't see money rows.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(8);
+select plan(10);
 
 insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-0000000000e1'::uuid, 'rc-admin@test.local'),
@@ -72,6 +72,18 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000000e2"}', true);
 select is((select count(*) from public.load_line_items), 0::bigint, 'driver role sees zero line items');
 reset role;
+
+-- 9/10. fuel-surcharge recovery flip (#14/#69): captured FSC over fuel spend.
+reset role;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000000e1"}', true);
+insert into public.fuel_transactions (uuid, transaction_time, amount, net_of_discount, gallons, fuel_type)
+  values ('rc-test-fuel-1', now() - interval '1 day', 620.00, 600.00, 160, 'Diesel');
+select is(
+  (public.fuel_surcharge_recovery(30)->>'fsc_captured')::numeric,
+  150::numeric, 'recovery report sums captured FSC');
+select is(
+  (public.fuel_surcharge_recovery(30)->>'recovery_pct')::numeric,
+  25.0::numeric, 'recovery pct = FSC / net-of-discount fuel spend');
 
 select * from finish();
 rollback;
