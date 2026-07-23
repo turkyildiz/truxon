@@ -82,4 +82,14 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **A#12 failover drill EXECUTED**: stopped Ollama on Lynx → heartbeat flipped to 'ollama=inactive' in 24 seconds, VRAM freed; restarted, recovery confirmed; drill finding shipped — the Machines card now goes red on a sick heartbeat, not just a silent one.
 - **Suite: 896 pgTAP / 155 files.**
 
+### Mobile v15 batch (Aug-1 sprint, day 1 evening)
+- **#143/144 Driver settlement** — `my_settlement` RPC (own pay itemized per load, 26-week history, revenue excluded) + My Pay screen with week chevrons; office/unlinked logins get an honest null.
+- **#141 Breakdown flow** — guided report (what broke, drivable?, GPS auto-attach): unplanned MX item + critical ops insight + a driver-callable `breakdown` action on the notify fn that rings admins/dispatchers through DND. Report is on the books even if the push fails.
+- **#142 Fuel receipt capture** — scan at the pump (OCR rides along), files against the TRUCK under a driver-scoped `fuel/<driver_id>/` storage prefix; catches cash buys the card import never sees.
+- **#145 Document wallet** — CDL/med-card + truck registration/insurance/permits pulled from office filing; storage gate scoped to exactly the wallet set (own driver docs; truck ROAD paper only, PODs excluded). Prod truth: 0 driver docs on file until the owner adds CDL/med-card scans (already on the owner list).
+- **#150 Scan compression** — 2200px q70 before upload (5-10 MB → ~½ MB), EXIF stripped, OCR still runs on the original, raw-bytes fallback.
+- **#149 Diagnostics screen** — one-tap checks (version, server latency, GPS permission/service, push) + copy-paste report with the field log; wired from About.
+- **#146 Push preferences** — weather/paperwork/other can be quieted; assignment + breakdown alarms can never be muted (tested).
+- **Suite: 922 pgTAP / 162 files · mobile 90 flutter tests.** All pushed + live-verified on prod.
+
 *(Run continues; closeout will finalize the count.)*
