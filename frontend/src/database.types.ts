@@ -5044,6 +5044,7 @@ export type Database = {
         }[]
       }
       truck_mpg: { Args: { p_days?: number }; Returns: Json }
+      truck_utilization: { Args: { p_days?: number }; Returns: Json }
       trux_first_monday: { Args: { p_year: number }; Returns: string }
       trux_insights_feed: {
         Args: { p_include_resolved?: boolean }

@@ -2617,6 +2617,22 @@ export async function facilityDwellLeague(days = 45): Promise<DwellFacility[]> {
   return d?.facilities ?? []
 }
 
+export interface TruckUtilRow {
+  unit: string
+  moving_days: number
+  parked_days: number
+  banked_days: number
+  weekend_miles_pct: number | null
+  revenue: number
+  revenue_per_moving_day: number | null
+}
+
+/** ELD-banked moving vs parked days per unit (R9 #54/#55). */
+export async function truckUtilization(days = 28): Promise<TruckUtilRow[]> {
+  const d = unwrap(await supabase.rpc('truck_utilization', { p_days: days })) as unknown as { trucks: TruckUtilRow[] } | null
+  return d?.trucks ?? []
+}
+
 /** Owner-view straight-line depreciation (not the tax books). */
 export async function depreciationSchedule(): Promise<DepreciationSchedule | null> {
   return (unwrap(await supabase.rpc('depreciation_schedule')) as unknown as DepreciationSchedule) ?? null

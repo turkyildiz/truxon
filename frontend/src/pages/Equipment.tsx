@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import ResourcePage from '../components/ResourcePage'
 import { Badge, Card, formatDate, money } from '../components/ui'
-import { depreciationSchedule, listEquipmentConflicts, perTruckPnl, resolveEquipmentConflict, trailersApi, trucksApi } from '../data'
+import { depreciationSchedule, listEquipmentConflicts, perTruckPnl, resolveEquipmentConflict, trailersApi, trucksApi, truckUtilization } from '../data'
 import type { Equipment } from '../types'
 
 /** Each unit judged on its own ledger: revenue on its loads minus its fuel,
@@ -190,6 +190,39 @@ function EquipmentPage({ title, api, queryKey, entityType }: { title: string; ap
   )
 }
 
+/** Moving vs sitting, per unit — a truck earns nothing parked. */
+function UtilizationCard() {
+  const q = useQuery({ queryKey: ['truck-utilization'], queryFn: () => truckUtilization(28), retry: false })
+  const rows = q.data ?? []
+  if (q.isError || rows.length === 0) return null
+  return (
+    <Card title="📊 Utilization — last 28 days (ELD-banked days)">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead><tr className="text-left text-xs uppercase tracking-wide text-muted">
+            <th className="px-2 py-1.5">Unit</th><th className="px-2 py-1.5">Moving</th>
+            <th className="px-2 py-1.5">Parked</th><th className="px-2 py-1.5">Weekend mi</th>
+            <th className="px-2 py-1.5">Revenue</th><th className="px-2 py-1.5">$/moving day</th>
+          </tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.unit} className="border-t border-line">
+                <td className="px-2 py-1.5 font-medium">{r.unit}</td>
+                <td className="px-2 py-1.5">{r.moving_days}d</td>
+                <td className={`px-2 py-1.5 ${r.parked_days > r.moving_days ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-muted'}`}>{r.parked_days}d</td>
+                <td className="px-2 py-1.5 text-muted">{r.weekend_miles_pct != null ? `${r.weekend_miles_pct}%` : '—'}</td>
+                <td className="px-2 py-1.5">{money(Number(r.revenue))}</td>
+                <td className="px-2 py-1.5 font-semibold">{r.revenue_per_moving_day != null ? money(Number(r.revenue_per_moving_day)) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-1 text-[11px] text-muted">Unbanked ELD days are excluded, not guessed; the gap-filler is converging the history.</p>
+    </Card>
+  )
+}
+
 /** Owner-view straight-line depreciation. Hidden until purchase data exists. */
 function DepreciationCard() {
   const q = useQuery({ queryKey: ['depreciation'], queryFn: depreciationSchedule, retry: false })
@@ -224,6 +257,7 @@ export const Trucks = () => (
   <div>
     <EnrichmentConflicts entityType="truck" />
     <TruckPnlCard />
+    <UtilizationCard />
     <DepreciationCard />
     <EquipmentPage title="Trucks" api={trucksApi} queryKey="trucks" entityType="truck" />
   </div>
