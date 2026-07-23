@@ -13,6 +13,7 @@ import '../services/radio_rx.dart';
 import '../services/tracking_service.dart';
 import '../services/update_service.dart';
 import 'breakdown_screen.dart';
+import 'diagnostics_screen.dart';
 import 'dvir_screen.dart';
 import 'fuel_receipt_screen.dart';
 import 'settlement_screen.dart';
@@ -434,7 +435,16 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             Text(tr('aboutLoads')),
             Text(tr('aboutLocation')),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          // R9 #149: live health checks + copyable report for support calls.
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => DiagnosticsScreen(api: _api)),
+            ),
+            icon: const Icon(Icons.health_and_safety_outlined),
+            label: const Text('Run diagnostics'),
+          ),
+          const SizedBox(height: 8),
           // Read-only field log (Diag ring buffer) so tracking/upload problems
           // can be diagnosed on the driver's own device. Newest first.
           Text(tr('diagnostics'), style: Theme.of(context).textTheme.titleSmall),

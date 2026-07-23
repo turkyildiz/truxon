@@ -302,6 +302,13 @@ class CompanionApi {
     return Map<String, dynamic>.from(data as Map);
   }
 
+  /// Cheap authenticated round-trip (diagnostics latency probe doubles as a
+  /// session check). Null for office/unlinked logins.
+  Future<int?> myDriverId() async {
+    final v = await _sb.rpc('my_driver_id');
+    return v == null ? null : (v as num).toInt();
+  }
+
   /// R9 #145 — document wallet: the driver's own filed docs (CDL, med card)
   /// plus truck road paperwork (registration, insurance, permits, IFTA).
   Future<Map<String, dynamic>?> myWalletDocuments() async {
