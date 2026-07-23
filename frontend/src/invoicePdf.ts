@@ -353,6 +353,7 @@ export async function downloadBrokerPacket(): Promise<string | null> {
   lines.forEach((l, i) => cover.drawText(String(l), { x: 54, y: 630 - i * 18, size: 11, font: fontN }))
 
   for (const f of pdfs) {
+    if (!f.storage_path) continue
     const { data: blob, error } = await supabase.storage.from('team').download(f.storage_path)
     if (error || !blob) continue
     try {
