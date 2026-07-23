@@ -46,6 +46,11 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **#76 Pickup detention** — premise was real (8 pickup events measured, 0 proposals banked); the proposer covers pickups, the imbalance was historic. Catch-up run banked 13 pickup proposals with evidence.
 - **#77/78/80/81/82/84/88 sentinel batch** — stale drafts 48h+, POD-on-file-but-uninvoiced 72h+, fuel/tolls on ELD-no-mileage days, same-day duplicate loads (live: one real candidate, loads #24/#27), QBO sync drift, 30-day-unseen findings auto-close. **Precision incident:** first live scan fired 19 darkday warns that were eld_daily_miles JOB GAPS, not parked trucks — hotfixed to require banked movement on both adjacent days; all 19 auto-resolved.
 - **#57 ELD gap-filler** — root cause: the miles bank skips days (156 gaps in 14d!). DriveHOS keeps history, so eld-sync's new gapfill mode re-fetches exactly the missing vehicle-days nightly, re-banks, and stamps zero-markers when the truck really sat. (Live drain in progress at handoff.)
+- **#58 Dark-ELD ladder** — 'Unit 05 ELD STILL dark - week 28' live; title bumps weekly so the brief re-surfaces it, detail names the action (fix or mark out of service).
+- **#60 Map breadcrumb tails** — click a truck, see its last 4h of ELD GPS (solid); phone trail stays the dashed fallback.
+- **#62 IFTA close package** — 🖨️ printable per-jurisdiction miles+gallons PDF with the coverage window printed on the page.
+- **#51/61 Dock-time league** — dwell avg/P50/P90 + detention $ per facility; live: TQL delivery docks P90 14.8h, $672 detention in 45 days. Bonus catch: the codebase's negated auth-gate idiom passes on a null role claim (test-context only, not API-exploitable) — new function written positive-form, idiom-wide audit chipped for a separate session.
+- **Suite now 862 pgTAP / 141 files** · mobile 87 · deno 8.
 - **#45/46 Harsh-driving proxy** — breadcrumbs are dense (p90 gap 10s), so ≥25 mph lost in ≤12s is banked nightly as a hard-braking proxy (labeled a proxy everywhere). Live: 77 braking + 31 acceleration events in 2 days; real samples like 45→9 mph in 10s. On the driver scorecard as 'Harsh'; playbook harsh metric flipped with an honest source note.
 
 *(Run continues; closeout will finalize the count.)*
