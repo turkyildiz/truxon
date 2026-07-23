@@ -8,6 +8,41 @@ export type LlmContent = string | Array<{ type: string; text?: string; image_url
 const TEXT_HEAD = 7000
 const TEXT_TAIL = 4000
 
+// ---------- extraction ledger (R9) ----------
+// Bank every extraction (arm/model/latency/output) into llm_extractions so
+// model A/Bs score themselves on real traffic and office corrections become
+// labels. Prompt TEXT is never stored — sha + length only.
+let _ctx: { kind: string; ref: string | null } = { kind: 'unknown', ref: null }
+export function setLlmContext(kind: string, ref?: string | number | null) {
+  _ctx = { kind, ref: ref == null ? null : String(ref) }
+}
+
+async function sha256hex(s: string): Promise<string> {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function ledger(arm: 'local' | 'cloud' | 'vision', model: string, ms: number, promptStr: string, output: string | null, ok: boolean) {
+  // fire-and-forget; telemetry must never break an extraction
+  ;(async () => {
+    try {
+      const url = Deno.env.get('SUPABASE_URL')
+      const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+      if (!url || !key) return
+      let out: unknown = null
+      if (output) { try { out = parseFields(output) } catch { out = { raw: output.slice(0, 2000) } } }
+      await fetch(`${url}/rest/v1/llm_extractions`, {
+        method: 'POST',
+        headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          kind: _ctx.kind, ref: _ctx.ref, model, arm, ok, latency_ms: ms,
+          prompt_sha: await sha256hex(promptStr), prompt_len: promptStr.length, output: out,
+        }),
+      })
+    } catch { /* never surface */ }
+  })()
+}
+
 /** Keep the start AND end of a long document (totals hide near signatures). */
 export function sliceText(text: string): string {
   if (text.length <= TEXT_HEAD + TEXT_TAIL + 100) return text
@@ -95,6 +130,7 @@ export async function callTextLlm(cloudKey: string, cloudModel: string, prompt: 
         if (typeof out === 'string' && out.trim()) {
           // Observability: grep edge logs for `[localllm]` to see the hit rate.
           console.log(`[localllm] hit model=${localModel} ms=${Date.now() - t0}`)
+          ledger('local', localModel, Date.now() - t0, prompt, out.trim(), true)
           return out.trim()
         }
       }
@@ -106,7 +142,10 @@ export async function callTextLlm(cloudKey: string, cloudModel: string, prompt: 
     // Local is configured but this prompt is too long to be fast on CPU.
     console.log(`[localllm] skip len=${prompt.length} > ${LOCAL_MAX_CHARS} -> cloud`)
   }
-  return callLlm(cloudKey, cloudModel, prompt)
+  const t1 = Date.now()
+  const cloudOut = await callLlm(cloudKey, cloudModel, prompt)
+  ledger('cloud', cloudModel, Date.now() - t1, prompt, cloudOut, true)
+  return cloudOut
 }
 
 /** Text-only field extraction that PREFERS the self-hosted NAS model (see
@@ -137,8 +176,14 @@ export function parseFields(content: string): Record<string, unknown> {
 /** Call the model, and if the reply isn't parseable JSON retry once with a
  * sharper instruction before giving up. */
 export async function extractFields(apiKey: string, model: string, content: LlmContent, baseUrl?: string): Promise<Record<string, unknown>> {
+  const isVision = typeof content !== 'string' && content.some((c) => c.image_url)
+  const t0 = Date.now()
   try {
-    return parseFields(await callLlm(apiKey, model, content, baseUrl))
+    const out = await callLlm(apiKey, model, content, baseUrl)
+    const fields = parseFields(out)
+    ledger(isVision ? 'vision' : 'cloud', model, Date.now() - t0,
+      typeof content === 'string' ? content : JSON.stringify(content).slice(0, 4000), out, true)
+    return fields
   } catch {
     const stricter =
       typeof content === 'string'
