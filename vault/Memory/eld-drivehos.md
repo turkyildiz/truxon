@@ -34,3 +34,9 @@ New data source (received 2026-07-20) for [[northstar-project]]: the **DriveHOS 
 **Match key:** ELD `vin` → trucks.vin (exact); fallback ELD `number` → trucks.unit_number (digit-normalized).
 
 **What it feeds:** live fleet map (augments the flaky mobile GPS), accurate odometer → maintenance PM engine + IFTA state miles, load actual mileage / empty-mile detection, HOS-aware dispatch (who has hours), detention/dwell detection, breakdown prediction (Northstar #4). Next build: an `eld-sync` edge fn + tables (eld vehicles/drivers, live status, location breadcrumbs).
+
+**R9 additions (2026-07-23):**
+- **History is retained server-side** — `vehicle-location-history` accepts arbitrary date windows, so missed bank days are recoverable. `eld_gap_days()` + eld-sync `mode:'gapfill'` (cron every 2h, limit 6, newest-first) re-fetch missing vehicle-days, re-bank via `rollup_eld_daily(day)` + `ifta_attribute_states(day)`, and stamp zero-marker rows (miles=0) when the API confirms the truck sat. Found 156 gaps in 14 days at launch; converges continuously.
+- **A full driving day's fetch can eat one edge invocation** — that's why the cadence is small-batch/frequent, not nightly-bulk.
+- **Breadcrumb cadence is dense (p90 gap 10s)** → harsh-driving proxy is defensible: `detect_harsh_events(day)` banks ≥25 mph lost in ≤12s as 'braking' (and ≥20 gained ≤10s as 'acceleration') nightly at 06:05 before the ~2-day window evaporates. On the driver scorecard as 'Harsh'. It is a PROXY — OEM accelerometer events remain unavailable.
+- Sentinels that treat a missing eld_daily_miles row as "truck parked" MUST require banked movement on both adjacent days (bank gaps look identical to parked days otherwise — caused 19 false warns once).

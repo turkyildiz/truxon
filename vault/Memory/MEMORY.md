@@ -18,12 +18,12 @@
 - [Offline voice](offline-voice.md) — dead-zone voice SHIPPED: sherpa STT + Piper TTS on-device, models from NAS Funnel /models, store-and-forward brain; fleet OTA publish awaits owner
 - [Android emulator](android-emulator.md) — headless Pixel-Tablet AVD on dev box; verify ALL tablet UI visually before publishing (standard loop since 2026-07-21)
 - [Northstar project](northstar-project.md) — Truxon PREDICTIVE (Level 5); forecasts #1/#2/#3/#5 live, playbook 171/1000, not_captured down to harsh-braking + driver NPS; #4 breakdown ML awaits data
-- [ELD DriveHOS API](eld-drivehos.md) — telematics feed (GPS/odometer/engine-hrs/HOS) for Northstar; **LIVE** (both keys set, eld-sync running, 138K+ location rows); #4 breakdown-ML just needs data-accumulation time
+- [ELD DriveHOS API](eld-drivehos.md) — telematics LIVE; history retained server-side → gap-filler recovers missed bank days (2h cron); harsh-driving proxy from dense breadcrumbs; missing-day sentinels must demand adjacent-day proof
 - [Geocoding](geocoding.md) — load stops → lat/lon+state for lane rate history; LIVE, all ~975 loads backfilled; unblocks detention detection next
 - [PrePass tolls](tolls-prepass.md) — toll CSVs via SFTP → NAS importer → toll_transactions; LIVE (42 tolls first pull); daily 05:30 cron
 - [GPU box: Lynx](gpu-box.md) — RTX 5060 Ti (8 GB) desktop **Lynx**, LIVE 2026-07-22: driver 595 + Ollama (7B models) tailnet-only; `ssh lynx` (root@100.110.143.84); separate from ikedev laptop
 - [NAS local LLM](nas-local-llm.md) — self-hosted qwen2.5:3b does bulk doc classify/extract (token-gated proxy, cloud fallback); 3B beat 7B on measurement; iGPU parked for vision only
 - [Fuel-theft detection](fuel-theft-detection.md) — Forest now flags non-diesel-on-diesel, cash advances, tank overflow, fuel-vs-(dispatch+deadhead)-miles; MPG needs telematics; amount field is dirty
-- [Denim factoring](denim-factoring.md) — LIVE 2026-07-22 (owner gave API key); denim-sync reconciles factoring jobs→invoices every 2h, read-only, no money movement; key is edge-secret only (owner: add to vault)
+- [Denim factoring](denim-factoring.md) — LIVE; fees ride subtype not type (fixed); denim_jobs mirror + reconciliation; factoring costs 1.99% eff / ~5.3% APR vs 139d book pay; 116 write-off proposals propose-only
 - [Offsite NAS](offsite-nas.md) — INDIANCREEK, 2nd Synology at a different site; on the tailnet via a Docker Tailscale container (100.99.180.17); waiting only on owner to authorize the rsync key, then Claude wires nightly encrypted replication
 - [Security posture](security-posture.md) — CRON_SECRET architecture (rotate via secrets set + watchdog setter), my_role raises for inactive, money-path locks; S-08/09/11 CLOSED + verified 2026-07-21 (withCors 100% coverage); residual gap = OTA manifest signing (mitigated by Android same-key install requirement)
