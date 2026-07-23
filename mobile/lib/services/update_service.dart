@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config.dart';
 import '../i18n.dart';
@@ -52,13 +54,24 @@ bool isAllowedApkUrl(String apkUrl) {
 /// Pure decision half of the update check, split out of
 /// [UpdateService.checkAndPrompt] so it's unit-testable. Returns the parsed
 /// manifest fields alongside the decision (sha256 normalized to lowercase hex).
+///
+/// R9 #151 — staged rollout: an optional manifest `rolloutPct` (0-100) gates
+/// who is OFFERED the build. Each device holds a stable random bucket 0-99;
+/// bucket < pct → offered. Absent/invalid pct means 100 (everyone), so old
+/// manifests keep full reach; a device outside the wave just sees
+/// notApplicable and picks the build up when the wave widens.
 ({UpdateDecision decision, int latestCode, String apkUrl, String sha256Hex})
-    evaluateUpdateManifest(Map<String, dynamic> manifest, int currentCode) {
+    evaluateUpdateManifest(Map<String, dynamic> manifest, int currentCode,
+        {int rolloutBucket = 0}) {
   final latestCode = (manifest['versionCode'] as num?)?.toInt() ?? 0;
   final apkUrl = (manifest['apkUrl'] as String?) ?? '';
   final sha256Hex = ((manifest['sha256'] as String?) ?? '').trim().toLowerCase();
+  final pctRaw = (manifest['rolloutPct'] as num?)?.toInt();
+  final rolloutPct = (pctRaw == null || pctRaw < 0 || pctRaw > 100) ? 100 : pctRaw;
   final UpdateDecision decision;
-  if (latestCode <= currentCode || apkUrl.isEmpty) {
+  if (latestCode <= currentCode ||
+      apkUrl.isEmpty ||
+      rolloutBucket.clamp(0, 99) >= rolloutPct) {
     decision = UpdateDecision.notApplicable;
   } else if (sha256Hex.isEmpty || !isAllowedApkUrl(apkUrl)) {
     // No checksum, or the APK would come from a host we don't release on →
@@ -76,6 +89,22 @@ bool isAllowedApkUrl(String apkUrl) {
 }
 
 class UpdateService {
+  /// Stable per-device rollout bucket 0-99 (drawn once, then persisted) so a
+  /// staged wave lands on the same tablets until the pct widens.
+  static Future<int> _rolloutBucket() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      var b = sp.getInt('ota_rollout_bucket');
+      if (b == null) {
+        b = Random().nextInt(100);
+        await sp.setInt('ota_rollout_bucket', b);
+      }
+      return b;
+    } catch (_) {
+      return 0; // prefs unreadable — device joins the first wave
+    }
+  }
+
   /// Check silently; if a newer build exists, prompt. Never throws.
   static Future<void> checkAndPrompt(BuildContext context) async {
     if (AppConfig.updateManifestUrl.isEmpty) return;
@@ -88,7 +117,8 @@ class UpdateService {
           .timeout(const Duration(seconds: 10));
       if (res.statusCode != 200) return;
       final j = jsonDecode(res.body) as Map<String, dynamic>;
-      final m = evaluateUpdateManifest(j, currentCode);
+      final m = evaluateUpdateManifest(j, currentCode,
+          rolloutBucket: await _rolloutBucket());
       if (m.decision == UpdateDecision.notApplicable) return;
       if (m.decision == UpdateDecision.unverifiable) {
         if (context.mounted) await _showVerifyFailed(context);

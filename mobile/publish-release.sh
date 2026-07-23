@@ -22,6 +22,12 @@ for f in "$HOME/dev-tools/flutter/bin" "$HOME/sdk/flutter/bin"; do
 done
 REPO="turkyildiz/truxon-releases"
 NOTES="${1:-Update}"
+# R9 #151 — staged rollout: ROLLOUT=25 ./publish-release.sh "notes" offers the
+# build to ~25% of tablets (stable per-device buckets). Re-publish latest.json
+# with a higher pct to widen the wave. Default 100 = everyone.
+ROLLOUT="${ROLLOUT:-100}"
+case "$ROLLOUT" in (*[!0-9]*|'') echo "ROLLOUT must be 0-100"; exit 1;; esac
+[ "$ROLLOUT" -le 100 ] || { echo "ROLLOUT must be 0-100"; exit 1; }
 
 # 1) bump versionCode:  1.0.0+N  ->  1.0.0+(N+1)
 line=$(grep -m1 '^version:' pubspec.yaml)
@@ -46,7 +52,7 @@ APK="build/app/outputs/flutter-apk/TruxCompanion.apk"
 APKURL="https://github.com/${REPO}/releases/latest/download/TruxCompanion.apk"
 SHA256=$(sha256sum "$APK" | cut -d' ' -f1)
 cat > /tmp/latest.json <<JSON
-{ "versionCode": ${newcode}, "versionName": "${name}", "apkUrl": "${APKURL}", "sha256": "${SHA256}", "notes": "${NOTES//\"/\\\"}" }
+{ "versionCode": ${newcode}, "versionName": "${name}", "apkUrl": "${APKURL}", "sha256": "${SHA256}", "rolloutPct": ${ROLLOUT}, "notes": "${NOTES//\"/\\\"}" }
 JSON
 
 # 4) publish the GitHub release with both assets

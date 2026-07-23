@@ -92,4 +92,41 @@ void main() {
       expect(m.decision, UpdateDecision.unverifiable);
     });
   });
+
+  group('staged rollout (R9 #151)', () {
+    Map<String, dynamic> staged(int pct) => {
+          'versionCode': 4,
+          'apkUrl': 'https://github.com/x/app.apk',
+          'sha256': sha,
+          'rolloutPct': pct,
+        };
+
+    test('bucket inside the wave is offered, outside is not', () {
+      expect(evaluateUpdateManifest(staged(25), 3, rolloutBucket: 10).decision,
+          UpdateDecision.install);
+      expect(evaluateUpdateManifest(staged(25), 3, rolloutBucket: 25).decision,
+          UpdateDecision.notApplicable);
+      expect(evaluateUpdateManifest(staged(25), 3, rolloutBucket: 99).decision,
+          UpdateDecision.notApplicable);
+    });
+
+    test('pct 0 offers nobody; pct 100 and absent offer everybody', () {
+      expect(evaluateUpdateManifest(staged(0), 3, rolloutBucket: 0).decision,
+          UpdateDecision.notApplicable);
+      expect(evaluateUpdateManifest(staged(100), 3, rolloutBucket: 99).decision,
+          UpdateDecision.install);
+      expect(
+          evaluateUpdateManifest(
+              manifest(code: 4, url: 'https://github.com/x/app.apk', sha256: sha), 3,
+              rolloutBucket: 99).decision,
+          UpdateDecision.install);
+    });
+
+    test('invalid pct means full rollout, not a bricked wave', () {
+      expect(evaluateUpdateManifest(staged(-5), 3, rolloutBucket: 99).decision,
+          UpdateDecision.install);
+      expect(evaluateUpdateManifest(staged(400), 3, rolloutBucket: 99).decision,
+          UpdateDecision.install);
+    });
+  });
 }
