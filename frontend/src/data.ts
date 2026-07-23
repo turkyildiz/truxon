@@ -1559,6 +1559,11 @@ export async function listInsights(includeResolved = false): Promise<TruxInsight
   return unwrap(await supabase.rpc('trux_insights_feed', { p_include_resolved: includeResolved })) as unknown as TruxInsight[]
 }
 
+/** Snooze: stays open in the feed but brief/digest/pushes skip it (R9 #87). */
+export async function snoozeInsight(id: number, days = 7): Promise<void> {
+  unwrap(await supabase.rpc('snooze_insight', { p_id: id, p_days: days }))
+}
+
 export async function acknowledgeInsight(id: number): Promise<void> {
   unwrap(await supabase.rpc('acknowledge_insight', { p_id: id }))
 }

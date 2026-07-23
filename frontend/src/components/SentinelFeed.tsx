@@ -6,7 +6,7 @@
  * investigate. Hidden entirely when there's nothing to show. */
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { acknowledgeInsight, insightDetail, listInsights } from '../data'
+import { acknowledgeInsight, insightDetail, listInsights, snoozeInsight } from '../data'
 
 const SEV: Record<string, { cls: string; icon: string }> = {
   critical: { cls: 'bg-red-500/15 text-red-600 dark:text-red-300', icon: '‼️' },
@@ -92,6 +92,10 @@ export default function SentinelFeed() {
     mutationFn: (id: number) => acknowledgeInsight(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['insights'] }),
   })
+  const snooze = useMutation({
+    mutationFn: (id: number) => snoozeInsight(id, 7),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['insights'] }),
+  })
   const [openId, setOpenId] = useState<number | null>(null)
 
   const items = q.data ?? []
@@ -121,13 +125,23 @@ export default function SentinelFeed() {
                 <div className="mt-0.5 text-[11px] font-medium text-brand">Click to investigate →</div>
               </div>
               {i.status === 'open' ? (
-                <button
-                  onClick={(e) => { e.stopPropagation(); ack.mutate(i.id) }}
-                  disabled={ack.isPending}
-                  className="shrink-0 rounded-lg border border-line px-2 py-1 text-xs text-muted hover:text-body disabled:opacity-50"
-                >
-                  Got it
-                </button>
+                <span className="flex shrink-0 gap-1">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); ack.mutate(i.id) }}
+                    disabled={ack.isPending}
+                    className="rounded-lg border border-line px-2 py-1 text-xs text-muted hover:text-body disabled:opacity-50"
+                  >
+                    Got it
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); snooze.mutate(i.id) }}
+                    disabled={snooze.isPending}
+                    title="Stays open, but the brief and pushes skip it for 7 days"
+                    className="rounded-lg border border-line px-2 py-1 text-xs text-muted hover:text-body disabled:opacity-50"
+                  >
+                    😴 7d
+                  </button>
+                </span>
               ) : (
                 <span className="shrink-0 text-xs text-muted">✓ acknowledged</span>
               )}

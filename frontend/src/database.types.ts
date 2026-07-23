@@ -3276,6 +3276,7 @@ export type Database = {
           notified_at: string | null
           resolved_at: string | null
           severity: string
+          snoozed_until: string | null
           status: string
           title: string
         }
@@ -3293,6 +3294,7 @@ export type Database = {
           notified_at?: string | null
           resolved_at?: string | null
           severity: string
+          snoozed_until?: string | null
           status?: string
           title: string
         }
@@ -3310,6 +3312,7 @@ export type Database = {
           notified_at?: string | null
           resolved_at?: string | null
           severity?: string
+          snoozed_until?: string | null
           status?: string
           title?: string
         }
@@ -3920,6 +3923,7 @@ export type Database = {
           notified_at: string | null
           resolved_at: string | null
           severity: string
+          snoozed_until: string | null
           status: string
           title: string
         }
@@ -3984,6 +3988,7 @@ export type Database = {
         Returns: undefined
       }
       bless_security_baseline: { Args: never; Returns: Json }
+      breakdown_ml_readiness: { Args: never; Returns: Json }
       bs_upsert: { Args: { p: Json }; Returns: undefined }
       budget_variance: {
         Args: { p_end: string; p_start: string }
@@ -4932,6 +4937,7 @@ export type Database = {
           notified_at: string | null
           resolved_at: string | null
           severity: string
+          snoozed_until: string | null
           status: string
           title: string
         }[]
@@ -4942,6 +4948,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      sentinel_weekly_digest: { Args: never; Returns: Json }
       set_cron_config: {
         Args: { p_key: string; p_value: string }
         Returns: undefined
@@ -5006,7 +5013,12 @@ export type Database = {
           total: number
         }[]
       }
+      snooze_insight: {
+        Args: { p_days?: number; p_id: number }
+        Returns: undefined
+      }
       speeding_summary: { Args: { p_days?: number }; Returns: Json }
+      speeding_trend: { Args: never; Returns: Json }
       stop_dwell_summary: {
         Args: { p_days?: number; p_radius_mi?: number }
         Returns: Json
@@ -5062,6 +5074,7 @@ export type Database = {
           notified_at: string | null
           resolved_at: string | null
           severity: string
+          snoozed_until: string | null
           status: string
           title: string
         }[]
