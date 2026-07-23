@@ -94,17 +94,25 @@ stops:[{t:'pu'|'del', name, loc, date, h, m, ap, po}] }`. Importer is
 builds stop timestamps with AM/PM via `iso()`, auto-creates missing
 customers/drivers, and stamps `[ITS #<editId>]` into notes.
 
-## Nightly capture → cutover (the runbook)
-1. `fetch-its.mjs` runs on the NAS at 01:00 CST (Docker cron): login → enumerate
-   open+closed boards (rolling `ITS_LOOKBACK_DAYS` window) → fetch+parse each →
-   **accumulate** into `its_loads_full.json` + a dated `its_delta/YYYY-MM-DD.json`
-   snapshot. **Never touches prod.**
-2. `--selfcheck` asserts structural invariants (every load: number, customer,
-   ≥1 pickup, ≥1 delivery, numeric rate, valid dates) — a canary that ITS hasn't
-   changed its HTML.
-3. At cutover (~Aug 1): alias truck `003`→`03` (AtoB name), then
-   `node import.mjs <admin> <pw>` once against the accumulated file (idempotent).
-   Review `punchlist.json`.
+## Assisted capture → cutover (the runbook, rebuilt 2026-07-23)
+Nightly unattended capture is dead (Turnstile, §4). The working loop — all
+tools live IN THIS DIRECTORY now (the old box's scratchpad copies were lost in
+the machine swap; never keep migration tooling out of the repo):
+1. **(optional) FLOOR**: `CRON_SECRET=… node its-dryrun.mjs` prints the highest
+   editId already in prod — paste into `its-harvest.js` so the probe sweep knows
+   where to stop. Without it the harvester falls back to a date-guarded walk.
+2. **Harvest** (owner): open app.itsdispatch.com logged-in → DevTools console →
+   paste ALL of `its-harvest.js` → it enumerates open+closed boards **and probes
+   editId gaps** (recovers loads that were invoiced and left the board — this is
+   why one comprehensive harvest can replace the lost nightly accumulation) →
+   downloads `its-captured-<date>.json`.
+3. **Merge**: `node merge-its.mjs ~/Downloads/its-captured-*.json` → accumulates
+   into `its_loads_full.json` + dated snapshot. Never touches prod.
+4. **Dry-run**: `CRON_SECRET=… node its-dryrun.mjs` — maps the capture against
+   prod (new vs already-in; unmatched customers/drivers/trucks; zero-rate flags).
+5. At cutover (~Aug 1): fix any flags in ITS, re-harvest (final sweep), then
+   `ADMIN_EMAIL=… ADMIN_PASSWORD=… node import.mjs --delta` (loads-only,
+   idempotent; the 003→03 truck alias is built in). Review `punchlist.json`.
 
 ## Documents (TODO, lower priority)
 Per-load attachments (rate cons / PODs) hang off the load editor's attachments

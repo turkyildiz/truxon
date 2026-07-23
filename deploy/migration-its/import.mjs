@@ -1,21 +1,31 @@
 // ITS Dispatch → Truxon data import (entities + loads).
-// Usage: ADMIN_EMAIL=… ADMIN_PASSWORD=… node import.mjs [--dry]
+// Usage: ADMIN_EMAIL=… ADMIN_PASSWORD=… node import.mjs [--dry] [--delta]
 // Credentials come from env only — argv lands in shell history and `ps`.
-// Reads the xlsx exports + its_loads_full.json from this directory,
-// writes punchlist.json with everything that didn't map cleanly.
+// Bulk mode reads the xlsx exports + its_loads_full.json from this directory.
+// --delta (the cutover mode): loads-only from its_loads_full.json — no xlsx
+// needed; customers/drivers/trucks/trailers are matched against what is already
+// in prod (missing customers/drivers auto-create as before; trucks punchlist).
+// Writes punchlist.json with everything that didn't map cleanly.
 import { createClient } from '@supabase/supabase-js'
-import { readFileSync, writeFileSync } from 'node:fs'
-import XLSX from 'xlsx'
+import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 
 const DIR = new URL('.', import.meta.url).pathname
-const env = Object.fromEntries(
-  readFileSync('/home/turkyildiz/TRUXON/frontend/.env.local', 'utf8')
-    .split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]),
-)
-const sb = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
+// Connection: frontend/.env.local when present (repo-relative — no hardcoded
+// home dir; the original box's /home/turkyildiz path broke on every machine
+// since), else SUPABASE_URL/SUPABASE_ANON_KEY env, else prod defaults (anon
+// key is public-safe — RLS enforces access; same default as mobile/build-apk.sh).
+const envPath = DIR + '../../frontend/.env.local'
+const fileEnv = existsSync(envPath)
+  ? Object.fromEntries(readFileSync(envPath, 'utf8')
+      .split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
+  : {}
+const SB_URL = process.env.SUPABASE_URL || fileEnv.VITE_SUPABASE_URL || 'https://okoeeyxxvzypjiumraxq.supabase.co'
+const SB_ANON = process.env.SUPABASE_ANON_KEY || fileEnv.VITE_SUPABASE_ANON_KEY || 'sb_publishable_Ak8T-1XgtjC00LXbiI9xDA_o5b_n7C-'
+const sb = createClient(SB_URL, SB_ANON)
 const email = process.env.ADMIN_EMAIL
 const password = process.env.ADMIN_PASSWORD
 const DRY = process.argv.includes('--dry')
+const DELTA = process.argv.includes('--delta')
 if (!email || !password) { console.error('Set ADMIN_EMAIL and ADMIN_PASSWORD in the environment (not argv)'); process.exit(2) }
 const punch = []
 const note = (area, msg) => { punch.push({ area, msg }); console.log('PUNCH:', area, '—', msg) }
@@ -23,15 +33,29 @@ const note = (area, msg) => { punch.push({ area, msg }); console.log('PUNCH:', a
 const { error: loginErr } = await sb.auth.signInWithPassword({ email, password })
 if (loginErr) { console.error('login failed:', loginErr.message); process.exit(1) }
 
-const xl = (name) => XLSX.utils.sheet_to_json(XLSX.readFile(DIR + name).Sheets[XLSX.readFile(DIR + name).SheetNames[0]], { defval: '' })
 const S = (v) => String(v ?? '').trim()
 const dateOr = (v) => { const s = S(v); return /^\d{4}-\d{2}-\d{2}$/.test(s) && s !== '0000-00-00' ? s : null }
 const norm = (s) => S(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 
+let custByNorm, drvByNorm, truckByUnit, trailerByUnit
+if (DELTA) {
+  // Loads-only cutover: entity maps come straight from prod, nothing xlsx.
+  const grab = async (table, col) =>
+    new Map((((await sb.from(table).select(`id, ${col}`)).data) ?? []).map((r) => [norm(r[col]), r.id]))
+  custByNorm = await grab('customers', 'company_name')
+  drvByNorm = await grab('drivers', 'full_name')
+  truckByUnit = await grab('trucks', 'unit_number')
+  trailerByUnit = await grab('trailers', 'unit_number')
+  console.log(`delta mode: prod refs — ${custByNorm.size} customers, ${drvByNorm.size} drivers, ${truckByUnit.size} trucks, ${trailerByUnit.size} trailers`)
+} else {
+// xlsx only needed for the (historical) bulk path — lazy so delta mode runs without the package
+const XLSX = (await import('xlsx')).default
+const xl = (name) => XLSX.utils.sheet_to_json(XLSX.readFile(DIR + name).Sheets[XLSX.readFile(DIR + name).SheetNames[0]], { defval: '' })
+
 // ---------- customers ----------
 const custRows = xl('Customers.xlsx')
 const { data: existingCust } = await sb.from('customers').select('id, company_name')
-const custByNorm = new Map((existingCust ?? []).map((c) => [norm(c.company_name), c.id]))
+custByNorm = new Map((existingCust ?? []).map((c) => [norm(c.company_name), c.id]))
 let custAdded = 0
 for (const r of custRows) {
   const name = S(r['Company Name'])
@@ -60,7 +84,7 @@ console.log(`customers: +${custAdded} (existing ${existingCust?.length ?? 0})`)
 // ---------- drivers ----------
 const drvRows = xl('Drivers.xlsx')
 const { data: existingDrv } = await sb.from('drivers').select('id, full_name')
-const drvByNorm = new Map((existingDrv ?? []).map((d) => [norm(d.full_name), d.id]))
+drvByNorm = new Map((existingDrv ?? []).map((d) => [norm(d.full_name), d.id]))
 let drvAdded = 0
 for (const r of drvRows) {
   const name = S(r.Name)
@@ -138,8 +162,9 @@ async function importEquipment(file, table) {
   console.log(`${table}: +${added}`)
   return byUnit
 }
-const truckByUnit = await importEquipment('Trucks.xlsx', 'trucks')
-const trailerByUnit = await importEquipment('Trailers.xlsx', 'trailers')
+truckByUnit = await importEquipment('Trucks.xlsx', 'trucks')
+trailerByUnit = await importEquipment('Trailers.xlsx', 'trailers')
+} // end bulk (non-delta) entity import
 
 // ---------- loads ----------
 const loads = JSON.parse(readFileSync(DIR + 'its_loads_full.json', 'utf8'))
@@ -190,10 +215,12 @@ for (const L of loads) {
       unmatchedDrivers.add(drvName)
     }
   }
+  // ITS unit names that differ from Truxon's (audit 2026-07-19: ITS "003" = unit "03")
+  const TRUCK_ALIASES = { '003': '03' }
   const truckUnit = S(L.truck)
   let truck_id = null
   if (truckUnit && !/assign later/i.test(truckUnit)) {
-    truck_id = truckByUnit.get(norm(truckUnit)) ?? null
+    truck_id = truckByUnit.get(norm(TRUCK_ALIASES[truckUnit] ?? truckUnit)) ?? null
     if (!truck_id) unmatchedTrucks.add(truckUnit)
   }
   const trailerUnit = S(L.trailer)

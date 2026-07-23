@@ -10,6 +10,7 @@
     "login": "node fetch-its.mjs --login"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.8",
     "playwright": "^1.61.1"
   }
 }
