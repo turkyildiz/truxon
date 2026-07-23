@@ -14,16 +14,21 @@ begin
           or public.my_role() in ('admin','dispatcher','accountant')) then
     raise exception 'Not enough permissions';
   end if;
-  with pts as (
+  with raw as (
     select truck_id, ts, lat, lng, calc_location, speed,
-           extract(epoch from (lead(ts) over w - ts)) as gap_s,
-           case when coalesce(speed, 0) < 1 then 0 else 1 end as moving,
-           sum(case when coalesce(speed, 0) < 1 then 0 else 1 end)
-             over w as grp
+           extract(epoch from (lead(ts) over (partition by truck_id order by ts) - ts)) as gap_s
       from eld_location_history
      where ts > now() - make_interval(days => least(p_days, 14))
        and truck_id is not null and lat is not null
-    window w as (partition by truck_id order by ts)
+  ), flagged as (
+    -- a breadcrumb HOLE (>30 min to the next ping) is unknown time, not
+    -- parked time - it ends the stretch like movement does
+    select *, case when coalesce(speed, 0) < 1 and coalesce(gap_s, 0) <= 1800
+                   then 0 else 1 end as moving
+      from raw
+  ), pts as (
+    select *, sum(moving) over (partition by truck_id order by ts) as grp
+      from flagged
   ), stretches as (
     select truck_id, grp,
            min(ts) as started, max(ts) as ended,

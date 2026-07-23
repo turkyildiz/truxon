@@ -18,11 +18,13 @@ insert into public.eld_location_history (id, vehicle_id, truck_id, lat, lng, spe
 select gen_random_uuid(), '00000000-0000-4000-9000-000000000006'::uuid,
        (select id from public.trucks where unit_number='IL-T'),
        lat, lng, speed, now() - interval '1 day' + (n || ' minutes')::interval
-from (values
-  (40.0, -83.0, 0, 0), (40.0, -83.0, 0, 60), (40.0, -83.0, 0, 120),
-  (40.5, -83.5, 55, 150),
-  (41.0, -84.0, 0, 180), (41.0, -84.0, 0, 210), (41.0, -84.0, 0, 240)
-) v(lat, lng, speed, n);
+from (
+  -- dock stay: pings every 20 min for 2h (holes >30 min would rightly split)
+  select 40.0 lat, -83.0 lng, 0 speed, g*20 n from generate_series(0, 6) g
+  union all select 40.5, -83.5, 55, 150
+  -- far stop: every 20 min for 1h
+  union all select 41.0, -84.0, 0, 180 + g*20 from generate_series(0, 3) g
+) v;
 
 select ok((public.idle_locations(7)->>'dock_hours')::numeric >= 1.9,
   'the at-dock stretch lands in dock hours');
