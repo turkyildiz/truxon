@@ -67,3 +67,38 @@ body {
 .recharts-cartesian-grid line {
   stroke: var(--line);
 }
+
+/* ── Print (R9 #164): reports and tables come out clean — no chrome, no
+   buttons, black on white, tables that break across pages politely. ── */
+@media print {
+  nav, aside, header, .no-print, button, [role="dialog"] {
+    display: none !important;
+  }
+  body, .bg-base, .bg-surface, .bg-surface-2 {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  .rounded-2xl, .border, .shadow {
+    border: none !important;
+    box-shadow: none !important;
+  }
+  table {
+    width: 100% !important;
+    font-size: 11px !important;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  a {
+    color: #000 !important;
+    text-decoration: none !important;
+  }
+  .recharts-responsive-container {
+    break-inside: avoid;
+  }
+}
