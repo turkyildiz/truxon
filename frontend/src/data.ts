@@ -554,6 +554,25 @@ export async function createLoad(payload: Row, stops: Omit<LoadStop, 'id' | 'loa
   return load
 }
 
+const LINE_ITEM_KINDS = ['line_haul', 'fuel_surcharge', 'detention', 'lumper', 'stop_pay', 'other_accessorial'] as const
+
+/** Persist the rate-con line items captured at extraction time (R9 #104).
+ * Best-effort: the load is already created; a line-item hiccup must not eat it. */
+export async function saveLoadLineItems(loadId: number, items: ExtractedLineItem[]): Promise<void> {
+  const rows = items
+    .filter((i) => typeof i.amount === 'number' && isFinite(i.amount) && i.amount !== 0)
+    .map((i) => ({
+      load_id: loadId,
+      kind: (LINE_ITEM_KINDS as readonly string[]).includes(i.kind ?? '') ? (i.kind as string) : 'other_accessorial',
+      description: (i.description ?? '').slice(0, 200),
+      amount: Math.round((i.amount as number) * 100) / 100,
+      source: 'ratecon_extract',
+    }))
+  if (rows.length === 0) return
+  const { error } = await supabase.from('load_line_items').insert(rows)
+  if (error) console.warn('line items not saved:', error.message)
+}
+
 export async function updateLoad(id: number | string, payload: Row): Promise<Load> {
   const load = mapLoad(
     unwrap(await supabase.from('loads').update(payload as TablesUpdate<'loads'>).eq('id', Number(id)).select(LOAD_SELECT).single()),
@@ -1659,6 +1678,12 @@ export interface ExtractedStop {
   reference?: string | null
 }
 
+export interface ExtractedLineItem {
+  kind?: 'line_haul' | 'fuel_surcharge' | 'detention' | 'lumper' | 'stop_pay' | 'other_accessorial' | null
+  description?: string | null
+  amount?: number | null
+}
+
 export interface ExtractResult {
   raw_text: string
   fields: {
@@ -1672,6 +1697,7 @@ export interface ExtractResult {
     delivery_address?: string | null
     delivery_time?: string | null
     rate?: number | null
+    line_items?: ExtractedLineItem[] | null
     special_terms?: string | null
     stops?: ExtractedStop[] | null
   } | null

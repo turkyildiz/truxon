@@ -3,7 +3,7 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Button, Card, Field, Input, money, Select, Textarea } from '../components/ui'
-import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, eldFleetLive, estimateLoadMargin, extractPdf, fleetCostBasis, laneRateForRoute, listLoads, loadEtaRisk, sentinelSummary, type EldFleetRow, type ExtractedStop } from '../data'
+import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, eldFleetLive, estimateLoadMargin, extractPdf, fleetCostBasis, laneRateForRoute, listLoads, loadEtaRisk, saveLoadLineItems, sentinelSummary, type EldFleetRow, type ExtractedLineItem, type ExtractedStop } from '../data'
 import { errorMessage } from '../supabase'
 import { ReferenceDataBanner, useReferenceData } from '../useReferenceData'
 import FleetMap from './FleetMap'
@@ -144,6 +144,7 @@ export default function Dispatch() {
   ] : EMPTY_STOPS.map((s) => ({ ...s })))
   const [error, setError] = useState('')
   const [aiNote, setAiNote] = useState('')
+  const [lineItems, setLineItems] = useState<ExtractedLineItem[]>([])
   const [distError, setDistError] = useState('')
   const [dragOver, setDragOver] = useState(false)
   /** Extracted customer name that matched nothing — offer add-or-pick. */
@@ -199,6 +200,8 @@ export default function Dispatch() {
         special_terms: f.special_terms ?? form.special_terms,
       }
       setForm(merged)
+      // R9 #104: keep the printed rate breakdown — saved to load_line_items on create.
+      setLineItems(Array.isArray(f.line_items) ? f.line_items : [])
       // Build the itinerary — prefer the full stops list, fall back to the
       // flat pickup/delivery fields.
       const extractedStops: ExtractedStop[] = Array.isArray(f.stops) && f.stops.length > 0 ? f.stops : []
@@ -280,7 +283,10 @@ export default function Dispatch() {
         realStops.map((s) => ({ stop_type: s.stop_type, facility: s.facility, address: s.address, stop_time: s.time || null, reference: s.reference })),
       )
     },
-    onSuccess: (load) => navigate(`/loads/${load.id}`),
+    onSuccess: async (load) => {
+      if (lineItems.length > 0) await saveLoadLineItems(load.id, lineItems)
+      navigate(`/loads/${load.id}`)
+    },
     onError: (err) => setError(errorMessage(err)),
   })
 
@@ -425,6 +431,11 @@ export default function Dispatch() {
             <div className="flex items-end gap-3">
               <Field label="Rate ($)" className="flex-1">
                 <Input type="number" step="0.01" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} />
+                {lineItems.length > 0 && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Rate con itemizes: {lineItems.map((li) => `${li.description || li.kind} $${li.amount}`).join(' + ')}
+                  </p>
+                )}
               </Field>
               <Field label="Miles" className="flex-1">
                 <Input type="number" step="0.1" value={form.miles} onChange={(e) => setForm({ ...form, miles: e.target.value })} />

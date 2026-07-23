@@ -24,6 +24,7 @@ Respond with ONLY a JSON object (no markdown fences) with these keys:
 - delivery_address: final delivery — same format as pickup_address
 - delivery_time: delivery date/time, same rules as pickup_time (use the appointment time if one is set)
 - rate: TOTAL carrier pay in dollars as a plain number — the all-in amount ("Total", "Total Cost", "Cost", line haul + fuel surcharge + accessorials). Not a per-mile rate.
+- line_items: array itemizing how that total is built, ONLY from charges actually printed on the document (never invent a breakdown; if only a single total is shown, return [{"kind":"line_haul","description":"Line haul","amount":<total>}]). Each element: {"kind": "line_haul"|"fuel_surcharge"|"detention"|"lumper"|"stop_pay"|"other_accessorial", "description": the label as printed, "amount": dollars as a plain number}. The amounts should sum to rate.
 - equipment_type: required equipment as stated (e.g. "53' Van", "Reefer", "Flatbed", "Power Only"). null if not stated.
 - special_terms: short string (max 300 chars) with what a dispatcher must know: required equipment, temperature, tracking demands, unusual penalties. null if nothing notable.
 - stops: ordered array of EVERY stop on the load (multi-stop loads have more than two). Each element: {"type": "pickup"|"delivery", "facility": company/location name or null, "address": street/city/state/zip or null, "datetime": "YYYY-MM-DDTHH:MM" or null (same rules as pickup_time), "reference": that stop's PU#/delivery#/PO or null}.

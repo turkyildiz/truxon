@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   public: {
     Tables: {
       activity_log: {
@@ -1937,6 +1932,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "load_checkcalls_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "loads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      load_line_items: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string
+          id: number
+          kind: string
+          load_id: number
+          source: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string
+          id?: number
+          kind: string
+          load_id: number
+          source?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string
+          id?: number
+          kind?: string
+          load_id?: number
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "load_line_items_load_id_fkey"
             columns: ["load_id"]
             isOneToOne: false
             referencedRelation: "loads"
@@ -3966,6 +3999,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      anomaly_digest: { Args: { p_threshold_pct?: number }; Returns: Json }
       apply_customer_enrichment: {
         Args: {
           p_customer_id: number
@@ -4075,6 +4109,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      cancellation_analytics: { Args: { p_days?: number }; Returns: Json }
       capture_metric_snapshots: { Args: never; Returns: number }
       capture_truck_features: { Args: { p_week?: string }; Returns: number }
       carrier_safety_latest: { Args: never; Returns: Json }
@@ -4261,6 +4296,7 @@ export type Database = {
         }[]
       }
       dashboard_summary: { Args: never; Returns: Json }
+      deadhead_patterns: { Args: { p_days?: number }; Returns: Json }
       decide_accessorial: {
         Args: { p_approve: boolean; p_id: number }
         Returns: undefined
@@ -4318,6 +4354,7 @@ export type Database = {
         }[]
       }
       dispatch_productivity: { Args: { p_days?: number }; Returns: Json }
+      doc_retention_report: { Args: { p_days?: number }; Returns: Json }
       dot_audit_pack: { Args: never; Returns: Json }
       draft_dunning_notices: { Args: never; Returns: number }
       drive_create_share: {
@@ -4349,6 +4386,17 @@ export type Database = {
         }
         Returns: Json
       }
+      driver_add_fuel_receipt: {
+        Args: {
+          p_content_type?: string
+          p_filename: string
+          p_ocr_text?: string
+          p_size_bytes?: number
+          p_storage_path: string
+          p_truck_id: number
+        }
+        Returns: Json
+      }
       driver_change_load_status: {
         Args: {
           p_load_id: number
@@ -4372,6 +4420,7 @@ export type Database = {
           responses: number
         }[]
       }
+      driver_owns_fuel_path: { Args: { p_name: string }; Returns: boolean }
       driver_owns_load: { Args: { p_load_id: number }; Returns: boolean }
       driver_owns_load_path: { Args: { p_name: string }; Returns: boolean }
       driver_qual_files: { Args: never; Returns: Json }
@@ -4397,6 +4446,7 @@ export type Database = {
         Args: { p_end: string; p_start: string }
         Returns: Json
       }
+      driver_wallet_path: { Args: { p_name: string }; Returns: boolean }
       duplicate_customer_groups: {
         Args: never
         Returns: {
@@ -4533,6 +4583,7 @@ export type Database = {
           transactions: number
         }[]
       }
+      fuel_stop_analysis: { Args: { p_days?: number }; Returns: Json }
       gl_balance_ratios: { Args: never; Returns: Json }
       gl_breakeven_monthly: {
         Args: { p_months?: number }
@@ -4575,6 +4626,7 @@ export type Database = {
       gl_upsert_monthly: { Args: { p_rows: Json }; Returns: number }
       global_search: { Args: { q: string }; Returns: Json }
       honeytoken_seen: { Args: { p_hash: string }; Returns: boolean }
+      idle_locations: { Args: { p_days?: number }; Returns: Json }
       idle_summary: { Args: { p_days?: number }; Returns: Json }
       ifta_attribute_states: { Args: { p_day?: string }; Returns: number }
       ifta_miles_status: { Args: never; Returns: Json }
@@ -4791,6 +4843,8 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      my_settlement: { Args: { p_week_offset?: number }; Returns: Json }
+      my_wallet_documents: { Args: never; Returns: Json }
       my_week_scorecard: { Args: { p_week_offset?: number }; Returns: Json }
       next_invoice_number: { Args: never; Returns: string }
       next_load_number: { Args: never; Returns: string }
@@ -4810,6 +4864,7 @@ export type Database = {
         }[]
       }
       normalize_company_name: { Args: { p: string }; Returns: string }
+      ocr_quality_report: { Args: { p_limit?: number }; Returns: Json }
       ops_service_metrics: { Args: { p_days?: number }; Returns: Json }
       parking_in_bbox: {
         Args: {
@@ -4901,6 +4956,7 @@ export type Database = {
       }
       qbo_writeoff_list: { Args: never; Returns: Json }
       qbo_writeoff_seed: { Args: never; Returns: number }
+      ratecon_recon_report: { Args: { p_days?: number }; Returns: Json }
       record_invoice_payment: {
         Args: {
           p_amount: number
@@ -4931,6 +4987,16 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      report_breakdown: {
+        Args: {
+          p_description: string
+          p_drivable?: boolean
+          p_lat?: number
+          p_lon?: number
+          p_truck_id: number
+        }
+        Returns: Json
       }
       resolve_equipment_conflict: {
         Args: { p_action: string; p_log_id: number }
@@ -5391,6 +5457,101 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      iceberg_namespaces: {
+        Row: {
+          bucket_name: string
+          catalog_id: string
+          created_at: string
+          id: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          bucket_name: string
+          catalog_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          bucket_name?: string
+          catalog_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iceberg_namespaces_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "buckets_analytics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      iceberg_tables: {
+        Row: {
+          bucket_name: string
+          catalog_id: string
+          created_at: string
+          id: string
+          location: string
+          name: string
+          namespace_id: string
+          remote_table_id: string | null
+          shard_id: string | null
+          shard_key: string | null
+          updated_at: string
+        }
+        Insert: {
+          bucket_name: string
+          catalog_id: string
+          created_at?: string
+          id?: string
+          location: string
+          name: string
+          namespace_id: string
+          remote_table_id?: string | null
+          shard_id?: string | null
+          shard_key?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bucket_name?: string
+          catalog_id?: string
+          created_at?: string
+          id?: string
+          location?: string
+          name?: string
+          namespace_id?: string
+          remote_table_id?: string | null
+          shard_id?: string | null
+          shard_key?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iceberg_tables_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "buckets_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iceberg_tables_namespace_id_fkey"
+            columns: ["namespace_id"]
+            isOneToOne: false
+            referencedRelation: "iceberg_namespaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       migrations: {
         Row: {
@@ -5912,3 +6073,4 @@ export const Constants = {
     },
   },
 } as const
+
