@@ -125,6 +125,23 @@ class _LoadsScreenState extends State<LoadsScreen> {
       (item) => widget.api.changeStatus(item['load_id'] as int, item['status'] as String),
     );
     await prefs.setString('status_outbox', OfflineOutbox.encode(remaining));
+
+    // DVIRs parked by dead-zone submits ride the same drain.
+    final dvirs = OfflineOutbox.decode(prefs.getString('dvir_outbox'));
+    if (dvirs.isNotEmpty) {
+      final left = await OfflineOutbox.replay(
+        dvirs,
+        (d) => widget.api.submitDvir(
+          truckId: d['truck_id'] as int,
+          inspectionType: d['inspection_type'] as String,
+          items: Map<String, String>.from(d['items'] as Map),
+          odometer: d['odometer'] as num?,
+          defects: (d['defects'] ?? '') as String,
+          safe: (d['safe'] ?? true) as bool,
+        ),
+      );
+      await prefs.setString('dvir_outbox', OfflineOutbox.encode(left));
+    }
   }
 
   Future<void> _queueOrSendStatus(DriverLoad load, String next) async {

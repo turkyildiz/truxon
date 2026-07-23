@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../i18n.dart';
 import '../services/api.dart';
@@ -60,7 +61,36 @@ class _DvirScreenState extends State<DvirScreen> {
         Navigator.pop(context, true);
       }
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      // A dead zone must not eat a finished walkaround: network-shaped
+      // failures park the DVIR in an outbox (drained by the loads screen on
+      // the next successful refresh); real rejections still surface.
+      final msg = '$e';
+      final looksOffline = RegExp(
+        r'SocketException|Failed host lookup|Connection (refused|reset|closed|timed)|timeout|network',
+        caseSensitive: false,
+      ).hasMatch(msg);
+      if (looksOffline) {
+        final prefs = await SharedPreferences.getInstance();
+        final items = OfflineOutbox.decode(prefs.getString('dvir_outbox'));
+        items.add({
+          'truck_id': truckId,
+          'inspection_type': _type,
+          'items': _items,
+          'odometer': num.tryParse(_odoCtl.text),
+          'defects': _defectsCtl.text.trim(),
+          'safe': _safe,
+          'ts': DateTime.now().toIso8601String(),
+        });
+        await prefs.setString('dvir_outbox', OfflineOutbox.encode(items));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(tr('dvirQueuedOffline'))),
+          );
+          Navigator.pop(context, true);
+        }
+        return;
+      }
+      if (mounted) setState(() => _error = msg);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
