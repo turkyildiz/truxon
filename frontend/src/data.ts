@@ -2551,6 +2551,19 @@ export async function perTruckPnl(months = 3): Promise<PerTruckPnl | null> {
   return (unwrap(await supabase.rpc('per_truck_pnl', { p_months: months })) as unknown as PerTruckPnl) ?? null
 }
 
+export interface DepreciationSchedule {
+  assumptions: string
+  entered: number
+  trucks_total: number
+  monthly_depreciation_total: number
+  rows: { unit: string; purchase_price: number; purchase_date: string; monthly: number; months_elapsed: number; book_value: number }[]
+}
+
+/** Owner-view straight-line depreciation (not the tax books). */
+export async function depreciationSchedule(): Promise<DepreciationSchedule | null> {
+  return (unwrap(await supabase.rpc('depreciation_schedule')) as unknown as DepreciationSchedule) ?? null
+}
+
 export interface PaymentAudit {
   paid_but_open_in_qbo: { invoice: string; customer: string | null; total: number; qbo_balance: number }[]
   settled_in_qbo_but_open: { invoice: string; customer: string | null; total: number; days_open: number }[]

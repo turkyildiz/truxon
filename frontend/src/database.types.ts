@@ -4184,6 +4184,7 @@ export type Database = {
         Returns: undefined
       }
       denim_reconciliation: { Args: never; Returns: Json }
+      depreciation_schedule: { Args: never; Returns: Json }
       detention_events: {
         Args: {
           p_days?: number

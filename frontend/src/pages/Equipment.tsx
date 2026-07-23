@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import ResourcePage from '../components/ResourcePage'
 import { Badge, Card, formatDate, money } from '../components/ui'
-import { listEquipmentConflicts, perTruckPnl, resolveEquipmentConflict, trailersApi, trucksApi } from '../data'
+import { depreciationSchedule, listEquipmentConflicts, perTruckPnl, resolveEquipmentConflict, trailersApi, trucksApi } from '../data'
 import type { Equipment } from '../types'
 
 /** Each unit judged on its own ledger: revenue on its loads minus its fuel,
@@ -190,10 +190,41 @@ function EquipmentPage({ title, api, queryKey, entityType }: { title: string; ap
   )
 }
 
+/** Owner-view straight-line depreciation. Hidden until purchase data exists. */
+function DepreciationCard() {
+  const q = useQuery({ queryKey: ['depreciation'], queryFn: depreciationSchedule, retry: false })
+  const d = q.data
+  if (q.isError || !d || d.rows.length === 0) return null
+  return (
+    <Card title={`📉 Depreciation — ${money(d.monthly_depreciation_total)}/mo across ${d.entered} unit${d.entered === 1 ? '' : 's'}`}>
+      <p className="mb-2 text-xs text-muted">{d.assumptions}. Enter Purchase Price + Date on the rest ({d.trucks_total - d.entered} missing) to complete the picture.</p>
+      <table className="w-full text-sm">
+        <thead><tr className="text-left text-xs uppercase tracking-wide text-muted">
+          <th className="px-2 py-1">Unit</th><th className="px-2 py-1">Bought</th><th className="px-2 py-1">Price</th>
+          <th className="px-2 py-1">$/mo</th><th className="px-2 py-1">Months in</th><th className="px-2 py-1">Book value</th>
+        </tr></thead>
+        <tbody>
+          {d.rows.map((r) => (
+            <tr key={r.unit} className="border-t border-line">
+              <td className="px-2 py-1 font-medium">{r.unit}</td>
+              <td className="px-2 py-1">{formatDate(r.purchase_date)}</td>
+              <td className="px-2 py-1">{money(Number(r.purchase_price))}</td>
+              <td className="px-2 py-1">{money(Number(r.monthly))}</td>
+              <td className="px-2 py-1 text-muted">{r.months_elapsed}/60</td>
+              <td className="px-2 py-1 font-semibold">{money(Number(r.book_value))}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  )
+}
+
 export const Trucks = () => (
   <div>
     <EnrichmentConflicts entityType="truck" />
     <TruckPnlCard />
+    <DepreciationCard />
     <EquipmentPage title="Trucks" api={trucksApi} queryKey="trucks" entityType="truck" />
   </div>
 )
