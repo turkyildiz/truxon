@@ -16,7 +16,7 @@ import {
   createInvoice, decideAccessorial, deleteInvoicePayment, detentionEvents, emailInvoice, glBreakevenMonthly, glCfoSnapshot, glExpenseBreakdown,
   listAccessorials, proposeDetentionAccessorials,
   glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
-  denimReconciliation, factoringCostSummary, qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, revRecDrift, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
+  creditMemoSummary, denimReconciliation, factoringCostSummary, qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, revRecDrift, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
 } from '../data'
 import { downloadCustomerStatement, downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
 import { errorMessage } from '../supabase'
@@ -1251,6 +1251,40 @@ function GlSection() {
 }
 
 // ── Reports ──────────────────────────────────────────────────────────────────
+/** Credit memos = revenue walked back. The invoice-accuracy scoreboard. */
+function CreditMemoCard() {
+  const q = useQuery({ queryKey: ['credit-memos'], queryFn: () => creditMemoSummary(12), retry: false })
+  const d = q.data
+  if (q.isError || !d) return null
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-4">
+      <h3 className="mb-2 text-sm font-semibold text-body">Credit memos — invoice accuracy, last 12 months</h3>
+      <div className="grid grid-cols-3 gap-3">
+        <Kpi label="Credit memos" value={String(d.credit_memos)} sub={money(d.credit_memo_total)} />
+        <Kpi label="Credit-memo rate" value={d.credit_memo_rate_pct != null ? `${d.credit_memo_rate_pct}%` : '—'} sub="of invoiced revenue" tone={Number(d.credit_memo_rate_pct) > 1 ? 'warn' : undefined} />
+        <Kpi label="Invoice accuracy" value={`${d.invoice_accuracy_pct}%`} sub="playbook #73" tone={d.invoice_accuracy_pct >= 99 ? 'good' : 'warn'} />
+      </div>
+      {d.recent.length > 0 ? (
+        <table className="mt-3 w-full text-sm">
+          <tbody>
+            {d.recent.slice(0, 5).map((r) => (
+              <tr key={r.doc} className="border-t border-line">
+                <td className="px-2 py-1 font-medium">{r.doc}</td>
+                <td className="px-2 py-1 text-muted">{r.customer ?? '—'}</td>
+                <td className="px-2 py-1">{formatDate(r.date)}</td>
+                <td className="px-2 py-1">{money(Number(r.total))}</td>
+                <td className="px-2 py-1 text-muted">{r.memo ?? ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="mt-2 text-sm text-green-700 dark:text-green-300">No credit memos in QBO for this period ✓</p>
+      )}
+    </div>
+  )
+}
+
 /** Earned (delivery month) vs booked (invoice month) — the cross-month drift. */
 function RevRecCard() {
   const q = useQuery({ queryKey: ['rev-rec-drift'], queryFn: () => revRecDrift(6), retry: false })
@@ -1298,6 +1332,7 @@ function ReportsTab() {
     <div className="space-y-6">
       <GlSection />
       <RevRecCard />
+      <CreditMemoCard />
       {margins.length > 0 && (
         <div className="rounded-2xl border border-line bg-surface p-4">
           <h3 className="mb-2 text-sm font-semibold text-body">Revenue vs direct-cost margin (fuel + tolls + maintenance)</h3>

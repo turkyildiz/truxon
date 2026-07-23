@@ -2512,6 +2512,21 @@ export interface RevRecMonth {
   cross_month_amount: number
 }
 
+export interface CreditMemoSummary {
+  months: number
+  credit_memos: number
+  credit_memo_total: number
+  invoiced_total: number
+  credit_memo_rate_pct: number | null
+  invoice_accuracy_pct: number
+  recent: { doc: string; date: string; total: number; customer: string | null; memo: string | null }[]
+}
+
+/** Credit memos from the QBO mirror — the billing-error ledger. */
+export async function creditMemoSummary(months = 12): Promise<CreditMemoSummary | null> {
+  return (unwrap(await supabase.rpc('credit_memo_summary', { p_months: months })) as unknown as CreditMemoSummary) ?? null
+}
+
 /** Revenue earned (delivery month) vs booked (invoice month). */
 export async function revRecDrift(months = 6): Promise<RevRecMonth[]> {
   const d = unwrap(await supabase.rpc('rev_rec_drift', { p_months: months })) as unknown as { months: RevRecMonth[] } | null

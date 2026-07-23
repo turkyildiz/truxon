@@ -2402,9 +2402,43 @@ export type Database = {
         }
         Relationships: []
       }
+      qbo_credit_memos: {
+        Row: {
+          balance: number | null
+          customer_qbo_id: string | null
+          doc_number: string | null
+          memo: string | null
+          qbo_id: string
+          total: number | null
+          txn_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          balance?: number | null
+          customer_qbo_id?: string | null
+          doc_number?: string | null
+          memo?: string | null
+          qbo_id: string
+          total?: number | null
+          txn_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          balance?: number | null
+          customer_qbo_id?: string | null
+          doc_number?: string | null
+          memo?: string | null
+          qbo_id?: string
+          total?: number | null
+          txn_date?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       qbo_sync_state: {
         Row: {
           backfilled: boolean
+          cm_backfilled: boolean
           id: number
           last_cdc: string | null
           last_error: string | null
@@ -2414,6 +2448,7 @@ export type Database = {
         }
         Insert: {
           backfilled?: boolean
+          cm_backfilled?: boolean
           id?: number
           last_cdc?: string | null
           last_error?: string | null
@@ -2423,6 +2458,7 @@ export type Database = {
         }
         Update: {
           backfilled?: boolean
+          cm_backfilled?: boolean
           id?: number
           last_cdc?: string | null
           last_error?: string | null
@@ -4095,6 +4131,7 @@ export type Database = {
         }
       }
       create_work_order_draft: { Args: { p: Json }; Returns: number }
+      credit_memo_summary: { Args: { p_months?: number }; Returns: Json }
       current_odometer: { Args: { p_truck_id: number }; Returns: number }
       customer_exposure: { Args: { p_customer_id: number }; Returns: Json }
       customer_keep_fire: {
@@ -4731,6 +4768,7 @@ export type Database = {
       }
       qbo_mark_voided: { Args: { p_qbo_ids: Json }; Returns: number }
       qbo_status: { Args: never; Returns: Json }
+      qbo_upsert_credit_memos: { Args: { p_rows: Json }; Returns: number }
       qbo_upsert_invoices: { Args: { p_rows: Json }; Returns: Json }
       qbo_writeoff_decide: {
         Args: { p_approve: boolean; p_id: number }

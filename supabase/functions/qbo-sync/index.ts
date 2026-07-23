@@ -103,6 +103,19 @@ function mapInvoice(inv: any): Record<string, unknown> {
   }
 }
 
+// deno-lint-ignore no-explicit-any
+function mapCreditMemo(cm: any): Record<string, unknown> {
+  return {
+    qbo_id: String(cm.Id),
+    doc_number: String(cm.DocNumber ?? cm.Id),
+    customer_qbo_id: String(cm.CustomerRef?.value ?? ''),
+    txn_date: cm.TxnDate,
+    total: Number(cm.TotalAmt ?? 0),
+    balance: Number(cm.RemainingCredit ?? cm.Balance ?? 0),
+    memo: String(cm.CustomerMemo?.value ?? cm.PrivateNote ?? '').slice(0, 500) || null,
+  }
+}
+
 // ── GL mirror: monthly P&L + balance-sheet snapshot ─────────────────────────
 // Walks the QBO ProfitAndLoss report (summarized by month) into flat
 // {month, account, grp, amount} rows for gl_upsert_monthly.
@@ -248,6 +261,7 @@ async function pull(s: SupabaseClient): Promise<Response> {
   const { data: st } = await s.from('qbo_sync_state').select('*').eq('id', 1).single()
   const cdcStart = new Date(Date.now() - 60_000).toISOString() // watermark BEFORE queries: no gap
   let rows: Record<string, unknown>[] = []
+  let cmRows: Record<string, unknown>[] = []
   const voided: string[] = []
 
   try {
@@ -265,13 +279,30 @@ async function pull(s: SupabaseClient): Promise<Response> {
       }
     } else {
       const since = st.last_cdc ?? new Date(Date.now() - 86_400_000).toISOString()
-      const out = await qboGet(at.token, `/v3/company/${at.realm}/cdc?entities=Invoice&changedSince=${encodeURIComponent(since)}&minorversion=75`)
+      const out = await qboGet(at.token, `/v3/company/${at.realm}/cdc?entities=Invoice,CreditMemo&changedSince=${encodeURIComponent(since)}&minorversion=75`)
       // deno-lint-ignore no-explicit-any
       for (const resp of ((out.CDCResponse as any)?.[0]?.QueryResponse ?? []) as any[]) {
         for (const inv of resp.Invoice ?? []) {
           if (inv.status === 'Deleted') voided.push(String(inv.Id))
           else rows.push(mapInvoice(inv))
         }
+        for (const cm of resp.CreditMemo ?? []) {
+          if (cm.status !== 'Deleted') cmRows.push(mapCreditMemo(cm))
+        }
+      }
+    }
+
+    // one-time credit-memo backfill (added 2026-07-22, after invoices were live)
+    if (!st?.cm_backfilled) {
+      let startPos = 1
+      for (let page = 0; page < 10; page++) {
+        const q = `select * from CreditMemo where TxnDate >= '${BACKFILL_FROM}' orderby Id startposition ${startPos} maxresults 500`
+        const out = await qboGet(at.token, `/v3/company/${at.realm}/query?query=${encodeURIComponent(q)}&minorversion=75`)
+        // deno-lint-ignore no-explicit-any
+        const batch = ((out.QueryResponse as any)?.CreditMemo ?? []) as any[]
+        cmRows = cmRows.concat(batch.map(mapCreditMemo))
+        if (batch.length < 500) break
+        startPos += 500
       }
     }
 
@@ -283,6 +314,12 @@ async function pull(s: SupabaseClient): Promise<Response> {
       voidedN = (vn as number) ?? 0
     }
     const result: Record<string, unknown> = { ...(upserted as Record<string, unknown>), voided: voidedN, fetched: rows.length }
+
+    if (cmRows.length) {
+      const { data: cmN, error: cmErr } = await s.rpc('qbo_upsert_credit_memos', { p_rows: cmRows })
+      if (cmErr) result.cm_error = cmErr.message.slice(0, 200)
+      else result.credit_memos = cmN
+    }
 
     // GL mirror: refresh the monthly P&L + balance sheet about once a day
     // (best-effort — a report hiccup must not fail the invoice sync).
@@ -296,7 +333,7 @@ async function pull(s: SupabaseClient): Promise<Response> {
     }
 
     await s.from('qbo_sync_state').update({
-      backfilled: true, last_cdc: cdcStart, last_pull_at: new Date().toISOString(),
+      backfilled: true, cm_backfilled: true, last_cdc: cdcStart, last_pull_at: new Date().toISOString(),
       last_error: null, last_result: result,
     }).eq('id', 1)
     return json({ ok: true, ...result })
