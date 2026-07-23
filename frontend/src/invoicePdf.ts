@@ -96,3 +96,83 @@ export async function invoicePdfBase64(invoiceId: number): Promise<string> {
   const { doc } = await buildInvoicePdf(invoiceId)
   return doc.output('datauristring').split(',')[1]
 }
+
+/** Monthly customer statement: every open (unfactored) invoice with aging
+ * buckets and a total — the page you print or attach to a collections email. */
+export async function buildCustomerStatement(customerId: number): Promise<{ doc: jsPDF; customerName: string } | null> {
+  const [company, { supabase }] = await Promise.all([getCompanySettings(), import('./supabase')])
+  const { data: cust } = await supabase
+    .from('customers').select('company_name, billing_address').eq('id', customerId).single()
+  const { data: invs } = await supabase
+    .from('invoices')
+    .select('invoice_number, invoice_date, due_date, total, qbo_balance, status, factored_at')
+    .eq('customer_id', customerId).eq('status', 'sent').is('factored_at', null)
+    .order('invoice_date')
+  if (!cust || !invs || invs.length === 0) return null
+
+  const money = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' })
+  const NAVY2 = '#1e3a5f'
+  doc.setTextColor(NAVY2).setFontSize(22).setFont('helvetica', 'bold')
+  doc.text(company.company_name, 54, 60)
+  doc.setFontSize(8).setFont('helvetica', 'normal').setTextColor('#555555')
+  const companyLine = [company.address.replace(/\n/g, ', '), company.phone, company.mc_number && `MC# ${company.mc_number}`]
+    .filter(Boolean).join('  ·  ')
+  if (companyLine) doc.text(companyLine, 54, 72)
+  doc.setTextColor(NAVY2).setFont('helvetica', 'bold').setFontSize(14)
+  doc.text('STATEMENT OF ACCOUNT', 54, 92)
+  doc.setTextColor('#000000').setFontSize(10).setFont('helvetica', 'normal')
+  const head = [
+    `To: ${cust.company_name}`,
+    ...String(cust.billing_address ?? '').split('\n').filter(Boolean),
+    `As of: ${new Date().toLocaleDateString()}`,
+  ]
+  head.forEach((line, i) => doc.text(line, 54, 112 + i * 14))
+
+  const days = (d: string | null) => (d ? Math.max(0, Math.floor((Date.now() - new Date(d).getTime()) / 864e5)) : 0)
+  const bal = (r: { qbo_balance: number | null; total: number }) => Number(r.qbo_balance ?? r.total)
+  const buckets = { current: 0, d30: 0, d60: 0, d90: 0, over: 0 }
+  const body = invs.map((r) => {
+    const overdue = days(r.due_date)
+    const b = bal(r)
+    if (overdue <= 0) buckets.current += b
+    else if (overdue <= 30) buckets.d30 += b
+    else if (overdue <= 60) buckets.d60 += b
+    else if (overdue <= 90) buckets.d90 += b
+    else buckets.over += b
+    return [
+      r.invoice_number,
+      new Date(r.invoice_date).toLocaleDateString(),
+      r.due_date ? new Date(r.due_date).toLocaleDateString() : '—',
+      overdue > 0 ? `${overdue}d overdue` : 'current',
+      money(b),
+    ]
+  })
+  const total = invs.reduce((s, r) => s + bal(r), 0)
+  autoTable(doc, {
+    startY: 112 + head.length * 14 + 12,
+    head: [['Invoice', 'Date', 'Due', 'Status', 'Balance']],
+    body,
+    foot: [['', '', '', 'TOTAL DUE', money(total)]],
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: NAVY2 },
+    footStyles: { fillColor: '#f0f4f8', textColor: '#000000', fontStyle: 'bold' },
+  })
+  const lastY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY
+  doc.setFontSize(9).setFont('helvetica', 'bold').setTextColor(NAVY2)
+  doc.text('Aging', 54, lastY + 20)
+  doc.setFont('helvetica', 'normal').setTextColor('#000000')
+  doc.text(
+    `Current ${money(buckets.current)}   ·   1-30d ${money(buckets.d30)}   ·   31-60d ${money(buckets.d60)}` +
+      `   ·   61-90d ${money(buckets.d90)}   ·   90+d ${money(buckets.over)}`,
+    54, lastY + 34,
+  )
+  return { doc, customerName: cust.company_name }
+}
+
+export async function downloadCustomerStatement(customerId: number): Promise<void> {
+  const res = await buildCustomerStatement(customerId)
+  if (!res) return
+  const stamp = new Date().toISOString().slice(0, 7)
+  res.doc.save(`statement-${res.customerName.replace(/\W+/g, '-')}-${stamp}.pdf`)
+}

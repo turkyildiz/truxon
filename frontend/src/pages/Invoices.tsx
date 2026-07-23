@@ -18,7 +18,7 @@ import {
   glPnlMonthly, listCustomers, listInvoicePayments, listInvoices, listLoads,
   denimReconciliation, factoringCostSummary, qboConnectUrl, qboStatus, qboWriteoffDecide, qboWriteoffList, recordInvoicePayment, revenueForecast, setInvoiceStatus, slowPayRisk, triggerQboPull, voidInvoice,
 } from '../data'
-import { downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
+import { downloadCustomerStatement, downloadInvoicePdf, invoicePdfBase64 } from '../invoicePdf'
 import { errorMessage } from '../supabase'
 import type { Invoice } from '../types'
 
@@ -982,7 +982,7 @@ function AgingTab() {
   if (rows.length === 0) return <p className="py-8 text-center text-muted">No open receivables. 🎉</p>
   const sum = (k: keyof typeof rows[0]) => rows.reduce((s, r) => s + Number(r[k] ?? 0), 0)
   return (
-    <Table headers={['Customer', 'Current', '1–30', '31–60', '61–90', '90+', 'Total', 'Inv.']}>
+    <Table headers={['Customer', 'Current', '1–30', '31–60', '61–90', '90+', 'Total', 'Inv.', '']}>
       {rows.map((r) => (
         <tr key={r.customer_id} className="hover:bg-surface-2">
           <td className="px-3 py-2.5 font-medium">{r.customer_name}</td>
@@ -993,6 +993,10 @@ function AgingTab() {
           <td className="px-3 py-2.5">{Number(r.d90_plus) > 0 ? <span className="font-semibold text-red-600 dark:text-red-300">{money(Number(r.d90_plus))}</span> : '—'}</td>
           <td className="px-3 py-2.5 font-semibold">{money(Number(r.total))}</td>
           <td className="px-3 py-2.5 text-muted">{r.invoice_count}</td>
+          <td className="px-3 py-2.5">
+            <button type="button" className="btn px-2 py-0.5 text-xs" title="Download statement PDF"
+              onClick={() => void downloadCustomerStatement(r.customer_id)}>Statement</button>
+          </td>
         </tr>
       ))}
       <tr className="border-t-2 border-line bg-surface-2 font-semibold">
