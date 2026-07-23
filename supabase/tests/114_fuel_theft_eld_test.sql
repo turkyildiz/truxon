@@ -3,7 +3,7 @@
 -- out-of-route burner (GPS > booked) stops false-flagging.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(4);
+select plan(6);
 
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-000000000115'::uuid, 'ft@test.local');
 update public.profiles set role = 'admin' where id = '00000000-0000-4000-8000-000000000115';
@@ -45,6 +45,25 @@ select is(
 select ok(
   (select fe.total_miles between 3800 and 4000 from public.fuel_efficiency_by_truck(45) fe
     where fe.unit_number = 'FTE-1'), 'total miles are the GPS actuals, not booked');
+
+-- window-match: FTE-3's ELD starts only 10 days ago; a 40-day-old fuel
+-- purchase must NOT count against its 10 days of miles
+insert into public.trucks (unit_number) values ('FTE-3');
+insert into public.eld_daily_miles (day, truck_id, state, miles, points, path)
+select current_date - g, (select id from public.trucks where unit_number='FTE-3'), 'IL', 300, 10, '[]'::jsonb
+from generate_series(1, 10) g;
+insert into public.fuel_transactions (uuid, truck_id, transaction_time, gallons, amount, fuel_type)
+values ('fte3-old', (select id from public.trucks where unit_number='FTE-3'), now() - interval '40 days', 400, 1400, 'Diesel'),
+       ('fte3-new', (select id from public.trucks where unit_number='FTE-3'), now() - interval '5 days', 450, 1575, 'Diesel');
+
+select is(
+  (select round(fe.gallons) from public.fuel_efficiency_by_truck(45) fe
+    where fe.unit_number = 'FTE-3'),
+  450::numeric, 'fuel outside the truck''s GPS coverage span is excluded');
+select is(
+  (select round(fe.gallons_untracked) from public.fuel_efficiency_by_truck(45) fe
+    where fe.unit_number = 'FTE-3'),
+  400::numeric, 'off-coverage gallons reported separately, not hidden');
 
 select public.sentinel_scan();
 
