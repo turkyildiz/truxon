@@ -164,12 +164,29 @@ function GlobalSearch() {
   // Non-load entities have no detail routes; carrying the search term lets
   // the destination list page pre-filter to the clicked match.
   const carry = `?q=${encodeURIComponent(q.trim())}`
+  // R9 #153: documents ride along — each lands on its owning entity's page
+  // (loads/customers have detail routes; the rest carry the search term).
+  const docPath = (d: { entity_type: string; entity_id: number }) =>
+    d.entity_type === 'load' ? `/loads/${d.entity_id}`
+    : d.entity_type === 'customer' ? `/customers/${d.entity_id}`
+    : d.entity_type === 'driver' ? `/drivers${carry}`
+    : d.entity_type === 'truck' ? `/trucks${carry}`
+    : d.entity_type === 'trailer' ? `/trailers${carry}`
+    : `/maintenance${carry}`
   const sections: { title: string; items: { id: number; label: string }[]; path: (id: number) => string }[] = results
     ? [
         { title: 'Loads', items: results.loads, path: (id) => `/loads/${id}` },
         { title: 'Customers', items: results.customers, path: () => `/customers${carry}` },
         { title: 'Drivers', items: results.drivers, path: () => `/drivers${carry}` },
         { title: 'Trucks', items: results.trucks, path: () => `/trucks${carry}` },
+        {
+          title: 'Documents',
+          items: results.documents ?? [],
+          path: (id) => {
+            const d = (results.documents ?? []).find((x) => x.id === id)
+            return d ? docPath(d) : `/docsearch${carry}`
+          },
+        },
       ]
     : []
 

@@ -555,4 +555,5 @@ export interface SearchResults {
   customers: { id: number; label: string }[]
   drivers: { id: number; label: string }[]
   trucks: { id: number; label: string }[]
+  documents: { id: number; label: string; entity_type: string; entity_id: number }[]
 }
