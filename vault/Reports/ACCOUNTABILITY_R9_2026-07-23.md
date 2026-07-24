@@ -158,4 +158,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 
 - **#161/#162 undo toast + empty-state coaching** — UndoToast wired only where a TRUE inverse exists (load cancel ↔ uncancel, template delete ↔ restore — no fake undo on hard deletes); every ResourcePage empty list now coaches the next action (drop a rate con, forward a WO mail, add the unit), and Loads separates "filters match nothing" (one-click clear) from "no loads at all" (points at Dispatch). Frontend-only; suite stands 1037. `a6c5646`.
 
+- **#165 real-user perf telemetry** — `web_vitals` table (RLS: users insert only their own rows, admin-only read) fed by a best-effort beacon (`perf.ts`: TTFB/FCP/LCP from the Performance API + session length, flushed on page-hide, no IP/UA stored); `web_perf_report()` gives p50/p95 per metric, avg session length, slowest pages by LCP p75; ⚡ admin-only Reports card; 90-day purge cron. Answers "is it fast for the person actually using it" with field numbers, not lab numbers. Suite: **1043 pgTAP / 179 files.** `b1c50da`.
+
 *(Run continues; closeout will finalize the count.)*
