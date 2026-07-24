@@ -9,10 +9,15 @@
 //                      verified the sender); results feed back into the loop
 //                      so multi-step requests (create load → assign) work.
 
-import type { createClient } from 'jsr:@supabase/supabase-js@2'
+import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { completeChat, type ToolDef } from './llm.ts'
 
-export type Sb = ReturnType<typeof createClient>
+// Permissive client type: edge functions don't import the generated Database
+// types, so the query builder is intentionally schema-untyped here (the RLS +
+// RPC guards are the real enforcement, not TS). Naming it explicitly lets the
+// module type-check (and thus be unit-tested) instead of inferring `never` rows.
+// Types are erased at runtime — this changes no agent behaviour.
+export type Sb = SupabaseClient<any, any, any>
 
 const ALL_TOOLS: Record<string, ToolDef> = {
   search_customers: {
