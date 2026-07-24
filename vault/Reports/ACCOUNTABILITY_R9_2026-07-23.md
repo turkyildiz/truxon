@@ -127,4 +127,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 
 - **#123 weather always-on** — the map's NWS severe-alert layer no longer waits for a toggle: alerts fetch unconditionally, trucks inside a warning are flagged in the subtitle/table at all times, and the polygon overlay auto-enables the moment a truck is actually in one (manual toggle still wins). `99fffd9`.
 
+- **#124 PREP (radio transcript search)** — the shelf and the search, NOT the recorder: `radio_transcripts` (service_role-write-only — authenticated INSERT is refused by test, so nothing can fill it until the owner approves transcription), websearch FTS RPC with injection-safe `[[ ]]` snippet markers, office-only 🔎 card on the Radio page that states plainly "nothing is recorded or transcribed." **SECTION I COMPLETE (113–126).** Suite: **973 pgTAP / 169 files.** `c97ae86`.
+
 *(Run continues; closeout will finalize the count.)*
