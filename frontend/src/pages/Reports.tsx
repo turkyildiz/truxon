@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, downloadBankerPackage, downloadTaxPackage, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, downloadBankerPackage, downloadInsuranceDataRoom, downloadTaxPackage, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -291,6 +291,10 @@ function ExecPackagesCard() {
         <Button variant="secondary" disabled={!!busy}
           onClick={() => run('Tax package', () => downloadTaxPackage(year))}>
           {busy === 'Tax package' ? 'Building…' : `🧾 Tax package ${year}`}
+        </Button>
+        <Button variant="secondary" disabled={!!busy}
+          onClick={() => run('Insurance data room', () => downloadInsuranceDataRoom(12))}>
+          {busy === 'Insurance data room' ? 'Building…' : '🛡️ Insurance data room'}
         </Button>
       </div>
       {note && <p className="mt-2 text-xs text-muted">{note}</p>}

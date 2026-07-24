@@ -4988,6 +4988,7 @@ export type Database = {
       import_toll_transactions: { Args: { p_rows: Json }; Returns: Json }
       ingest_vehicle_positions: { Args: { p_points: Json }; Returns: Json }
       insight_detail: { Args: { p_id: number }; Returns: Json }
+      insurance_data_room: { Args: { p_months?: number }; Returns: Json }
       insurance_snapshot: { Args: never; Returns: Json }
       invoice_balance: {
         Args: { i: Database["public"]["Tables"]["invoices"]["Row"] }

@@ -2926,6 +2926,9 @@ export function downloadBankerPackage(months = 12): Promise<void> {
 export function downloadTaxPackage(year: number): Promise<void> {
   return downloadPackageJson('tax_season_package', { p_year: year }, `truxon-tax-package-${year}.json`)
 }
+export function downloadInsuranceDataRoom(months = 12): Promise<void> {
+  return downloadPackageJson('insurance_data_room', { p_months: months }, `truxon-insurance-data-room-${new Date().toISOString().slice(0, 10)}.json`)
+}
 
 export interface WriteoffProposal {
   id: number
