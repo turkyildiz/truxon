@@ -8,6 +8,7 @@
 // Writes punchlist.json with everything that didn't map cleanly.
 import { createClient } from '@supabase/supabase-js'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { getCreds } from './_creds.mjs'
 
 const DIR = new URL('.', import.meta.url).pathname
 // Connection: frontend/.env.local when present (repo-relative — no hardcoded
@@ -22,14 +23,12 @@ const fileEnv = existsSync(envPath)
 const SB_URL = process.env.SUPABASE_URL || fileEnv.VITE_SUPABASE_URL || 'https://okoeeyxxvzypjiumraxq.supabase.co'
 const SB_ANON = process.env.SUPABASE_ANON_KEY || fileEnv.VITE_SUPABASE_ANON_KEY || 'sb_publishable_Ak8T-1XgtjC00LXbiI9xDA_o5b_n7C-'
 const sb = createClient(SB_URL, SB_ANON)
-const email = process.env.ADMIN_EMAIL
-const password = process.env.ADMIN_PASSWORD
 const DRY = process.argv.includes('--dry')
 const DELTA = process.argv.includes('--delta')
-if (!email || !password) { console.error('Set ADMIN_EMAIL and ADMIN_PASSWORD in the environment (not argv)'); process.exit(2) }
 const punch = []
 const note = (area, msg) => { punch.push({ area, msg }); console.log('PUNCH:', area, '—', msg) }
 
+const { email, password } = await getCreds()
 const { error: loginErr } = await sb.auth.signInWithPassword({ email, password })
 if (loginErr) { console.error('login failed:', loginErr.message); process.exit(1) }
 

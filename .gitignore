@@ -20,6 +20,8 @@ deploy/migration-its/.its-profile/
 deploy/migration-its/its.log
 deploy/migration-its/its_delta/
 deploy/migration-its/its_loads_full.json
+deploy/migration-its/load_id_map.json
+deploy/migration-its/punchlist.json
 deploy/migration-its/files/
 
 # NAS vision enrichment: env (public token, but keep NAS-only) + logs
