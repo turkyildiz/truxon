@@ -2775,6 +2775,43 @@ export async function createLoadShare(loadId: number): Promise<string> {
   return `${window.location.origin}/share/${token}`
 }
 
+/** R9 #134: quarter-over-quarter facts for the customer QBR call. */
+export interface QbrQuarter { loads_n: number; cancels: number; revenue: number | null; avg_rate: number | null; rpm: number | null }
+export interface CustomerQbr {
+  customer: string
+  quarter_start: string
+  current: QbrQuarter | null
+  previous: QbrQuarter | null
+  payment: { avg_days_to_pay: number | null; paid_n: number; open_n: number; open_total: number | null } | null
+  top_lanes: { lane: string; loads: number; revenue: number }[]
+  note: string
+}
+export async function customerQbr(customerId: number): Promise<CustomerQbr | null> {
+  const data = unwrap(await supabase.rpc('customer_qbr', { p_customer_id: customerId }))
+  return (data as unknown as CustomerQbr) ?? null
+}
+
+/** R9 #137: the customer's facilities' measured dwell → a detention policy. */
+export interface DetentionProfile {
+  customer: string
+  days: number
+  free_min: number
+  rate_per_hour: number
+  stops_total: number
+  stops_measured: number
+  avg_dwell_min: number | null
+  median_dwell_min: number | null
+  pct_over_free: number | null
+  detention_hours: number | null
+  est_owed: number | null
+  worst_facilities: { facility: string; stop_type: string; stops: number; avg_dwell_min: number }[]
+  note: string
+}
+export async function customerDetentionProfile(customerId: number): Promise<DetentionProfile | null> {
+  const data = unwrap(await supabase.rpc('customer_detention_profile', { p_customer_id: customerId }))
+  return (data as unknown as DetentionProfile) ?? null
+}
+
 export interface WriteoffProposal {
   id: number
   status: 'proposed' | 'approved'

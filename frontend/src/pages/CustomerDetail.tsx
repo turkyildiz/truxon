@@ -1,7 +1,70 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { Card, formatDate, LoadError, money, Table } from '../components/ui'
-import { collectionsQueue, customerExposure, customerKeepFire, customerProfile } from '../data'
+import { collectionsQueue, customerDetentionProfile, customerExposure, customerKeepFire, customerProfile, customerQbr } from '../data'
+
+const hm = (min: number | null | undefined) =>
+  min == null ? '—' : `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`
+
+/** R9 #134: the quarter-over-quarter one-pager for the QBR call. */
+function QbrCard({ customerId }: { customerId: number }) {
+  const q = useQuery({ queryKey: ['customer-qbr', customerId], queryFn: () => customerQbr(customerId), retry: false, staleTime: 10 * 60 * 1000 })
+  const r = q.data
+  if (q.isError || !r || (!r.current && !r.previous)) return null
+  const row = (label: string, cur: string, prev: string) => (
+    <tr><td className="px-3 py-1.5 font-medium">{label}</td><td className="px-3 py-1.5">{cur}</td><td className="px-3 py-1.5 text-muted">{prev}</td></tr>
+  )
+  const fmt = (v: number | null | undefined, f: (n: number) => string) => (v == null ? '—' : f(Number(v)))
+  return (
+    <Card title="📋 QBR one-pager">
+      <Table headers={['', 'This quarter', 'Last quarter']}>
+        {row('Loads', String(r.current?.loads_n ?? 0), String(r.previous?.loads_n ?? 0))}
+        {row('Revenue', fmt(r.current?.revenue, money), fmt(r.previous?.revenue, money))}
+        {row('Avg rate', fmt(r.current?.avg_rate, money), fmt(r.previous?.avg_rate, money))}
+        {row('$/mi', fmt(r.current?.rpm, (n) => `$${n.toFixed(2)}`), fmt(r.previous?.rpm, (n) => `$${n.toFixed(2)}`))}
+        {row('Cancellations', String(r.current?.cancels ?? 0), String(r.previous?.cancels ?? 0))}
+      </Table>
+      {r.payment && (
+        <p className="mt-2 text-sm text-body">
+          Pays in {r.payment.avg_days_to_pay ?? '—'} days on average ({r.payment.paid_n} paid, {r.payment.open_n} open{r.payment.open_total ? ` totaling ${money(r.payment.open_total)}` : ''}).
+        </p>
+      )}
+      {r.top_lanes.length > 0 && (
+        <p className="mt-1 text-xs text-muted">
+          Top lanes this quarter: {r.top_lanes.map((l) => `${l.lane} (${l.loads} loads, ${money(l.revenue)})`).join(' · ')}
+        </p>
+      )}
+      <p className="mt-1 text-[11px] text-muted">{r.note}. Print this page for the call.</p>
+    </Card>
+  )
+}
+
+/** R9 #137: their docks' measured dwell → a detention policy with receipts. */
+function DetentionProfileCard({ customerId }: { customerId: number }) {
+  const q = useQuery({ queryKey: ['customer-detention', customerId], queryFn: () => customerDetentionProfile(customerId), retry: false, staleTime: 10 * 60 * 1000 })
+  const d = q.data
+  if (q.isError || !d || d.stops_measured === 0) return null
+  return (
+    <Card title="🕐 Detention policy one-pager">
+      <p className="text-sm text-body">
+        Across <span className="font-semibold">{d.stops_measured}</span> GPS-measured stops (of {d.stops_total} total, {d.days}d), their facilities average{' '}
+        <span className="font-semibold">{hm(d.avg_dwell_min)}</span> (median {hm(d.median_dwell_min)});{' '}
+        <span className={`font-semibold ${(d.pct_over_free ?? 0) >= 30 ? 'text-rose-600 dark:text-rose-400' : ''}`}>{d.pct_over_free ?? 0}%</span> blow past the {d.free_min / 60}h free time.
+      </p>
+      {(d.detention_hours ?? 0) > 0 && (
+        <p className="mt-1 text-sm text-body">
+          That's <span className="font-semibold">{d.detention_hours}h</span> of detention — <span className="font-semibold text-brand">{money(d.est_owed ?? 0)}</span> at ${d.rate_per_hour}/h.
+        </p>
+      )}
+      {d.worst_facilities.length > 0 && (
+        <p className="mt-1 text-xs text-muted">
+          Slowest docks: {d.worst_facilities.slice(0, 3).map((f) => `${f.facility} (${f.stop_type}, avg ${hm(f.avg_dwell_min)} × ${f.stops})`).join(' · ')}
+        </p>
+      )}
+      <p className="mt-1 text-[11px] text-muted">{d.note}</p>
+    </Card>
+  )
+}
 
 const VERDICT_STYLE: Record<string, string> = {
   grow: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
@@ -186,6 +249,8 @@ export default function CustomerDetail() {
               </p>
             </Card>
           )}
+          <QbrCard customerId={Number(id)} />
+          <DetentionProfileCard customerId={Number(id)} />
         </div>
       )}
     </div>

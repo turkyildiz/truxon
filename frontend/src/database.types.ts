@@ -4485,6 +4485,15 @@ export type Database = {
       create_work_order_draft: { Args: { p: Json }; Returns: number }
       credit_memo_summary: { Args: { p_months?: number }; Returns: Json }
       current_odometer: { Args: { p_truck_id: number }; Returns: number }
+      customer_detention_profile: {
+        Args: {
+          p_customer_id: number
+          p_days?: number
+          p_free_min?: number
+          p_rate?: number
+        }
+        Returns: Json
+      }
       customer_exposure: { Args: { p_customer_id: number }; Returns: Json }
       customer_keep_fire: {
         Args: { p_days?: number }
@@ -4512,6 +4521,7 @@ export type Database = {
         }[]
       }
       customer_profile: { Args: { p_customer_id: number }; Returns: Json }
+      customer_qbr: { Args: { p_customer_id: number }; Returns: Json }
       customer_rate_profile: { Args: { p_customer_id: number }; Returns: Json }
       customer_revenue_extras: { Args: { p_days?: number }; Returns: Json }
       customers_over_exposure: {
