@@ -1,4 +1,3 @@
-Connecting to db 5432
 export type Json =
   | string
   | number
@@ -1413,6 +1412,93 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      extraction_ab_scores: {
+        Row: {
+          cost_cents: number
+          doc_ref: string | null
+          doc_type: string
+          engine: string
+          field_accuracy: number
+          id: number
+          latency_ms: number | null
+          ran_at: string
+        }
+        Insert: {
+          cost_cents?: number
+          doc_ref?: string | null
+          doc_type: string
+          engine: string
+          field_accuracy: number
+          id?: number
+          latency_ms?: number | null
+          ran_at?: string
+        }
+        Update: {
+          cost_cents?: number
+          doc_ref?: string | null
+          doc_type?: string
+          engine?: string
+          field_accuracy?: number
+          id?: number
+          latency_ms?: number | null
+          ran_at?: string
+        }
+        Relationships: []
+      }
+      extraction_routing: {
+        Row: {
+          auto: boolean
+          doc_type: string
+          engine: string
+          reason: string
+          updated_at: string
+        }
+        Insert: {
+          auto?: boolean
+          doc_type: string
+          engine: string
+          reason?: string
+          updated_at?: string
+        }
+        Update: {
+          auto?: boolean
+          doc_type?: string
+          engine?: string
+          reason?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      forecast_snapshots: {
+        Row: {
+          basis: string
+          created_at: string
+          id: number
+          made_on: string
+          metric: string
+          predicted: number
+          target_week: string
+        }
+        Insert: {
+          basis?: string
+          created_at?: string
+          id?: number
+          made_on?: string
+          metric?: string
+          predicted: number
+          target_week: string
+        }
+        Update: {
+          basis?: string
+          created_at?: string
+          id?: number
+          made_on?: string
+          metric?: string
+          predicted?: number
+          target_week?: string
+        }
+        Relationships: []
       }
       fuel_transactions: {
         Row: {
@@ -4385,6 +4471,10 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_extraction_routing: {
+        Args: { p_days?: number; p_min_samples?: number }
+        Returns: Json
+      }
       apply_load_geocode: {
         Args: {
           p_delivery_lat: number
@@ -4420,6 +4510,7 @@ export type Database = {
         Returns: undefined
       }
       banker_package: { Args: { p_months?: number }; Returns: Json }
+      best_extraction_engine: { Args: { p_doc_type: string }; Returns: string }
       bless_security_baseline: { Args: never; Returns: Json }
       breakdown_ml_readiness: { Args: never; Returns: Json }
       bs_upsert: { Args: { p: Json }; Returns: undefined }
@@ -4478,6 +4569,7 @@ export type Database = {
       }
       cancellation_analytics: { Args: { p_days?: number }; Returns: Json }
       capture_metric_snapshots: { Args: never; Returns: number }
+      capture_revenue_forecast: { Args: never; Returns: number }
       capture_truck_features: { Args: { p_week?: string }; Returns: number }
       carrier_safety_latest: { Args: never; Returns: Json }
       cashflow_forecast: {
@@ -4624,6 +4716,10 @@ export type Database = {
       create_work_order_draft: { Args: { p: Json }; Returns: number }
       credit_memo_summary: { Args: { p_months?: number }; Returns: Json }
       current_odometer: { Args: { p_truck_id: number }; Returns: number }
+      customer_churn_watch: {
+        Args: { p_drop_pct?: number; p_min_baseline?: number }
+        Returns: Json
+      }
       customer_detention_profile: {
         Args: {
           p_customer_id: number
@@ -4668,6 +4764,14 @@ export type Database = {
       customer_qbr: { Args: { p_customer_id: number }; Returns: Json }
       customer_rate_profile: { Args: { p_customer_id: number }; Returns: Json }
       customer_revenue_extras: { Args: { p_days?: number }; Returns: Json }
+      customer_statement: {
+        Args: { p_customer_id: number; p_end: string; p_start: string }
+        Returns: Json
+      }
+      customer_statement_email_draft: {
+        Args: { p_customer_id: number; p_end: string; p_start: string }
+        Returns: Json
+      }
       customers_over_exposure: {
         Args: never
         Returns: {
@@ -4791,6 +4895,10 @@ export type Database = {
         }
         Returns: Json
       }
+      driver_fatigue_watch: {
+        Args: { p_days?: number; p_min_streak?: number }
+        Returns: Json
+      }
       driver_get_load: { Args: { p_load_id: number }; Returns: Json }
       driver_list_documents: { Args: { p_load_id: number }; Returns: Json }
       driver_load_dto: { Args: { p_load_id: number }; Returns: Json }
@@ -4894,6 +5002,10 @@ export type Database = {
           unit_number: string
         }[]
       }
+      extraction_engine_ranking: {
+        Args: { p_days?: number; p_min_samples?: number }
+        Returns: Json
+      }
       facility_dwell_league: { Args: { p_days?: number }; Returns: Json }
       factoring_cost_summary: { Args: never; Returns: Json }
       factoring_overview: { Args: never; Returns: Json }
@@ -4919,6 +5031,7 @@ export type Database = {
         Args: { p_basics?: Json; p_snapshot: Json }
         Returns: Json
       }
+      forecast_mape_report: { Args: { p_weeks?: number }; Returns: Json }
       fuel_by_truck: {
         Args: { p_end: string; p_start: string }
         Returns: {
@@ -5014,6 +5127,10 @@ export type Database = {
       }
       gl_upsert_monthly: { Args: { p_rows: Json }; Returns: number }
       global_search: { Args: { q: string }; Returns: Json }
+      gps_confirmed_missing_pod: {
+        Args: { p_days?: number; p_radius_mi?: number }
+        Returns: Json
+      }
       honeytoken_seen: { Args: { p_hash: string }; Returns: boolean }
       idle_locations: { Args: { p_days?: number }; Returns: Json }
       idle_summary: { Args: { p_days?: number }; Returns: Json }
@@ -5046,6 +5163,10 @@ export type Database = {
       }
       lane_rate_history: {
         Args: { p_dest_state: string; p_origin_state: string }
+        Returns: Json
+      }
+      lane_rate_trend: {
+        Args: { p_min_loads?: number; p_move_pct?: number }
         Returns: Json
       }
       lane_summary: { Args: { p_days?: number }; Returns: Json }
@@ -5416,6 +5537,10 @@ export type Database = {
         }[]
       }
       rollup_eld_daily: { Args: { p_day?: string }; Returns: number }
+      route_deviation_report: {
+        Args: { p_days?: number; p_min_pct?: number }
+        Returns: Json
+      }
       safety_summary: {
         Args: { p_end: string; p_start: string }
         Returns: Json
@@ -5597,7 +5722,9 @@ export type Database = {
           violations: number
         }[]
       }
+      truck_breakeven_analysis: { Args: never; Returns: Json }
       truck_mpg: { Args: { p_days?: number }; Returns: Json }
+      truck_retirement_scenario: { Args: { p_truck_id: number }; Returns: Json }
       truck_utilization: { Args: { p_days?: number }; Returns: Json }
       trux_first_monday: { Args: { p_year: number }; Returns: string }
       trux_insights_feed: {

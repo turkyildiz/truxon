@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, Card, LoadError, money, Table } from '../components/ui'
+import { Button, Card, Input, LoadError, money, Table } from '../components/ui'
 import { createSavedReport, customerChurnWatch, deleteSavedReport, driverFatigueWatch, forecastMapeReport, listActiveTrucksBasic, truckBreakevenAnalysis, truckRetirementScenario, gpsConfirmedMissingPod, laneRateTrend, listSavedReports, reportMetricCatalog, routeDeviationReport, cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, downloadBankerPackage, downloadInsuranceDataRoom, downloadTaxPackage, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import { errorMessage } from '../supabase'
 import type { WeeklyRow } from '../types'
@@ -1055,6 +1055,7 @@ export default function Reports() {
           <TruckBreakevenCard />
           <TruckRetirementCard />
           <ForecastMapeCard />
+          <QuotePricingCard />
           <NpsCard />
         </>
       )}

@@ -2943,7 +2943,7 @@ export interface TruckBreakeven {
   note: string
 }
 export async function truckBreakevenAnalysis(): Promise<TruckBreakeven | null> {
-  const data = unwrap(await supabase.rpc('truck_breakeven_analysis', {}))
+  const data = unwrap(await supabase.rpc('truck_breakeven_analysis'))
   return (data as unknown as TruckBreakeven) ?? null
 }
 
@@ -3040,7 +3040,7 @@ export async function webPerfReport(days = 7): Promise<WebPerf | null> {
 /** R9 #170/#171: external-party export packages (banker / tax). Fetch the
  * assembled JSON and hand it to the browser as a download. */
 async function downloadPackageJson(rpc: string, args: Record<string, unknown>, filename: string): Promise<void> {
-  const data = unwrap(await supabase.rpc(rpc, args))
+  const data = unwrap(await supabase.rpc(rpc as never, args as never))
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
