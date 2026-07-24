@@ -64,3 +64,28 @@ These can't be finished solo and are batched for one short joint session:
 
 None is a hard launch blocker (the resilience already survived a 9-hour Vercel
 deploy outage with zero customer impact), so they're safe to schedule.
+
+## Edge-function tests — scoped, blocked on two small prod/CI changes
+Investigated adding `_shared/*.test.ts` coverage for the two highest-value pure
+boundaries — `requireCron`/`timingSafeEqualStr` (the CRON secret door) and
+`toolsForRole` (the AI agent's per-role tool authorization). Wrote both, they
+pass locally, then **reverted both** because each trips the existing CI deno gate
+(`.github/workflows/ci.yml:78` → `deno test --quiet supabase/functions/_shared/`,
+type-checked, no permission flags). Two concrete blockers to clear WITH the owner
+(neither done unattended pre-launch — they touch prod code / CI config):
+1. **`auth.ts` reads env at module load** — `const CORS_EXTRA_ORIGINS = Deno.env.get(...)`
+   at line ~19 runs on import, so any test importing `auth.ts` needs `--allow-env`,
+   which the CI command doesn't pass. Fix: either add `--allow-env` to the CI deno
+   step, or make that CORS read lazy (compute inside `corsHeaders()` instead of at
+   top level). The lazy refactor is cleaner and unlocks testing every door helper.
+2. **`truxcore.ts` doesn't type-check standalone** — 19 `TS2353/TS2345` errors from
+   untyped supabase-client `.rpc()`/insert calls in its execute path (returns
+   `never[]` without generated DB types). CI type-checks the import graph, so a
+   test importing `truxcore.ts` fails the gate. This is also latent CI fragility:
+   the day anyone adds a test touching `truxcore.ts`, CI breaks. Fix: type the
+   client (`createClient<Database>`) or cast the rpc/insert payloads.
+
+Both fixes are ~30–60 min and turn the whole edge-function `_shared` surface into
+testable ground (cron gate, agent authz, doc-filing prompts, remediations map).
+The pure-logic modules that DON'T read env or need DB types (denim, fmcsa,
+fuel_csv) are already tested and green (23 deno tests).
