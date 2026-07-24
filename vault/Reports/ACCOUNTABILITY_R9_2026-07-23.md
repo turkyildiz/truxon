@@ -154,4 +154,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 
 - **#159/#155 list-level actions** — Loads rows now advance status one step inline (same guarded RPC as the detail page — a driverless load still refuses to go `assigned`; errors show under the row) and swap drivers from the list while pending/assigned. Invoices receivables gained checkboxes + a bulk bar: batch mark-sent for drafts, batch PDF download. Batch *email* deliberately omitted — recipients are chosen per send, no blind mass mail. QBO-synced rows excluded. Frontend-only (DB untouched, suite stands at 1037). `c40d74a`.
 
+- **#156/#157 saved views + column chooser** — Loads (the big table) pilots both: "+ Save view" names the current filter set for one-click re-apply (chips with × delete), ⚙ Columns hides/shows the six non-essential columns; both persist per browser. Load#/Status/actions never hideable. Frontend-only; suite stands 1037. `185731c`.
+
 *(Run continues; closeout will finalize the count.)*
