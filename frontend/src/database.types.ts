@@ -5260,6 +5260,16 @@ export type Database = {
         }
         Returns: Json
       }
+      suggest_assignment: {
+        Args: {
+          p_delivery_state?: string
+          p_pickup_lat: number
+          p_pickup_lon: number
+          p_pickup_state?: string
+          p_pickup_time?: string
+        }
+        Returns: Json
+      }
       system_status: { Args: never; Returns: Json }
       toll_by_agency: {
         Args: { p_end: string; p_start: string }

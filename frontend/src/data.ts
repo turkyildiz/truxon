@@ -2637,6 +2637,47 @@ export async function deadheadPatterns(days = 120): Promise<DeadheadPatterns | n
   return (data as unknown as DeadheadPatterns) ?? null
 }
 
+/** R9 #115/#116: ranked driver suggestions for a pickup, deadhead priced. */
+export interface AssignmentSuggestion {
+  driver_id: number
+  driver: string
+  suggested_truck_id: number | null
+  suggested_truck: string | null
+  position_source: 'eld' | 'last_delivery' | null
+  last_seen: string | null
+  deadhead_miles: number | null
+  reposition_cost: number | null
+  hos_drive_h: number | null
+  on_load: string | null
+  free_at: string | null
+  busy: boolean
+  lane_runs: number
+}
+export interface AssignmentSuggestions {
+  suggestions: AssignmentSuggestion[]
+  all_in_rpm: number
+  note: string
+}
+export async function suggestAssignment(
+  pickupLat: number, pickupLon: number,
+  pickupTime?: string | null, pickupState?: string | null, deliveryState?: string | null,
+): Promise<AssignmentSuggestions | null> {
+  const data = unwrap(await supabase.rpc('suggest_assignment', {
+    p_pickup_lat: pickupLat, p_pickup_lon: pickupLon,
+    p_pickup_time: pickupTime ?? undefined, p_pickup_state: pickupState ?? undefined,
+    p_delivery_state: deliveryState ?? undefined,
+  }))
+  return (data as unknown as AssignmentSuggestions) ?? null
+}
+
+/** Geocode one freeform address via the edge function (cache-first). */
+export async function geocodeAddress(address: string): Promise<{ lat: number | null; lon: number | null; state: string }> {
+  const { data, error } = await supabase.functions.invoke('geocode', { body: { address } })
+  if (error) throw new Error(error.message)
+  const geo = (data as { geo?: { lat: number | null; lon: number | null; state?: string } })?.geo
+  return { lat: geo?.lat ?? null, lon: geo?.lon ?? null, state: geo?.state ?? '' }
+}
+
 export interface WriteoffProposal {
   id: number
   status: 'proposed' | 'approved'

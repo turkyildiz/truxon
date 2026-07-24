@@ -3,7 +3,7 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Button, Card, Field, Input, money, Select, Textarea } from '../components/ui'
-import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, deleteLoadTemplate, eldFleetLive, estimateLoadMargin, extractPdf, fleetCostBasis, laneRateForRoute, listLoads, listLoadTemplates, loadEtaRisk, saveLoadLineItems, saveLoadTemplate, sentinelSummary, type EldFleetRow, type ExtractedLineItem, type ExtractedStop, type LoadTemplate } from '../data'
+import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, deleteLoadTemplate, eldFleetLive, estimateLoadMargin, extractPdf, fleetCostBasis, geocodeAddress, laneRateForRoute, listLoads, listLoadTemplates, loadEtaRisk, saveLoadLineItems, saveLoadTemplate, sentinelSummary, suggestAssignment, type EldFleetRow, type ExtractedLineItem, type ExtractedStop, type LoadTemplate } from '../data'
 import { errorMessage } from '../supabase'
 import { ReferenceDataBanner, useReferenceData } from '../useReferenceData'
 import FleetMap from './FleetMap'
@@ -282,6 +282,24 @@ export default function Dispatch() {
       else setDistError('Distance service unavailable (no Google Maps API key) — enter miles manually.')
     },
     onError: (err) => setDistError(`Mileage lookup failed: ${errorMessage(err)} — enter miles manually.`),
+  })
+
+  /** R9 #115/#116: rank drivers for this pickup — deadhead priced so a
+   * far-away assignment is a decision, not a surprise. */
+  const suggest = useMutation({
+    mutationFn: async () => {
+      const pu = stops.find((s) => s.stop_type === 'pickup' && stopLine(s))
+      if (!pu) throw new Error('Enter a pickup address first')
+      const de = [...stops].reverse().find((s) => s.stop_type === 'delivery' && stopLine(s))
+      const [pug, deg] = await Promise.all([
+        geocodeAddress(stopLine(pu)),
+        de ? geocodeAddress(stopLine(de)).catch(() => null) : Promise.resolve(null),
+      ])
+      if (pug.lat == null || pug.lon == null) throw new Error('Could not locate the pickup address')
+      return suggestAssignment(pug.lat, pug.lon,
+        pu.time ? new Date(pu.time).toISOString() : null,
+        pug.state || null, deg?.state || null)
+    },
   })
 
   /** Auto-fill miles when the route is known and miles is still empty. */
@@ -596,6 +614,38 @@ export default function Dispatch() {
                   </p>
                 )
               })()}
+              <div className="mt-1">
+                <Button type="button" disabled={suggest.isPending || !routeOf(stops).origin}
+                  onClick={() => suggest.mutate()}>
+                  {suggest.isPending ? 'Ranking drivers…' : '🎯 Suggest driver'}
+                </Button>
+                {suggest.isError && <p className="mt-1 text-xs text-red-600">{errorMessage(suggest.error)}</p>}
+                {suggest.data && suggest.data.suggestions.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {suggest.data.suggestions.slice(0, 5).map((s) => {
+                      const costly = (s.reposition_cost ?? 0) >= 100
+                      return (
+                        <button type="button" key={s.driver_id}
+                          onClick={() => setForm((prev) => ({ ...prev, driver_id: String(s.driver_id), truck_id: s.suggested_truck_id ? String(s.suggested_truck_id) : prev.truck_id }))}
+                          className={`block w-full rounded border border-edge px-2 py-1 text-left text-xs hover:bg-surface-2 ${s.busy ? 'opacity-60' : ''}`}>
+                          <span className="font-medium">{s.driver}</span>
+                          {s.suggested_truck ? ` · truck ${s.suggested_truck}` : ''}
+                          {s.deadhead_miles != null
+                            ? <span className={costly ? 'font-semibold text-amber-600 dark:text-amber-400' : ''}>
+                                {` — ${Number(s.deadhead_miles).toLocaleString()} mi deadhead${s.reposition_cost != null ? ` (~${money(s.reposition_cost)} to reposition)` : ''}`}
+                              </span>
+                            : ' — position unknown'}
+                          {s.hos_drive_h != null ? ` · ${s.hos_drive_h}h drive left` : ''}
+                          {s.lane_runs > 0 ? ` · ran this lane ×${s.lane_runs}` : ''}
+                          {s.busy ? ` · on ${s.on_load ?? 'a load'}${s.free_at ? ` until ${new Date(s.free_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric' })}` : ''}` : ''}
+                          {s.last_seen ? ` · last seen ${s.last_seen}` : ''}
+                        </button>
+                      )
+                    })}
+                    <p className="text-[11px] text-muted">{suggest.data.note}</p>
+                  </div>
+                )}
+              </div>
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Truck">
