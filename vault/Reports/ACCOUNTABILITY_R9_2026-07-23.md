@@ -125,4 +125,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 
 - **#117 stop reorder** — multi-stop loads reorder by drag handle (⠿, within pickup/delivery group) or ↑/↓ buttons (cab tablet), miles recalc on every reorder. Frontend-only; `faadcbc`.
 
+- **#123 weather always-on** — the map's NWS severe-alert layer no longer waits for a toggle: alerts fetch unconditionally, trucks inside a warning are flagged in the subtitle/table at all times, and the polygon overlay auto-enables the moment a truck is actually in one (manual toggle still wins). `99fffd9`.
+
 *(Run continues; closeout will finalize the count.)*
