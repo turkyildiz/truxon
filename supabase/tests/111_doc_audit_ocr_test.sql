@@ -2,7 +2,7 @@
 -- auto-resolves on relabel) and the OCR-quality verdicts.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(10);
+select plan(12);
 
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-0000000000a1'::uuid, 'audit-admin@test.local');
 update public.profiles set role = 'admin' where id = '00000000-0000-4000-8000-0000000000a1';
@@ -80,7 +80,14 @@ select is(
     where x->>'filename' = 'misfiled.pdf'),
   0::bigint, 'a doc is never similar to itself');
 
--- 10. role gate
+-- 10/11. storage usage (#112): totals include the fixtures; by_type keyed
+update public.documents set size_bytes = 1000 where filename in ('misfiled.pdf','garbled.pdf','unsure.pdf');
+select is(((public.storage_usage_report())->>'total_bytes')::bigint >= 3000, true, 'storage rollup sums size_bytes');
+select is(
+  ((public.storage_usage_report())->'by_type'->'BOL'->>'docs')::int >= 1,
+  true, 'by_type rollup carries the BOL bucket');
+
+-- 12. role gate
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-0000000000a2'::uuid, 'audit-driver@test.local');
 update public.profiles set role = 'driver' where id = '00000000-0000-4000-8000-0000000000a2';
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000000a2"}', true);

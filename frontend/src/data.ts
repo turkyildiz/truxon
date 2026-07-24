@@ -1021,6 +1021,33 @@ export async function listDocuments(entityType: string, entityId: number | strin
   )
 }
 
+/** R9 #111: every doc on an entity as one zip (client-side, fflate). */
+export async function downloadEntityDocsZip(entityType: string, entityId: number | string, label: string): Promise<number> {
+  const docs = await listDocuments(entityType, entityId)
+  if (docs.length === 0) return 0
+  const { zipSync } = await import('fflate')
+  const files: Record<string, Uint8Array> = {}
+  const used = new Set<string>()
+  for (const d of docs) {
+    const { data: blob, error } = await supabase.storage.from('documents').download(d.storage_path)
+    if (error || !blob) continue
+    let name = `${(d.doc_type || 'Other').replace(/[^A-Za-z0-9 _-]/g, '')}/${d.filename.replace(/[/\\]/g, '_')}`
+    while (used.has(name)) name = name.replace(/(\.[^.]*)?$/, `_${d.id}$1`)
+    used.add(name)
+    files[name] = new Uint8Array(await blob.arrayBuffer())
+  }
+  const got = Object.keys(files).length
+  if (got === 0) throw new Error('No documents could be downloaded')
+  const zipped = zipSync(files)
+  const url = URL.createObjectURL(new Blob([zipped.buffer as ArrayBuffer], { type: 'application/zip' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${label.replace(/[^A-Za-z0-9 _-]/g, '')}-documents.zip`
+  a.click()
+  URL.revokeObjectURL(url)
+  return got
+}
+
 export async function uploadDocument(entityType: string, entityId: number | string, file: File, docType: string): Promise<void> {
   const safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_')
   const path = `${entityType}/${entityId}/${crypto.randomUUID().slice(0, 12)}_${safeName}`
@@ -2538,6 +2565,20 @@ export interface DotAuditPack {
 export async function dotAuditPack(): Promise<DotAuditPack | null> {
   const data = unwrap(await supabase.rpc('dot_audit_pack'))
   return (data as unknown as DotAuditPack) ?? null
+}
+
+/** R9 #112: storage usage rollup for the Reports card. */
+export interface StorageUsage {
+  total_bytes: number
+  docs: number
+  by_entity: Record<string, { docs: number; bytes: number }>
+  by_type: Record<string, { docs: number; bytes: number }>
+  monthly: { month: string; docs: number; bytes: number }[]
+  largest: { document_id: number; filename: string; doc_type: string | null; entity: string; bytes: number }[]
+}
+export async function storageUsageReport(): Promise<StorageUsage | null> {
+  const data = unwrap(await supabase.rpc('storage_usage_report'))
+  return (data as unknown as StorageUsage) ?? null
 }
 
 export interface WriteoffProposal {

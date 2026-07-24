@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { customerKeepFire, dotAuditPack, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { customerKeepFire, dotAuditPack, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -81,6 +81,35 @@ function DotAuditCard() {
       <p className="mt-2 text-[11px] text-muted">
         Not tracked: {p.not_tracked.join('; ')}. Fix records on the Drivers / Equipment pages; log MVR &amp; Clearinghouse in the Compliance log.
       </p>
+    </Card>
+  )
+}
+
+/** R9 #112: where the document storage actually goes (pairs with the
+ * growth-anomaly sentinel — this is the "look for yourself" view). */
+function StorageCard() {
+  const q = useQuery({ queryKey: ['storage-usage'], queryFn: storageUsageReport, retry: false, staleTime: 10 * 60 * 1000 })
+  const s = q.data
+  if (q.isError || !s) return null
+  const mb = (b: number) => b > 1024 * 1024 * 1024 ? `${(b / 1073741824).toFixed(1)} GB` : `${Math.max(1, Math.round(b / 1048576))} MB`
+  const months = s.monthly.slice(-6)
+  return (
+    <Card title="🗄️ Document storage">
+      <p className="text-sm text-body">
+        <span className="font-semibold">{mb(s.total_bytes)}</span> across {s.docs.toLocaleString()} documents —{' '}
+        {Object.entries(s.by_type).sort((a, b) => b[1].bytes - a[1].bytes).slice(0, 4)
+          .map(([t, v]) => `${t} ${mb(v.bytes)}`).join(' · ')}
+      </p>
+      {months.length > 1 && (
+        <p className="mt-1 text-xs text-muted">
+          Monthly intake: {months.map((m) => `${m.month.slice(5)}: ${mb(m.bytes)}`).join(' → ')}
+        </p>
+      )}
+      {s.largest.length > 0 && (
+        <p className="mt-1 text-xs text-muted">
+          Largest: {s.largest.slice(0, 3).map((l) => `${l.filename} (${mb(l.bytes)})`).join(' · ')}
+        </p>
+      )}
     </Card>
   )
 }
@@ -472,6 +501,7 @@ export default function Reports() {
           <ReportTable title="By Driver" rows={data.by_driver} isDriver />
           <DriverCards weekOffset={Math.max(0, Math.round((new Date(todayISO() + 'T00:00:00').getTime() - new Date(weekOf + 'T00:00:00').getTime()) / (7 * 86400000)))} />
           <DotAuditCard />
+          <StorageCard />
           <LanesCard />
           <StressCard />
           <PricingDisciplineCard />

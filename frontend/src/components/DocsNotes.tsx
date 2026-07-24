@@ -6,7 +6,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
-import { addNote, attachPodFromArchive, downloadDocument, listActivity, listDocuments, podArchiveCandidate, uploadDocument } from '../data'
+import { addNote, attachPodFromArchive, downloadDocument, downloadEntityDocsZip, listActivity, listDocuments, podArchiveCandidate, uploadDocument } from '../data'
 import { errorMessage } from '../supabase'
 import type { DocumentMeta } from '../types'
 import { Button, Card, formatDateTime, Input, LoadError, Select } from './ui'
@@ -93,6 +93,12 @@ export default function DocsNotes({ entityType, entityId, docTypes, className = 
     downloadDocument(d).catch((err) => setDocError(errorMessage(err)))
   }
 
+  // R9 #111: everything on this entity as one zip, foldered by doc type.
+  const zipAll = useMutation({
+    mutationFn: () => downloadEntityDocsZip(entityType, entityId, `${entityType}-${entityId}`),
+    onError: (err) => setDocError(errorMessage(err)),
+  })
+
   // A load counts as having a POD if any evidence doc is on file (case-insensitive
   // to match the detector: pod/bol/receipt/scale).
   const hasPod = docs.some((d) => ['pod', 'bol', 'receipt', 'scale'].includes((d.doc_type ?? '').toLowerCase()))
@@ -117,6 +123,13 @@ export default function DocsNotes({ entityType, entityId, docTypes, className = 
             className="text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-navy-700 file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-white hover:file:bg-navy-800"
           />
         </div>
+        {docs.length > 1 && (
+          <div className="mb-2">
+            <Button variant="secondary" onClick={() => zipAll.mutate()} disabled={zipAll.isPending}>
+              {zipAll.isPending ? 'Zipping…' : `Download all (${docs.length}) as zip`}
+            </Button>
+          </div>
+        )}
         {upload.isPending && <p className="mb-2 text-sm text-muted">Uploading…</p>}
         {docError && <p className="mb-2 text-sm text-red-600">{docError}</p>}
         {docsQ.isError ? (
