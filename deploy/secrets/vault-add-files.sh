@@ -30,9 +30,19 @@ rows=(
   "Truxon/Integrations|FCM-google-services|/home/ike/TRUXON/mobile/android/app/google-services.json|Firebase push config. Public-safe but not in git; losing it blocks APK builds until re-downloaded from the Firebase console."
 )
 
-# Ensure parent groups exist (harmless if they already do).
+cat <<'BANNER'
+------------------------------------------------------------------------------
+keepassxc-cli will ask for your MASTER PASSWORD on each step below (it prints
+"Enter password to unlock ...").  Type it and press Enter each time.  Seeing
+"Group ... already exists" or "Entry ... already exists" is EXPECTED and
+harmless — the script keeps going.  (stderr is intentionally NOT hidden here, so
+the password prompt is always visible.)
+------------------------------------------------------------------------------
+BANNER
+
+# Ensure parent groups exist (the "already exists" message is fine).
 for g in "Truxon" "Truxon/Mobile-Signing" "Truxon/Integrations"; do
-  "$CLI" mkdir "$DB" "$g" 2>/dev/null || true
+  "$CLI" mkdir "$DB" "$g" || true
 done
 
 added=0
@@ -40,8 +50,9 @@ for row in "${rows[@]}"; do
   IFS='|' read -r group entry file notes <<<"$row"
   path="$group/$entry"
   if [ ! -f "$file" ]; then echo "-- skip $path (file absent: $file)"; continue; fi
+  echo ">> $path"
   # Create the entry if missing (add errors when it already exists — tolerate).
-  "$CLI" add "$DB" "$path" --notes "$notes" 2>/dev/null || echo "   ($path already exists — keeping it)"
+  "$CLI" add "$DB" "$path" --notes "$notes" || echo "   ($path already exists — keeping it)"
   if "$CLI" attachment-import -f "$DB" "$path" "$(basename "$file")" "$file"; then
     echo "== attached $(basename "$file")  ->  $path"
     added=$((added+1))
