@@ -103,5 +103,8 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - Live-verified: migrations local=remote, anon → `permission denied` on the RPC (gate holds), extract-pdf redeployed.
 - **Suite: 930 pgTAP / 163 files** — one real test catch on the way: RLS assertions are no-ops as `postgres`; the driver-invisibility test needed `set local role authenticated`.
 - **G flips #14/#69 (fuel-surcharge revenue + recovery rate)** — `fuel_surcharge_recovery(days)`: FSC captured from line items ÷ net-of-discount fuel spend, extraction coverage printed in the payload (never implied 100%). **Playbook now 193 live.** Suite: **932 pgTAP**. Prod pushed, anon gate verified.
+- **#106 BOL↔POD pairing** — `doc_pairing_report(days)`: delivered loads with a broken road-paper pair, named worklist worst-first, role-gated. Suite 937.
+- **#102 Misfiled-doc detector** — NAS 3B re-reads LABELED docs weekly (Sun 05:10 scheduler cron, run-audit.sh): opinions banked in `doc_label_audits` (propose-only; unsure = 'Other' and never disputes a human), disagreements fire sentinel `doc_misfiled` ops-warns that auto-resolve on relabel. Sentinel lineage head → `20260723150007`.
+- **#103 OCR quality** — `doc_ocr_quality_report()`: garbled/thin/no_text verdicts from indexed text (plain heuristic, no LLM), re-scan worklist worst-first, image-only docs routed to the vision queue not the re-scan list. Suite: **945 pgTAP / 165 files.** All prod-pushed + live-verified; first live audit run fired on the NAS.
 
 *(Run continues; closeout will finalize the count.)*
