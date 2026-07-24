@@ -5,6 +5,7 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: 7541d708-7353-4f10-878c-db1e3485f192
+  modified: 2026-07-24T14:48:52.209Z
 ---
 
 DR map, audited 2026-07-22 ("what happens if this computer dies?").
@@ -22,4 +23,4 @@ DR map, audited 2026-07-22 ("what happens if this computer dies?").
 - `frontend/.env.local` (anon key — public-safe, also in build-apk.sh), `deploy/drive-import/drive.env` (regenerable). Low impact.
 
 **~~THE RESIDUAL SINGLE-POINT-OF-FAILURE~~ — CLOSED 2026-07-22:** the signing bundle was **NAS-only**, so dev-box + NAS double-loss = signing key gone = **whole fleet re-key** (task #109). **Fixed:** the GPG-encrypted `signing-2026-07-21b.tar.gz.gpg` is now uploaded to a **private Supabase Storage bucket `dr-vault`** (`dr-vault/release-signing/…`, cloud → survives dev-box+NAS loss; verified byte-identical sha256). The nightly backup (`scripts/backup.sh` on the NAS + repo `deploy/backup/backup.sh`) re-mirrors `release-signing/*.gpg` to `dr-vault` every run, so future key rotations stay offsite automatically. Retrieve: download `dr-vault/release-signing/*.gpg` with the service key, `gpg -d` with `BACKUP_PASSPHRASE`.
- **Still worth doing (belt+suspenders):** the KeePassXC [[secrets-vault]] (owner-run) for a *second* offsite + all other secrets; and drop a copy in a personal cloud. **⚠ FLAG:** an **unencrypted** `signing-2026-07-21b.tar.gz` (the raw .jks) sits next to the .gpg on the NAS — nothing references it; safe to delete (the .gpg + passphrase reproduce it). Related: [[nas-access]], [[security-posture]], [[release recovery]].
+ **Belt+suspenders DONE 2026-07-24:** the KeePassXC [[secrets-vault]] now holds the signing keystore (`truxon-release.jks`) AND the new Ed25519 OTA-manifest signing key AND `google-services.json` as entry attachments (`deploy/secrets/vault-add-files.sh`, owner-run; Claude never saw the master password or key values). Pushed to NAS primary + versions + 2 local backups (`secrets-sync.sh push`); README's B2 nightly sweep of `secrets/` = a *second* independent offsite for the keys, on top of the `dr-vault` bucket. The loose plaintext OTA `.pem` was `shred -u`'d — the key lives ONLY in the encrypted vault now. **Still worth doing:** drop a `.kdbx` copy in a personal cloud; populate the remaining TEXT secrets (service_role/CRON_SECRET/passwords) via the GUI (values never pass through Claude). **⚠ FLAG:** an **unencrypted** `signing-2026-07-21b.tar.gz` (the raw .jks) sits next to the .gpg on the NAS — nothing references it; safe to delete (the .gpg + passphrase reproduce it). Related: [[nas-access]], [[security-posture]], [[release recovery]].
