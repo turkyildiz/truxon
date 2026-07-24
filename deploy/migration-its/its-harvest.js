@@ -11,13 +11,17 @@
 //
 // CONFIG — adjust before pasting if needed:
 //   FROM   ignore loads whose stops all pre-date this (bulk import covered ≤ Jul 17)
-//   FLOOR  highest editId already captured in prod (run its-dryrun.mjs to print it).
-//          0 = unknown → fall back to a date-guarded downward walk below the board.
+//   MAX_PROBES  0 = BOARD-ONLY (reliable, recommended for a first run). Set >0
+//               to also recover invoiced-and-gone loads by probing recent editIds.
+//   FLOOR  highest editId already in prod (run its-dryrun.mjs to print it). With
+//          MAX_PROBES>0, bounds the probe to (FLOOR, hi]; 0 = use RECENT_WINDOW.
+//   RECENT_WINDOW  how far below the newest board id to probe when FLOOR unknown.
 (async () => {
   const FROM = '2026-07-10'
   const FLOOR = 0
-  const MAX_PROBES = 500
-  const STOP_AFTER = 30 // consecutive blank/old probes ends the downward walk
+  const MAX_PROBES = 0            // board-only by default — flip to e.g. 400 once FLOOR is known
+  const RECENT_WINDOW = 6000
+  const STOP_AFTER = 30 // consecutive blank/old probes ends the probe early
 
   const D = '/modules/loads/data/edit_data.php'
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -64,8 +68,14 @@
   }
 
   async function fetchLoad(id) {
-    const html = await (await fetch(`${D}?window_id=0&duplicate=0&id=${id}&dispatch_status=open&pending=0&office_id=0`, { credentials: 'include' })).text()
-    return parseLoad(new DOMParser().parseFromString(html, 'text/html'), id)
+    // 8s per-request timeout — a single stalled edit_data.php must never freeze
+    // the whole harvest (that was the hang: no timeout on an awaited fetch).
+    const ctl = new AbortController()
+    const to = setTimeout(() => ctl.abort(), 8000)
+    try {
+      const html = await (await fetch(`${D}?window_id=0&duplicate=0&id=${id}&dispatch_status=open&pending=0&office_id=0`, { credentials: 'include', signal: ctl.signal })).text()
+      return parseLoad(new DOMParser().parseFromString(html, 'text/html'), id)
+    } finally { clearTimeout(to) }
   }
   const isRecent = (L) => {
     const dates = L.stops.map((s) => s.date).filter(Boolean)
@@ -95,16 +105,20 @@
   // 2) probe the gaps — invoiced loads leave the board but edit_data.php still
   //    serves them by id. In-range holes first, then walk downward below the
   //    board floor until FLOOR (if known) or STOP_AFTER consecutive blank/old.
-  const lo = board[0], hi = board[board.length - 1]
-  const holes = []
-  for (let id = lo + 1; id < hi; id++) if (!seen.has(id)) holes.push(id)
-  const downward = []
-  for (let id = lo - 1; id > 0 && downward.length < MAX_PROBES; id--) {
-    if (FLOOR > 0 && id <= FLOOR) break
-    downward.push(id) // when FLOOR is unknown the in-loop consecutive-stop rule ends the walk
+  // ITS editIds are GLOBAL across all Truckstop customers, so Aida's loads are
+  // sparse — probing the whole lo→hi span (or downward from an old outlier like
+  // still-open load 1136) is a needle-in-haystack that wastes every probe. New
+  // invoiced-and-gone loads have RECENT (high) editIds, so probe DOWNWARD from
+  // the newest board id, bounded by FLOOR (max editId already in prod; run
+  // its-dryrun.mjs to get it). Unknown FLOOR → a recent window. STOP_AFTER
+  // consecutive blank/old ends it early. MAX_PROBES=0 → board-only (safest).
+  const hi = board[board.length - 1]
+  const floorBound = FLOOR > 0 ? FLOOR : hi - RECENT_WINDOW
+  const candidates = []
+  for (let id = hi - 1; id > floorBound && candidates.length < MAX_PROBES; id--) {
+    if (!seen.has(id)) candidates.push(id) // recent → older
   }
-  const candidates = [...holes, ...downward].slice(0, MAX_PROBES)
-  console.log(`[harvest] probing ${holes.length} in-range holes + ${downward.length} below-board ids (cap ${MAX_PROBES})…`)
+  console.log(`[harvest] probing ${candidates.length} recent ids (hi=${hi} floor=${floorBound}, cap ${MAX_PROBES}, timeout 8s each)…`)
   let consecutive = 0
   for (const id of candidates) {
     try {
@@ -112,8 +126,8 @@
       if (!L.meta.loadNum) { probed.blank++; consecutive++; }
       else if (!isRecent(L)) { probed.old++; consecutive++; }
       else { loads.push(L); probed.kept++; consecutive = 0 }
-      if (FLOOR === 0 && id < lo && consecutive >= STOP_AFTER) { console.log(`[harvest] downward walk: ${STOP_AFTER} consecutive blank/old — stopping at ${id}`); break }
-      await sleep(250)
+      if (consecutive >= STOP_AFTER) { console.log(`[harvest] ${STOP_AFTER} consecutive blank/old — stopping at ${id}`); break }
+      await sleep(200)
     } catch (e) { warnings.push(`probe ${id}: ${String(e).slice(0, 80)}`) }
   }
 
