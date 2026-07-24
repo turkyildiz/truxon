@@ -60,6 +60,35 @@ Answer with the label only, nothing else.`
   return String((await r.json()).response ?? '').trim().replace(/^["']|["'.]$/g, '')
 }
 
+// ── R9 #102 audit mode: re-read LABELED docs and report the model's opinion.
+// Disagreements become misfile warnings via sentinel; agreements refresh the
+// 30-day clock. Nothing is relabeled from here — propose-only. ──
+if (process.argv.includes('--audit')) {
+  const a = { seen: 0, agree: 0, disagree: 0, unsure: 0, errors: 0 }
+  for (let round = 0; round < 10; round++) {
+    const { targets } = await edge({ mode: 'audit_targets', limit: 20 })
+    if (!targets?.length) break
+    for (const t of targets) {
+      a.seen++
+      try {
+        const t0 = Date.now()
+        const raw = await ask(t.filename, t.excerpt)
+        // An unsure model never disputes a human label — but the opinion is
+        // still banked (as 'Other') so the doc leaves the target queue for 30d;
+        // the sentinel ignores 'Other' opinions.
+        const label = LABELS.find((l) => raw.toLowerCase() === l.toLowerCase()) ?? 'Other'
+        if (label === 'Other') a.unsure++
+        const res = await edge({ mode: 'audit_report', document_id: t.document_id, stored_type: t.doc_type, model_type: label, model: MODEL, latency_ms: Date.now() - t0 })
+        if (res.ok) { res.disagrees ? a.disagree++ : a.agree++ }
+        else a.errors++
+        if (res.disagrees) log(`#${t.document_id} ${t.filename}: filed ${t.doc_type}, reads ${label}`)
+      } catch (e) { a.errors++; log(`#${t.document_id} error: ${e.message}`) }
+    }
+  }
+  log(`audit done: ${JSON.stringify(a)}`)
+  process.exit(0)
+}
+
 const stats = { seen: 0, applied: 0, kept_other: 0, errors: 0 }
 for (let round = 0; round < 10; round++) {
   const { targets } = await edge({ mode: 'classify_targets', limit: 20 })

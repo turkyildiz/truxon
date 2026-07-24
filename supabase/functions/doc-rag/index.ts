@@ -74,6 +74,56 @@ Deno.serve(withCors(async (req) => {
     return json({ ok: true })
   }
 
+  // ── audit_targets (R9 #102): LABELED docs due a second read — the NAS 3B
+  //    re-classifies them and disagreements surface as misfile warnings.
+  //    Docs audited in the last 30d are skipped. ──
+  if (body.mode === 'audit_targets') {
+    if (!cron) return json({ error: 'cron only' }, 403)
+    const limit = Math.min(Math.max(Number(body.limit) || 20, 1), 60)
+    const { data: docs } = await svc.from('documents')
+      .select('id, filename, doc_type, entity_type')
+      .neq('doc_type', 'Other').neq('doc_type', '')
+      .order('id', { ascending: true }).limit(400)
+    const { data: recent } = await svc.from('doc_label_audits')
+      .select('document_id').gt('audited_at', new Date(Date.now() - 30 * 864e5).toISOString())
+    const done = new Set((recent ?? []).map((r) => r.document_id))
+    const targets: Array<Record<string, unknown>> = []
+    for (const d of docs ?? []) {
+      if (targets.length >= limit) break
+      if (done.has(d.id)) continue
+      const { data: chunks } = await svc.from('document_embeddings')
+        .select('content').eq('document_id', d.id)
+        .order('chunk_index', { ascending: true }).limit(2)
+      const text = (chunks ?? []).map((c) => String(c.content ?? '')).join('\n').slice(0, 1800)
+      if (text.length < 60) continue
+      targets.push({ document_id: d.id, filename: d.filename, doc_type: d.doc_type, excerpt: text })
+    }
+    return json({ targets })
+  }
+
+  // ── audit_report: bank the model's opinion (agreements too — they refresh
+  //    the 30d clock and auto-resolve any stale misfile warning). ──
+  if (body.mode === 'audit_report') {
+    if (!cron) return json({ error: 'cron only' }, 403)
+    const id = Number(body.document_id)
+    const stored = String(body.stored_type ?? '')
+    const label = String(body.model_type ?? '')
+    const ALLOWED = ['POD', 'Rate Confirmation', 'BOL', 'Invoice', 'Registration', 'Insurance',
+      'Inspection', 'License', 'Medical Card', 'Receipt', 'Employment', 'Other']
+    if (!id || !stored || !ALLOWED.includes(label)) return json({ error: 'bad audit' }, 400)
+    const { error } = await svc.from('doc_label_audits').upsert({
+      document_id: id, stored_type: stored, model_type: label,
+      model: String(body.model ?? ''), audited_at: new Date().toISOString(),
+    })
+    if (error) return json({ error: error.message }, 500)
+    await svc.from('llm_extractions').insert({
+      kind: 'classify', ref: `audit:${id}`, model: String(body.model ?? 'qwen2.5:3b'),
+      arm: 'local', ok: true, latency_ms: Number(body.latency_ms) || null,
+      output: { stored_type: stored, model_type: label },
+    }).then(() => {}, () => {})
+    return json({ ok: true, disagrees: label !== stored })
+  }
+
   // ── targets: docs needing embedding + signed URLs (NAS) ──
   if (body.mode === 'targets') {
     if (!cron) return json({ error: 'cron only' }, 403)
