@@ -2894,6 +2894,27 @@ export async function customerEnrichmentGaps(): Promise<EnrichmentGaps | null> {
   return (data as unknown as EnrichmentGaps) ?? null
 }
 
+/** R9 #68: customers still booking but slowing vs their own baseline. */
+export interface ChurnWatch {
+  watch: { customer: string; baseline_per_30d: number; recent_per_30d: number; drop_pct: number; trailing_revenue: number }[]
+  note: string
+}
+export async function customerChurnWatch(): Promise<ChurnWatch | null> {
+  const data = unwrap(await supabase.rpc('customer_churn_watch', {}))
+  return (data as unknown as ChurnWatch) ?? null
+}
+
+/** R9 #69: per-lane recent $/mi vs the prior book — falling vs rising. */
+export interface LaneRateTrend {
+  falling: { lane: string; recent_rpm: number; prior_rpm: number; move_pct: number; recent_loads: number }[]
+  rising: { lane: string; recent_rpm: number; prior_rpm: number; move_pct: number; recent_loads: number }[]
+  note: string
+}
+export async function laneRateTrend(): Promise<LaneRateTrend | null> {
+  const data = unwrap(await supabase.rpc('lane_rate_trend', {}))
+  return (data as unknown as LaneRateTrend) ?? null
+}
+
 /** R9 #47/#48: out-of-route miles priced from the GPS trail vs booked. */
 export interface RouteDeviation {
   days: number

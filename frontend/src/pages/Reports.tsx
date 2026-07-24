@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { createSavedReport, deleteSavedReport, gpsConfirmedMissingPod, listSavedReports, reportMetricCatalog, routeDeviationReport, cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, downloadBankerPackage, downloadInsuranceDataRoom, downloadTaxPackage, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { createSavedReport, customerChurnWatch, deleteSavedReport, gpsConfirmedMissingPod, laneRateTrend, listSavedReports, reportMetricCatalog, routeDeviationReport, cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, downloadBankerPackage, downloadInsuranceDataRoom, downloadTaxPackage, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import { errorMessage } from '../supabase'
 import type { WeeklyRow } from '../types'
 
@@ -389,6 +389,66 @@ function ExecPackagesCard() {
       <p className="mt-1 text-[11px] text-muted">
         Worksheets, not filed returns or audited statements — each file names its own gaps.
       </p>
+    </Card>
+  )
+}
+
+/** R9 #68: customers still booking but slowing vs their own baseline. */
+function ChurnWatchCard() {
+  const q = useQuery({ queryKey: ['churn-watch'], queryFn: customerChurnWatch, retry: false, staleTime: 10 * 60 * 1000 })
+  const d = q.data
+  if (q.isError || !d || d.watch.length === 0) return null
+  return (
+    <Card title={`📉 Churn early-warning (${d.watch.length})`}>
+      <p className="mb-2 text-sm text-muted">Still booking, but at a materially lower rate than their own baseline — call before they go quiet.</p>
+      <Table headers={['Customer', 'Baseline/30d', 'Recent/30d', 'Drop', 'Trailing revenue']}>
+        {d.watch.slice(0, 8).map((r) => (
+          <tr key={r.customer}>
+            <td className="px-3 py-2 font-medium">{r.customer}</td>
+            <td className="px-3 py-2">{r.baseline_per_30d}</td>
+            <td className="px-3 py-2">{r.recent_per_30d}</td>
+            <td className="px-3 py-2 font-semibold text-amber-600 dark:text-amber-400">−{r.drop_pct}%</td>
+            <td className="px-3 py-2">{money(r.trailing_revenue)}</td>
+          </tr>
+        ))}
+      </Table>
+    </Card>
+  )
+}
+
+/** R9 #69: lanes where our $/mi is drifting from the prior book. */
+function LaneRateTrendCard() {
+  const q = useQuery({ queryKey: ['lane-rate-trend'], queryFn: laneRateTrend, retry: false, staleTime: 10 * 60 * 1000 })
+  const d = q.data
+  if (q.isError || !d || (d.falling.length === 0 && d.rising.length === 0)) return null
+  const row = (r: { lane: string; recent_rpm: number; prior_rpm: number; move_pct: number; recent_loads: number }, falling: boolean) => (
+    <tr key={r.lane}>
+      <td className="px-3 py-2 font-medium">{r.lane}</td>
+      <td className="px-3 py-2">${r.prior_rpm.toFixed(2)}</td>
+      <td className="px-3 py-2">${r.recent_rpm.toFixed(2)}</td>
+      <td className={`px-3 py-2 font-semibold ${falling ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{r.move_pct > 0 ? '+' : ''}{r.move_pct}%</td>
+      <td className="px-3 py-2 text-muted">{r.recent_loads}</td>
+    </tr>
+  )
+  return (
+    <Card title="📊 Lane rate trend (90d vs prior book)">
+      {d.falling.length > 0 && (
+        <>
+          <p className="mb-1 text-xs font-semibold text-rose-600 dark:text-rose-400">Falling — lost pricing power or a softening market</p>
+          <Table headers={['Lane', 'Prior $/mi', 'Recent $/mi', 'Move', 'Loads']}>
+            {d.falling.slice(0, 6).map((r) => row(r, true))}
+          </Table>
+        </>
+      )}
+      {d.rising.length > 0 && (
+        <>
+          <p className="mb-1 mt-3 text-xs font-semibold text-emerald-600 dark:text-emerald-400">Rising</p>
+          <Table headers={['Lane', 'Prior $/mi', 'Recent $/mi', 'Move', 'Loads']}>
+            {d.rising.slice(0, 4).map((r) => row(r, false))}
+          </Table>
+        </>
+      )}
+      <p className="mt-1 text-[11px] text-muted">{d.note}</p>
     </Card>
   )
 }
@@ -875,6 +935,8 @@ export default function Reports() {
           <DeadheadCard />
           <RouteDeviationCard />
           <GpsPodCard />
+          <ChurnWatchCard />
+          <LaneRateTrendCard />
           <NpsCard />
         </>
       )}
