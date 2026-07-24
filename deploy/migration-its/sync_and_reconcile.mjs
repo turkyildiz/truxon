@@ -11,7 +11,7 @@
 //
 // Usage: node sync_and_reconcile.mjs   (prompts for admin email/password)
 import { createClient } from '@supabase/supabase-js'
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, writeFileSync } from 'node:fs'
 import { getCreds } from './_creds.mjs'
 
 const DIR = new URL('.', import.meta.url).pathname
@@ -43,4 +43,30 @@ if (data && typeof data === 'object') {
   console.log(`\n→ inserted ${data.inserted ?? '?'} / updated ${data.updated ?? '?'} invoices`)
   console.log(`→ self-heal linked ${data.reconcile_linked ?? '?'} more loads → billed`)
   console.log(`→ still unbilled (genuinely no QBO invoice): ${data.reconcile_still_unbilled ?? '?'}`)
+}
+
+// Dump the final state for the customer+date+value cross-check audit.
+process.stdout.write('\ndumping completed + QBO-billed loads → loads_audit.json … ')
+const sel = 'load_number,reference_number,rate,status,pickup_time,delivery_time,invoice_id,' +
+            'customers(company_name),' +
+            'invoices!loads_invoice_id_fkey(qbo_doc_number,total,invoice_date,status,source)'
+const audit = []
+for (let from = 0; ; from += 1000) {
+  const { data: page, error: qErr } = await sb.from('loads').select(sel)
+    .in('status', ['completed', 'billed']).order('load_number').range(from, from + 999)
+  if (qErr) { console.error('\naudit dump failed:', qErr.message); break }
+  audit.push(...page)
+  if (page.length < 1000) break
+}
+if (audit.length) {
+  const flat = audit.map((l) => ({
+    load_number: l.load_number, reference_number: l.reference_number, rate: Number(l.rate || 0),
+    status: l.status, pickup: l.pickup_time, delivery: l.delivery_time,
+    customer: l.customers?.company_name || null,
+    linked_qbo_doc: l.invoices?.source === 'qbo' ? l.invoices?.qbo_doc_number : null,
+    linked_total: l.invoices ? Number(l.invoices.total || 0) : null,
+    linked_date: l.invoices?.invoice_date || null, linked_status: l.invoices?.status || null,
+  }))
+  writeFileSync(DIR + 'loads_audit.json', JSON.stringify(flat, null, 0))
+  console.log(`${flat.length} loads written.`)
 }
