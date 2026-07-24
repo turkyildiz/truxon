@@ -1,6 +1,7 @@
 /** Ordered pickup/delivery stop editor used by Dispatch (new load) and
  * LoadDetail (edit). The first pickup and final delivery become the load's
  * primary route fields; everything is stored in load_stops. */
+import { useState } from 'react'
 import { Button, Field, Input, Textarea } from './ui'
 
 export interface StopForm {
@@ -25,9 +26,19 @@ export default function StopsEditor({ stops, onChange, onRouteBlur }: Props) {
     { type: 'pickup', label: 'Pickup', addLabel: '+ Add pickup location' },
     { type: 'delivery', label: 'Delivery', addLabel: '+ Add delivery location' },
   ]
+  // R9 #117: drag (desktop) or ↑/↓ (tablet) to reorder stops within a group.
+  const [dragFrom, setDragFrom] = useState<number | null>(null)
 
   function update(index: number, patch: Partial<StopForm>) {
     onChange(stops.map((s, i) => (i === index ? { ...s, ...patch } : s)))
+  }
+  function move(from: number, to: number) {
+    if (from === to) return
+    const next = [...stops]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    onChange(next)
+    onRouteBlur?.()
   }
   function add(type: 'pickup' | 'delivery') {
     // Pickups stay grouped before deliveries so the route reads top-to-bottom.
@@ -58,15 +69,45 @@ export default function StopsEditor({ stops, onChange, onRouteBlur }: Props) {
             </div>
             <div className="space-y-3">
               {ofType.map(({ s, i }, n) => (
-                <div key={i} className="rounded-xl border border-line p-3">
+                <div
+                  key={i}
+                  className={`rounded-xl border border-line p-3 ${dragFrom === i ? 'opacity-50' : ''} ${dragFrom != null && dragFrom !== i && stops[dragFrom]?.stop_type === g.type ? 'border-dashed' : ''}`}
+                  onDragOver={(e) => { if (dragFrom != null && stops[dragFrom]?.stop_type === g.type) e.preventDefault() }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    if (dragFrom != null && stops[dragFrom]?.stop_type === g.type) move(dragFrom, i)
+                    setDragFrom(null)
+                  }}
+                >
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-brand">
+                    <span className="flex items-center gap-2 text-xs font-semibold text-brand">
+                      {ofType.length > 1 && (
+                        <span
+                          draggable
+                          onDragStart={(e) => { setDragFrom(i); e.dataTransfer.effectAllowed = 'move' }}
+                          onDragEnd={() => setDragFrom(null)}
+                          className="cursor-grab select-none text-sm text-muted"
+                          title="Drag to reorder"
+                        >
+                          ⠿
+                        </span>
+                      )}
                       {g.label} {ofType.length > 1 ? `#${n + 1}` : ''}
                     </span>
                     {ofType.length > 1 && (
-                      <button type="button" onClick={() => remove(i)} className="text-xs font-medium text-red-600 hover:underline">
-                        Remove
-                      </button>
+                      <span className="flex items-center gap-2">
+                        {n > 0 && (
+                          <button type="button" onClick={() => move(i, ofType[n - 1].i)} title="Move up"
+                            className="text-xs font-medium text-muted hover:text-body">↑</button>
+                        )}
+                        {n < ofType.length - 1 && (
+                          <button type="button" onClick={() => move(i, ofType[n + 1].i)} title="Move down"
+                            className="text-xs font-medium text-muted hover:text-body">↓</button>
+                        )}
+                        <button type="button" onClick={() => remove(i)} className="text-xs font-medium text-red-600 hover:underline">
+                          Remove
+                        </button>
+                      </span>
                     )}
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
