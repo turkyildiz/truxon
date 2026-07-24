@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Badge, Button, Card, compareValues, formatDateTime, Input, LoadError, money, Select, type SortState, Table, toggleSort } from '../components/ui'
-import { listCustomers, listDrivers, listLoads, listMissingPods } from '../data'
+import { listCustomers, listDrivers, listLoads, listMissingPods, loadEtaRisk } from '../data'
 import { LOAD_STATUSES, type Load } from '../types'
 
 const ALL_STATUSES = [...LOAD_STATUSES, 'cancelled' as const]
@@ -61,6 +61,9 @@ export default function Loads() {
   // Include inactive customers — old loads still need to be filterable by them.
   const { data: customers = [] } = useQuery({ queryKey: ['customers-all', ''], queryFn: () => listCustomers(undefined, { includeInactive: true }) })
   const { data: drivers = [] } = useQuery({ queryKey: ['drivers', ''], queryFn: () => listDrivers() })
+  // R9 #114: ETA/late-risk badges per rolling load (same feed as the Dispatch card)
+  const etaQ = useQuery({ queryKey: ['eta-risk'], queryFn: loadEtaRisk, refetchInterval: 5 * 60_000, retry: false })
+  const etaByLoad = useMemo(() => new Map((etaQ.data ?? []).map((r) => [r.load_id, r])), [etaQ.data])
   const loadsQ = useQuery({
     queryKey: ['loads', q, statusList.join(','), awaitingOnly, customerId, driverId, dateFrom, dateTo],
     queryFn: () => listLoads({ q, statuses: statusList, awaiting_paperwork: awaitingOnly, customer_id: customerId, driver_id: driverId, date_from: dateFrom, date_to: dateTo }),
@@ -203,6 +206,20 @@ export default function Loads() {
                   <td className="px-3 py-3">
                     <div className="flex flex-col items-start gap-1">
                       <Badge status={load.status} />
+                      {(() => {
+                        const r = etaByLoad.get(load.id)
+                        if (!r || load.status !== 'in_transit') return null
+                        const tone = r.risk === 'late' ? 'bg-rose-500/15 text-rose-600 dark:text-rose-300'
+                          : r.risk === 'hos_short' || r.risk === 'tight' ? 'bg-amber-500/15 text-amber-600 dark:text-amber-300'
+                          : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300'
+                        const label = r.risk === 'late' ? 'ETA past appt' : r.risk === 'hos_short' ? 'HOS short' : r.risk === 'tight' ? 'Tight' : 'On track'
+                        return (
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}
+                            title={`ETA ${new Date(r.eta).toLocaleString()} vs appt ${new Date(r.appointment).toLocaleString()} — ${r.miles_to_go} mi to go, ${r.slack_h}h slack (estimate)`}>
+                            ⏱ {label}
+                          </span>
+                        )
+                      })()}
                       {load.awaiting_paperwork && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-300" title="Booked — final paperwork not received yet">
                           📄 Awaiting paperwork

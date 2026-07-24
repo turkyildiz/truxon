@@ -3,7 +3,7 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Button, Card, Field, Input, money, Select, Textarea } from '../components/ui'
-import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, eldFleetLive, estimateLoadMargin, extractPdf, fleetCostBasis, laneRateForRoute, listLoads, loadEtaRisk, saveLoadLineItems, sentinelSummary, type EldFleetRow, type ExtractedLineItem, type ExtractedStop } from '../data'
+import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, deleteLoadTemplate, eldFleetLive, estimateLoadMargin, extractPdf, fleetCostBasis, laneRateForRoute, listLoads, listLoadTemplates, loadEtaRisk, saveLoadLineItems, saveLoadTemplate, sentinelSummary, type EldFleetRow, type ExtractedLineItem, type ExtractedStop, type LoadTemplate } from '../data'
 import { errorMessage } from '../supabase'
 import { ReferenceDataBanner, useReferenceData } from '../useReferenceData'
 import FleetMap from './FleetMap'
@@ -145,6 +145,45 @@ export default function Dispatch() {
   const [error, setError] = useState('')
   const [aiNote, setAiNote] = useState('')
   const [lineItems, setLineItems] = useState<ExtractedLineItem[]>([])
+  // R9 #118/#119: repeat lanes from templates (optionally on a cadence)
+  const [tplName, setTplName] = useState('')
+  const [tplCadence, setTplCadence] = useState<LoadTemplate['cadence']>('none')
+  const templatesQ = useQuery({ queryKey: ['load-templates'], queryFn: listLoadTemplates, staleTime: 60_000, retry: false })
+
+  function applyTemplate(t: LoadTemplate) {
+    setForm({
+      ...form,
+      customer_id: t.customer_id != null ? String(t.customer_id) : form.customer_id,
+      equipment_type: t.equipment_type || form.equipment_type,
+      rate: t.rate != null ? String(t.rate) : form.rate,
+      miles: t.miles != null ? String(t.miles) : form.miles,
+      special_terms: t.special_terms || form.special_terms,
+    })
+    if (t.stops.length > 0) setStops(t.stops.map((s) => ({ stop_type: s.stop_type === 'delivery' ? 'delivery' as const : 'pickup' as const, facility: s.facility, address: s.address, time: '', reference: '' })))
+    setAiNote(`✓ Template "${t.name}" applied — set the dates and go`)
+  }
+
+  const saveTpl = useMutation({
+    mutationFn: () => saveLoadTemplate({
+      name: tplName.trim(),
+      customer_id: form.customer_id ? Number(form.customer_id) : null,
+      equipment_type: form.equipment_type || '',
+      rate: form.rate ? Number(form.rate) : null,
+      miles: form.miles ? Number(form.miles) : null,
+      pickup_address: stops.find((s) => s.stop_type === 'pickup')?.address ?? '',
+      delivery_address: [...stops].reverse().find((s) => s.stop_type === 'delivery')?.address ?? '',
+      special_terms: form.special_terms || '',
+      stops: stops.filter((s) => s.facility || s.address).map((s) => ({ stop_type: s.stop_type, facility: s.facility, address: s.address })),
+      cadence: tplCadence,
+      next_run: tplCadence === 'none' ? null : new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+    }),
+    onSuccess: () => {
+      setTplName(''); setTplCadence('none')
+      qc.invalidateQueries({ queryKey: ['load-templates'] })
+      setAiNote('✓ Template saved' + (tplCadence !== 'none' ? ` — a ${tplCadence} draft will auto-appear (starting tomorrow, 6:10 AM)` : ''))
+    },
+    onError: (err) => setAiNote(errorMessage(err)),
+  })
   const [distError, setDistError] = useState('')
   const [dragOver, setDragOver] = useState(false)
   /** Extracted customer name that matched nothing — offer add-or-pick. */
@@ -378,6 +417,24 @@ export default function Dispatch() {
         </div>
       </Card>
 
+      {(templatesQ.data?.length ?? 0) > 0 && (
+        <Card title="⧉ Repeat lanes">
+          <div className="flex flex-wrap gap-2">
+            {templatesQ.data!.map((t) => (
+              <span key={t.id} className="inline-flex items-center gap-1 rounded-full border border-edge px-1 py-0.5">
+                <button type="button" onClick={() => applyTemplate(t)}
+                  className="rounded-full px-2 py-0.5 text-sm font-medium text-body hover:bg-slate-500/10"
+                  title={`${t.pickup_address} → ${t.delivery_address}${t.rate != null ? ` · $${t.rate}` : ''}${t.cadence !== 'none' ? ` · repeats ${t.cadence}` : ''}`}>
+                  {t.name}{t.cadence !== 'none' && ' 🔁'}
+                </button>
+                <button type="button" title="Remove template" className="px-1 text-xs text-muted hover:text-body"
+                  onClick={() => deleteLoadTemplate(t.id).then(() => qc.invalidateQueries({ queryKey: ['load-templates'] })).catch((err) => setAiNote(errorMessage(err)))}>✕</button>
+              </span>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card title="Load Details">
         <ReferenceDataBanner show={refError} onRetry={retryRef} />
         <form onSubmit={onSubmit}>
@@ -592,6 +649,26 @@ export default function Dispatch() {
             <Button type="submit" disabled={create.isPending}>
               {create.isPending ? 'Creating…' : 'Create Load'}
             </Button>
+          </div>
+          <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-edge pt-3">
+            <Field label="Save this lane as a template" className="w-56">
+              <Input value={tplName} onChange={(e) => setTplName(e.target.value)} placeholder="e.g. TQL Chicago→Nashville" />
+            </Field>
+            <Field label="Repeats" className="w-36">
+              <Select value={tplCadence} onChange={(e) => setTplCadence(e.target.value as LoadTemplate['cadence'])}>
+                <option value="none">No</option>
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Biweekly</option>
+                <option value="monthly">Monthly</option>
+              </Select>
+            </Field>
+            <Button type="button" variant="secondary" disabled={!tplName.trim() || saveTpl.isPending}
+              onClick={() => saveTpl.mutate()}>
+              {saveTpl.isPending ? 'Saving…' : 'Save template'}
+            </Button>
+            {tplCadence !== 'none' && (
+              <p className="basis-full text-xs text-muted">Recurring templates auto-draft a pending load ({tplCadence}) at 6:10 AM — dispatch confirms with the broker before it rolls.</p>
+            )}
           </div>
         </form>
       </Card>

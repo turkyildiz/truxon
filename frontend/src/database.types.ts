@@ -575,6 +575,38 @@ export type Database = {
           },
         ]
       }
+      doc_label_audits: {
+        Row: {
+          audited_at: string
+          document_id: number
+          model: string
+          model_type: string
+          stored_type: string
+        }
+        Insert: {
+          audited_at?: string
+          document_id: number
+          model?: string
+          model_type: string
+          stored_type: string
+        }
+        Update: {
+          audited_at?: string
+          document_id?: number
+          model?: string
+          model_type?: string
+          stored_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doc_label_audits_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: true
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       doc_search_requests: {
         Row: {
           claimed_at: string | null
@@ -2017,6 +2049,68 @@ export type Database = {
             columns: ["load_id"]
             isOneToOne: false
             referencedRelation: "loads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      load_templates: {
+        Row: {
+          cadence: string
+          cadence_dow: number | null
+          created_at: string
+          customer_id: number | null
+          delivery_address: string
+          equipment_type: string
+          id: number
+          is_active: boolean
+          miles: number | null
+          name: string
+          next_run: string | null
+          pickup_address: string
+          rate: number | null
+          special_terms: string
+          stops: Json
+        }
+        Insert: {
+          cadence?: string
+          cadence_dow?: number | null
+          created_at?: string
+          customer_id?: number | null
+          delivery_address?: string
+          equipment_type?: string
+          id?: number
+          is_active?: boolean
+          miles?: number | null
+          name: string
+          next_run?: string | null
+          pickup_address?: string
+          rate?: number | null
+          special_terms?: string
+          stops?: Json
+        }
+        Update: {
+          cadence?: string
+          cadence_dow?: number | null
+          created_at?: string
+          customer_id?: number | null
+          delivery_address?: string
+          equipment_type?: string
+          id?: number
+          is_active?: boolean
+          miles?: number | null
+          name?: string
+          next_run?: string | null
+          pickup_address?: string
+          rate?: number | null
+          special_terms?: string
+          stops?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "load_templates_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
@@ -4354,6 +4448,8 @@ export type Database = {
         }[]
       }
       dispatch_productivity: { Args: { p_days?: number }; Returns: Json }
+      doc_ocr_quality_report: { Args: { p_limit?: number }; Returns: Json }
+      doc_pairing_report: { Args: { p_days?: number }; Returns: Json }
       doc_retention_report: { Args: { p_days?: number }; Returns: Json }
       dot_audit_pack: { Args: never; Returns: Json }
       draft_dunning_notices: { Args: never; Returns: number }
@@ -4584,6 +4680,7 @@ export type Database = {
         }[]
       }
       fuel_stop_analysis: { Args: { p_days?: number }; Returns: Json }
+      fuel_surcharge_recovery: { Args: { p_days?: number }; Returns: Json }
       gl_balance_ratios: { Args: never; Returns: Json }
       gl_breakeven_monthly: {
         Args: { p_months?: number }
@@ -5118,6 +5215,10 @@ export type Database = {
         Returns: Json
       }
       shadow_summary: { Args: never; Returns: Json }
+      similar_documents: {
+        Args: { p_document_id: number; p_limit?: number }
+        Returns: Json
+      }
       slow_pay_risk: {
         Args: never
         Returns: {
@@ -5139,12 +5240,14 @@ export type Database = {
         Args: { p_days?: number; p_id: number }
         Returns: undefined
       }
+      spawn_recurring_loads: { Args: never; Returns: Json }
       speeding_summary: { Args: { p_days?: number }; Returns: Json }
       speeding_trend: { Args: never; Returns: Json }
       stop_dwell_summary: {
         Args: { p_days?: number; p_radius_mi?: number }
         Returns: Json
       }
+      storage_usage_report: { Args: never; Returns: Json }
       stress_test: { Args: never; Returns: Json }
       submit_dvir: {
         Args: {

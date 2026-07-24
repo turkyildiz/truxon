@@ -554,6 +554,34 @@ export async function createLoad(payload: Row, stops: Omit<LoadStop, 'id' | 'loa
   return load
 }
 
+/** R9 #118/#119: load templates (+ optional recurrence — spawner runs 06:10). */
+export interface LoadTemplate {
+  id: number
+  name: string
+  customer_id: number | null
+  equipment_type: string
+  rate: number | null
+  miles: number | null
+  pickup_address: string
+  delivery_address: string
+  special_terms: string
+  stops: { stop_type: string; facility: string; address: string }[]
+  cadence: 'none' | 'weekly' | 'biweekly' | 'monthly'
+  next_run: string | null
+  is_active: boolean
+}
+export async function listLoadTemplates(): Promise<LoadTemplate[]> {
+  return unwrap(await supabase.from('load_templates').select('*').eq('is_active', true).order('name')) as unknown as LoadTemplate[]
+}
+export async function saveLoadTemplate(t: Omit<LoadTemplate, 'id' | 'is_active'>): Promise<void> {
+  const { error } = await supabase.from('load_templates').insert(t as TablesInsert<'load_templates'>)
+  if (error) throw new Error(error.message)
+}
+export async function deleteLoadTemplate(id: number): Promise<void> {
+  const { error } = await supabase.from('load_templates').update({ is_active: false }).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
 const LINE_ITEM_KINDS = ['line_haul', 'fuel_surcharge', 'detention', 'lumper', 'stop_pay', 'other_accessorial'] as const
 
 /** Persist the rate-con line items captured at extraction time (R9 #104).
