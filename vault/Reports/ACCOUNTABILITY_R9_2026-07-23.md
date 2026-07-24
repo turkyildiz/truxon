@@ -147,4 +147,7 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 
 - **#138 close-out — SECTION J COMPLETE (127–138).** Round-2 mining already runs (docs, 2h owner-approved mail miner, QBO, vision-on-click), so #138's real gap was the residue: `customer_enrichment_gaps()` counts remaining blanks per field and names the **dead ends** — customers with blanks and NO minable source left (no docs on them or their loads, no observed mail, no QBO link) — "those need a phone call, not more AI." 🧩 card on Customers with the call list. Suite: **1027 pgTAP / 176 files.** `d7db3f8`.
 
+### Section L (web UX)
+- **#153 omnibox documents** — global search now finds paperwork: filename/doc-type match, newest first, label names the owning load, and clicking lands on the owning entity's page (drivers/trucks were already searchable — the gap was docs). Deep content search stays on /docsearch. Suite: **1032 pgTAP / 177 files.** `a15694e`.
+
 *(Run continues; closeout will finalize the count.)*
