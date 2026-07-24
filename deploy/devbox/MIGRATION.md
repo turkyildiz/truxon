@@ -44,7 +44,13 @@ by standing rule (below).
    fleet cert `3F:9D:34:BC…`). Then **google-services.json**: export the
    attachment from KeePassXC → `mobile/android/app/google-services.json`.
 8. **Supabase** — `supabase login` then
-   `supabase link --project-ref okoeeyxxvzypjiumraxq`.
+   `supabase link --project-ref okoeeyxxvzypjiumraxq`. Then regenerate
+   `frontend/.env.local` (gitignored, public values only):
+   ```bash
+   printf 'VITE_SUPABASE_URL=https://okoeeyxxvzypjiumraxq.supabase.co\nVITE_SUPABASE_ANON_KEY=%s\n' \
+     "$(supabase projects api-keys --project-ref okoeeyxxvzypjiumraxq -o json | jq -r '.[]|select(.name=="anon")|.api_key')" \
+     > ~/TRUXON/frontend/.env.local
+   ```
 9. **Verify** (nothing is done until this passes):
    ```bash
    flutter doctor                    # all green except optional linux-desktop

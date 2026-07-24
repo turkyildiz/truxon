@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { customerKeepFire, dotAuditPack, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -110,6 +110,71 @@ function StorageCard() {
           Largest: {s.largest.slice(0, 3).map((l) => `${l.filename} (${mb(l.bytes)})`).join(' · ')}
         </p>
       )}
+    </Card>
+  )
+}
+
+/** R9 #125: who cancels booked freight and what it costs. Hidden when the
+ * window has zero cancellations — no card is better than an empty brag. */
+function CancellationCard() {
+  const q = useQuery({ queryKey: ['cancel-analytics'], queryFn: () => cancellationAnalytics(90), retry: false, staleTime: 10 * 60 * 1000 })
+  const c = q.data
+  if (q.isError || !c || c.cancelled === 0) return null
+  return (
+    <Card title="🚫 Cancellations (90d)">
+      <p className="text-sm text-body">
+        <span className="font-semibold">{c.cancelled}</span> of {c.booked} booked loads cancelled
+        ({c.cancel_rate_pct ?? 0}%) — <span className="font-semibold text-rose-600 dark:text-rose-400">{money(c.revenue_walked)}</span> in booked revenue walked away.
+      </p>
+      {c.by_customer.length > 0 && (
+        <Table headers={['Customer', 'Booked', 'Cancelled', 'Rate', 'Revenue walked']}>
+          {c.by_customer.slice(0, 8).map((r) => (
+            <tr key={r.customer}>
+              <td className="px-3 py-2 font-medium">{r.customer}</td>
+              <td className="px-3 py-2">{r.booked}</td>
+              <td className="px-3 py-2">{r.cancelled}</td>
+              <td className={`px-3 py-2 ${r.rate_pct >= 20 ? 'font-semibold text-rose-600 dark:text-rose-400' : ''}`}>{r.rate_pct}%</td>
+              <td className="px-3 py-2">{money(r.revenue_walked)}</td>
+            </tr>
+          ))}
+        </Table>
+      )}
+      <p className="mt-1 text-[11px] text-muted">
+        Revenue walked is the booked rate on cancelled loads — it ignores any TONU collected, so treat it as the ceiling of the loss.
+      </p>
+    </Card>
+  )
+}
+
+/** R9 #126: which delivery regions strand the trucks — the repositioning bill. */
+function DeadheadCard() {
+  const q = useQuery({ queryKey: ['deadhead-patterns'], queryFn: () => deadheadPatterns(120), retry: false, staleTime: 10 * 60 * 1000 })
+  const d = q.data
+  if (q.isError || !d || d.hops_measured === 0) return null
+  return (
+    <Card title="🔄 Deadhead patterns (120d)">
+      <p className="text-sm text-body">
+        {d.hops_measured} load-to-load hops measured, averaging{' '}
+        <span className="font-semibold">{Number(d.avg_deadhead_miles ?? 0).toLocaleString()} empty miles</span> to the next pickup.
+      </p>
+      {d.by_delivery_state.length > 0 && (
+        <Table headers={['Deliver into', 'Hops', 'Avg deadhead', 'Total deadhead']}>
+          {d.by_delivery_state.slice(0, 8).map((r) => (
+            <tr key={r.state}>
+              <td className="px-3 py-2 font-medium">{r.state}</td>
+              <td className="px-3 py-2">{r.hops}</td>
+              <td className={`px-3 py-2 ${r.avg_deadhead >= 150 ? 'font-semibold text-amber-600 dark:text-amber-400' : ''}`}>{Number(r.avg_deadhead).toLocaleString()} mi</td>
+              <td className="px-3 py-2">{Number(r.total_deadhead).toLocaleString()} mi</td>
+            </tr>
+          ))}
+        </Table>
+      )}
+      {d.worst_pairs.length > 0 && (
+        <p className="mt-1 text-xs text-muted">
+          Worst repositioning: {d.worst_pairs.slice(0, 4).map((p) => `${p.from}→${p.to_pickup ?? '?'} pickup (${Number(p.avg_deadhead).toLocaleString()} mi avg)`).join(' · ')}
+        </p>
+      )}
+      <p className="mt-1 text-[11px] text-muted">{d.note}</p>
     </Card>
   )
 }

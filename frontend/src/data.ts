@@ -2609,6 +2609,34 @@ export async function storageUsageReport(): Promise<StorageUsage | null> {
   return (data as unknown as StorageUsage) ?? null
 }
 
+/** R9 #125: who cancels booked freight and what it costs. */
+export interface CancellationAnalytics {
+  days: number
+  booked: number
+  cancelled: number
+  cancel_rate_pct: number | null
+  revenue_walked: number
+  by_customer: { customer: string; booked: number; cancelled: number; rate_pct: number; revenue_walked: number }[]
+}
+export async function cancellationAnalytics(days = 90): Promise<CancellationAnalytics | null> {
+  const data = unwrap(await supabase.rpc('cancellation_analytics', { p_days: days }))
+  return (data as unknown as CancellationAnalytics) ?? null
+}
+
+/** R9 #126: which delivery regions strand the trucks (repositioning bill). */
+export interface DeadheadPatterns {
+  days: number
+  hops_measured: number
+  avg_deadhead_miles: number | null
+  by_delivery_state: { state: string; hops: number; avg_deadhead: number; total_deadhead: number }[]
+  worst_pairs: { from: string; to_pickup: string | null; hops: number; avg_deadhead: number }[]
+  note: string
+}
+export async function deadheadPatterns(days = 120): Promise<DeadheadPatterns | null> {
+  const data = unwrap(await supabase.rpc('deadhead_patterns', { p_days: days }))
+  return (data as unknown as DeadheadPatterns) ?? null
+}
+
 export interface WriteoffProposal {
   id: number
   status: 'proposed' | 'approved'
