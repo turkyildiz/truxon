@@ -2689,6 +2689,36 @@ export async function searchRadioTranscripts(query: string, days = 30): Promise<
   return (data as unknown as RadioSearchResult) ?? null
 }
 
+/** R9 #132: how fast paper becomes a booked load. */
+export interface RateconTurnaround {
+  days: number
+  loads: number
+  no_ratecon: number
+  extracted_at_booking: number
+  paper_first: { n: number; median_hours: number | null; worst_hours: number | null }
+  booked_before_paper: number
+  note: string
+}
+export async function rateconTurnaround(days = 90): Promise<RateconTurnaround | null> {
+  const data = unwrap(await supabase.rpc('ratecon_turnaround_report', { p_days: days }))
+  return (data as unknown as RateconTurnaround) ?? null
+}
+
+/** R9 #135: customers who used to ship and went quiet beyond their cadence. */
+export interface LostCustomerRow {
+  customer: string
+  last_load: string
+  days_quiet: number
+  usual_gap_days: number
+  loads: number
+  trailing_revenue: number
+  cancels: number
+}
+export async function lostCustomers(staleDays = 45): Promise<{ lost: LostCustomerRow[]; note: string } | null> {
+  const data = unwrap(await supabase.rpc('lost_customer_report', { p_stale_days: staleDays }))
+  return (data as unknown as { lost: LostCustomerRow[]; note: string }) ?? null
+}
+
 export interface WriteoffProposal {
   id: number
   status: 'proposed' | 'approved'

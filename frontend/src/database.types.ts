@@ -4856,6 +4856,10 @@ export type Database = {
       }
       loads_missing_pod_summary: { Args: { p_days?: number }; Returns: Json }
       log_observation: { Args: { p: Json }; Returns: number }
+      lost_customer_report: {
+        Args: { p_lookback_days?: number; p_stale_days?: number }
+        Returns: Json
+      }
       maintenance_alerts: {
         Args: never
         Returns: {
@@ -5093,6 +5097,7 @@ export type Database = {
       qbo_writeoff_list: { Args: never; Returns: Json }
       qbo_writeoff_seed: { Args: never; Returns: number }
       ratecon_recon_report: { Args: { p_days?: number }; Returns: Json }
+      ratecon_turnaround_report: { Args: { p_days?: number }; Returns: Json }
       record_invoice_payment: {
         Args: {
           p_amount: number

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -175,6 +175,52 @@ function DeadheadCard() {
         </p>
       )}
       <p className="mt-1 text-[11px] text-muted">{d.note}</p>
+    </Card>
+  )
+}
+
+/** R9 #132: paper-to-booked turnaround, buckets kept honest. */
+function TurnaroundCard() {
+  const q = useQuery({ queryKey: ['ratecon-turnaround'], queryFn: () => rateconTurnaround(90), retry: false, staleTime: 10 * 60 * 1000 })
+  const t = q.data
+  if (q.isError || !t || t.loads === 0) return null
+  return (
+    <Card title="⏱ Rate-con turnaround (90d)">
+      <p className="text-sm text-body">
+        {t.paper_first.n > 0
+          ? <>Paper-first bookings turn around in <span className="font-semibold">{t.paper_first.median_hours}h median</span> (worst {t.paper_first.worst_hours}h) across {t.paper_first.n} loads.</>
+          : 'No paper-first bookings in the window.'}
+      </p>
+      <p className="mt-1 text-xs text-muted">
+        {t.extracted_at_booking} extracted at booking · {t.booked_before_paper} booked before the paper arrived ·{' '}
+        <span className={t.no_ratecon > 0 ? 'font-semibold text-amber-600 dark:text-amber-400' : ''}>{t.no_ratecon} with no rate con at all</span> — of {t.loads} loads.
+      </p>
+      <p className="mt-1 text-[11px] text-muted">{t.note}</p>
+    </Card>
+  )
+}
+
+/** R9 #135: revenue that stopped — customers quiet beyond their own cadence. */
+function LostCustomersCard() {
+  const q = useQuery({ queryKey: ['lost-customers'], queryFn: () => lostCustomers(45), retry: false, staleTime: 10 * 60 * 1000 })
+  const r = q.data
+  if (q.isError || !r || r.lost.length === 0) return null
+  return (
+    <Card title="🕳 Lost customers">
+      <Table headers={['Customer', 'Last load', 'Quiet', 'Usual gap', 'Loads', 'Trailing revenue', 'Cancels']}>
+        {r.lost.slice(0, 8).map((c) => (
+          <tr key={c.customer}>
+            <td className="px-3 py-2 font-medium">{c.customer}</td>
+            <td className="px-3 py-2">{c.last_load}</td>
+            <td className="px-3 py-2 font-semibold text-rose-600 dark:text-rose-400">{c.days_quiet}d</td>
+            <td className="px-3 py-2">{c.usual_gap_days}d</td>
+            <td className="px-3 py-2">{c.loads}</td>
+            <td className="px-3 py-2">{money(c.trailing_revenue)}</td>
+            <td className="px-3 py-2">{c.cancels > 0 ? c.cancels : '—'}</td>
+          </tr>
+        ))}
+      </Table>
+      <p className="mt-1 text-[11px] text-muted">{r.note}. Worth a call before the lane goes to someone else.</p>
     </Card>
   )
 }
@@ -572,6 +618,10 @@ export default function Reports() {
           <PricingDisciplineCard />
           <ActualsCard />
           <KeepFireCard />
+          <TurnaroundCard />
+          <LostCustomersCard />
+          <CancellationCard />
+          <DeadheadCard />
           <NpsCard />
         </>
       )}
