@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, downloadBankerPackage, downloadInsuranceDataRoom, downloadTaxPackage, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { createSavedReport, deleteSavedReport, listSavedReports, reportMetricCatalog, cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, downloadBankerPackage, downloadInsuranceDataRoom, downloadTaxPackage, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { errorMessage } from '../supabase'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -261,6 +262,93 @@ function QuotePricingCard() {
         {p.note}. {p.no_rate_recorded > 0 ? `${p.no_rate_recorded} decided quotes had no rate recorded. ` : ''}
         {p.no_lane_history > 0 ? `${p.no_lane_history} priced quotes were on lanes we've never run.` : ''}
       </p>
+    </Card>
+  )
+}
+
+/** R9 #174/#175: build a report from the trended-metric catalog, save it, and
+ * optionally schedule it to email weekly. Office roles only (RPCs 42501). */
+function ReportBuilderCard() {
+  const qc = useQueryClient()
+  const catalogQ = useQuery({ queryKey: ['metric-catalog'], queryFn: reportMetricCatalog, retry: false, staleTime: 10 * 60 * 1000 })
+  const savedQ = useQuery({ queryKey: ['saved-reports'], queryFn: listSavedReports, retry: false })
+  const [name, setName] = useState('')
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [weekly, setWeekly] = useState(false)
+  const [recipients, setRecipients] = useState('')
+  const [note, setNote] = useState('')
+  const [filter, setFilter] = useState('')
+  const create = useMutation({
+    mutationFn: () => createSavedReport({
+      name: name.trim(),
+      metric_keys: [...picked],
+      schedule: weekly ? 'weekly' : 'none',
+      recipients: recipients.split(',').map((s) => s.trim()).filter(Boolean),
+    }),
+    onSuccess: () => {
+      setName(''); setPicked(new Set()); setWeekly(false); setRecipients(''); setNote('✓ Report saved')
+      qc.invalidateQueries({ queryKey: ['saved-reports'] })
+    },
+    onError: (e) => setNote(errorMessage(e)),
+  })
+  const del = useMutation({
+    mutationFn: (id: number) => deleteSavedReport(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-reports'] }),
+  })
+  if (catalogQ.isError) return null
+  const catalog = catalogQ.data ?? []
+  const shown = filter ? catalog.filter((m) => m.metric_key.includes(filter.toLowerCase())) : catalog
+  const toggle = (k: string) => setPicked((p) => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n })
+  return (
+    <Card title="🧱 Report builder">
+      {(savedQ.data ?? []).length > 0 && (
+        <ul className="mb-3 space-y-1">
+          {savedQ.data!.map((r) => (
+            <li key={r.id} className="flex items-center justify-between rounded border border-edge px-2 py-1 text-sm">
+              <span>
+                <span className="font-medium">{r.name}</span>
+                <span className="ml-2 text-xs text-muted">
+                  {r.metric_keys.length} metric{r.metric_keys.length === 1 ? '' : 's'}
+                  {r.schedule === 'weekly' ? ` · 📧 weekly → ${r.recipients.join(', ') || 'no recipients'}` : ''}
+                  {r.last_sent_at ? ` · last sent ${new Date(r.last_sent_at).toLocaleDateString()}` : ''}
+                </span>
+              </span>
+              <button type="button" aria-label={`Delete ${r.name}`} className="text-xs text-muted hover:text-red-600" onClick={() => del.mutate(r.id)}>✕</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
+          <Input placeholder="Report name" value={name} onChange={(e) => setName(e.target.value)} className="w-48 !py-1 text-sm" />
+          <Input placeholder="Filter metrics…" value={filter} onChange={(e) => setFilter(e.target.value)} className="w-40 !py-1 text-sm" />
+          <label className="flex items-center gap-1.5 text-sm text-body">
+            <input type="checkbox" checked={weekly} onChange={(e) => setWeekly(e.target.checked)} /> 📧 Email weekly (Mon 7am)
+          </label>
+          {weekly && (
+            <Input placeholder="recipients, comma-separated" value={recipients} onChange={(e) => setRecipients(e.target.value)} className="w-56 !py-1 text-sm" />
+          )}
+        </div>
+        <div className="max-h-40 overflow-y-auto rounded border border-edge p-2">
+          {shown.length === 0 ? (
+            <p className="text-xs text-muted">No trended metrics yet — the nightly snapshot fills this catalog.</p>
+          ) : shown.map((m) => (
+            <label key={m.metric_key} className="flex cursor-pointer items-center gap-2 py-0.5 text-xs">
+              <input type="checkbox" checked={picked.has(m.metric_key)} onChange={() => toggle(m.metric_key)} />
+              <span className="font-mono">{m.metric_key}</span>
+              <span className="text-muted">{Number(m.value).toLocaleString()}</span>
+            </label>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button type="button" disabled={create.isPending || !name.trim() || picked.size === 0}
+            onClick={() => { setNote(''); create.mutate() }}>
+            {create.isPending ? 'Saving…' : `Save report (${picked.size})`}
+          </Button>
+          {note && <span className="text-xs text-muted">{note}</span>}
+        </div>
+        <p className="text-[11px] text-muted">Metrics come from the nightly trend store — the builder surfaces only what the app already tracks. Weekly reports email a WoW digest.</p>
+      </div>
     </Card>
   )
 }
@@ -720,6 +808,7 @@ export default function Reports() {
           <DotAuditCard />
           <StorageCard />
           <ExecPackagesCard />
+          <ReportBuilderCard />
           <WebPerfCard />
           <LanesCard />
           <StressCard />

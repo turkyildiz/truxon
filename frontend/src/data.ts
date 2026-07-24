@@ -3138,3 +3138,37 @@ export async function revRecDrift(months = 6): Promise<RevRecMonth[]> {
   const d = unwrap(await supabase.rpc('rev_rec_drift', { p_months: months })) as unknown as { months: RevRecMonth[] } | null
   return d?.months ?? []
 }
+
+/** R9 #174/#175: custom report builder + scheduling. */
+export interface MetricCatalogItem { metric_key: string; value: number; captured_on: string }
+export async function reportMetricCatalog(): Promise<MetricCatalogItem[]> {
+  const d = unwrap(await supabase.rpc('report_metric_catalog')) as unknown as { metrics: MetricCatalogItem[] } | null
+  return d?.metrics ?? []
+}
+export interface SavedReport {
+  id: number
+  name: string
+  metric_keys: string[]
+  schedule: 'none' | 'weekly'
+  recipients: string[]
+  is_active: boolean
+  last_sent_at: string | null
+}
+export async function listSavedReports(): Promise<SavedReport[]> {
+  const { data, error } = await supabase.from('saved_reports').select('*').order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data as unknown as SavedReport[]) ?? []
+}
+export async function createSavedReport(r: Pick<SavedReport, 'name' | 'metric_keys' | 'schedule' | 'recipients'>): Promise<void> {
+  const { error } = await supabase.from('saved_reports').insert(r)
+  if (error) throw new Error(error.message)
+}
+export async function deleteSavedReport(id: number): Promise<void> {
+  const { error } = await supabase.from('saved_reports').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+export interface RenderedReportRow { metric_key: string; value: number | null; captured_on: string | null; prior: number | null }
+export async function renderSavedReport(id: number): Promise<{ name: string; rows: RenderedReportRow[] } | null> {
+  const d = unwrap(await supabase.rpc('render_saved_report', { p_id: id }))
+  return (d as unknown as { name: string; rows: RenderedReportRow[] }) ?? null
+}

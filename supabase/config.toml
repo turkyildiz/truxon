@@ -59,6 +59,10 @@ verify_jwt = false
 # public status door: token → one load's read-only status + post-delivery thumbs
 verify_jwt = false
 
+[functions.report-send]
+# weekly scheduled-report emailer; cron-gated (x-cron-key), no interactive caller
+verify_jwt = false
+
 [functions.trux-tts]
 # premium voice: proxies ElevenLabs TTS; caller verified in-function via getCaller
 verify_jwt = false

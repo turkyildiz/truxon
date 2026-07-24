@@ -1,3 +1,4 @@
+Connecting to db 5432
 export type Json =
   | string
   | number
@@ -3104,6 +3105,50 @@ export type Database = {
           },
         ]
       }
+      saved_reports: {
+        Row: {
+          created_at: string
+          id: number
+          is_active: boolean
+          last_sent_at: string | null
+          metric_keys: string[]
+          name: string
+          owner_id: string
+          recipients: string[]
+          schedule: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          is_active?: boolean
+          last_sent_at?: string | null
+          metric_keys?: string[]
+          name: string
+          owner_id?: string
+          recipients?: string[]
+          schedule?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          is_active?: boolean
+          last_sent_at?: string | null
+          metric_keys?: string[]
+          name?: string
+          owner_id?: string
+          recipients?: string[]
+          schedule?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_reports_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       state_polygons: {
         Row: {
           geom: unknown
@@ -4789,6 +4834,7 @@ export type Database = {
         Returns: Json
       }
       driver_wallet_path: { Args: { p_name: string }; Returns: boolean }
+      due_scheduled_reports: { Args: never; Returns: Json }
       duplicate_customer_groups: {
         Args: never
         Returns: {
@@ -5137,6 +5183,7 @@ export type Database = {
         Args: { p_factor?: string; p_fee?: number; p_id: number }
         Returns: undefined
       }
+      mark_report_sent: { Args: { p_id: number }; Returns: undefined }
       match_document_embeddings: {
         Args: { p_count?: number; p_embedding: string; p_entity_type?: string }
         Returns: {
@@ -5318,6 +5365,7 @@ export type Database = {
         }
         Returns: Json
       }
+      render_saved_report: { Args: { p_id: number }; Returns: Json }
       replace_load_stops: {
         Args: { p_load_id: number; p_stops?: Json }
         Returns: {
@@ -5348,6 +5396,7 @@ export type Database = {
         }
         Returns: Json
       }
+      report_metric_catalog: { Args: never; Returns: Json }
       resolve_equipment_conflict: {
         Args: { p_action: string; p_log_id: number }
         Returns: undefined
