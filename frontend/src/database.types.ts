@@ -4374,6 +4374,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      banker_package: { Args: { p_months?: number }; Returns: Json }
       bless_security_baseline: { Args: never; Returns: Json }
       breakdown_ml_readiness: { Args: never; Returns: Json }
       bs_upsert: { Args: { p: Json }; Returns: undefined }
@@ -5526,6 +5527,7 @@ export type Database = {
         Returns: Json
       }
       system_status: { Args: never; Returns: Json }
+      tax_season_package: { Args: { p_year: number }; Returns: Json }
       toll_by_agency: {
         Args: { p_end: string; p_start: string }
         Returns: {

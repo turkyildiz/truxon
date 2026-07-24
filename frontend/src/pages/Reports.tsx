@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, downloadBankerPackage, downloadTaxPackage, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -260,6 +260,42 @@ function QuotePricingCard() {
       <p className="mt-1 text-[11px] text-muted">
         {p.note}. {p.no_rate_recorded > 0 ? `${p.no_rate_recorded} decided quotes had no rate recorded. ` : ''}
         {p.no_lane_history > 0 ? `${p.no_lane_history} priced quotes were on lanes we've never run.` : ''}
+      </p>
+    </Card>
+  )
+}
+
+/** R9 #170/#171: one-click export packages for a banker or the accountant —
+ * assembled from data we already hold, downloaded as structured JSON. Hidden
+ * for non-office roles (the RPCs 42501). */
+function ExecPackagesCard() {
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState('')
+  const year = new Date().getFullYear() - 1
+  const run = async (label: string, fn: () => Promise<void>) => {
+    setBusy(label); setNote('')
+    try { await fn(); setNote(`✓ ${label} downloaded`) }
+    catch (e) { setNote(e instanceof Error ? e.message : 'Export failed') }
+    finally { setBusy('') }
+  }
+  return (
+    <Card title="📦 Export packages">
+      <p className="text-sm text-muted">
+        Structured bundles assembled from data we already hold — hand them to a lender or your accountant.
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button variant="secondary" disabled={!!busy}
+          onClick={() => run('Banker package', () => downloadBankerPackage(12))}>
+          {busy === 'Banker package' ? 'Building…' : '🏦 Banker package'}
+        </Button>
+        <Button variant="secondary" disabled={!!busy}
+          onClick={() => run('Tax package', () => downloadTaxPackage(year))}>
+          {busy === 'Tax package' ? 'Building…' : `🧾 Tax package ${year}`}
+        </Button>
+      </div>
+      {note && <p className="mt-2 text-xs text-muted">{note}</p>}
+      <p className="mt-1 text-[11px] text-muted">
+        Worksheets, not filed returns or audited statements — each file names its own gaps.
       </p>
     </Card>
   )
@@ -679,6 +715,7 @@ export default function Reports() {
           <DriverCards weekOffset={Math.max(0, Math.round((new Date(todayISO() + 'T00:00:00').getTime() - new Date(weekOf + 'T00:00:00').getTime()) / (7 * 86400000)))} />
           <DotAuditCard />
           <StorageCard />
+          <ExecPackagesCard />
           <WebPerfCard />
           <LanesCard />
           <StressCard />

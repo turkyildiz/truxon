@@ -2908,6 +2908,25 @@ export async function webPerfReport(days = 7): Promise<WebPerf | null> {
   return (data as unknown as WebPerf) ?? null
 }
 
+/** R9 #170/#171: external-party export packages (banker / tax). Fetch the
+ * assembled JSON and hand it to the browser as a download. */
+async function downloadPackageJson(rpc: string, args: Record<string, unknown>, filename: string): Promise<void> {
+  const data = unwrap(await supabase.rpc(rpc, args))
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+export function downloadBankerPackage(months = 12): Promise<void> {
+  return downloadPackageJson('banker_package', { p_months: months }, `truxon-banker-package-${new Date().toISOString().slice(0, 10)}.json`)
+}
+export function downloadTaxPackage(year: number): Promise<void> {
+  return downloadPackageJson('tax_season_package', { p_year: year }, `truxon-tax-package-${year}.json`)
+}
+
 export interface WriteoffProposal {
   id: number
   status: 'proposed' | 'approved'
