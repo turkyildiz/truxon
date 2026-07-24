@@ -137,4 +137,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 
 - **#129 quote pricing feedback** — `quoted_rate`/`lost_reason` now captured on the quote queue (📨 card on Customers: record rate → Won/Lost-with-reason); `quote_pricing_report()` says the sentence win-rate never could: won vs lost premium **against our own booked lane average** (never claims market knowledge; unpriced quotes and never-run lanes reported separately, not hidden). 💬 Reports card. Suite: **989 pgTAP / 171 files**, anon 42501 verified, `1638c1e`.
 
+- **#127/#133 customer share links + NPS-lite** — 🔗 Share-status on LoadDetail mints one idempotent, revocable, 90-day token per load; public `/share/<token>` page (load-share edge fn, drive-share bounded-capability pattern, IP rate-limited 30/min) shows status/route/appointments, coarse "near \<city\>" only while rolling, and a POD-on-file line; thumbs 👍/👎 + comment opens only after delivery, exactly once per link, banked in `load_feedback`. Live-verified: bogus token → 404, anon RPC → 42501. Suite: **997 pgTAP / 172 files.** `e306d01`.
+
 *(Run continues; closeout will finalize the count.)*
