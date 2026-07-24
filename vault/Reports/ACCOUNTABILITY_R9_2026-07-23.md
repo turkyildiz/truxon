@@ -145,4 +145,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 
 - **#128 quote-response drafts (propose-only)** — 💡 Draft on the quote queue: `draft_quote_response()` prices from our own lane book (90-day book preferred, year fallback), folds in the won-quote premium when it's sane (±20%), rounds to $25, and writes the reply email; one click copies it and prefills the rate field. Unknown lanes return `no_history` and no number. **Nothing sends — the human quotes.** Suite: **1021 pgTAP / 175 files.** `4fafc72`.
 
+- **#138 close-out — SECTION J COMPLETE (127–138).** Round-2 mining already runs (docs, 2h owner-approved mail miner, QBO, vision-on-click), so #138's real gap was the residue: `customer_enrichment_gaps()` counts remaining blanks per field and names the **dead ends** — customers with blanks and NO minable source left (no docs on them or their loads, no observed mail, no QBO link) — "those need a phone call, not more AI." 🧩 card on Customers with the call list. Suite: **1027 pgTAP / 176 files.** `d7db3f8`.
+
 *(Run continues; closeout will finalize the count.)*
