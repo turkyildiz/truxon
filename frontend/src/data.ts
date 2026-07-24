@@ -2769,6 +2769,12 @@ export async function quotePricingReport(days = 180): Promise<QuotePricing | nul
   return (data as unknown as QuotePricing) ?? null
 }
 
+/** R9 #127: mint (or reuse) the public share link for a load. */
+export async function createLoadShare(loadId: number): Promise<string> {
+  const token = unwrap(await supabase.rpc('create_load_share', { p_load_id: loadId }))
+  return `${window.location.origin}/share/${token}`
+}
+
 export interface WriteoffProposal {
   id: number
   status: 'proposed' | 'approved'

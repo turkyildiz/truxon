@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom'
 import DocsNotes from '../components/DocsNotes'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
 import { Badge, Button, Card, Field, formatDateTime, Input, LoadError, money, Select, Textarea } from '../components/ui'
-import { addCheckCall, cancelLoad, changeLoadStatus, getLoad, listCheckCalls, listStops, loadRoute, nextLoadSuggestions, replaceStops, setLoadPaperwork, uncancelLoad, updateLoad } from '../data'
+import { addCheckCall, cancelLoad, changeLoadStatus, createLoadShare, getLoad, listCheckCalls, listStops, loadRoute, nextLoadSuggestions, replaceStops, setLoadPaperwork, uncancelLoad, updateLoad } from '../data'
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -193,6 +193,23 @@ export default function LoadDetail() {
     onError: (err) => setError(errorMessage(err)),
   })
 
+  // R9 #127: mint the customer status link and put it on the clipboard.
+  const [shareNote, setShareNote] = useState('')
+  const share = useMutation({
+    mutationFn: () => createLoadShare(Number(id)),
+    onSuccess: async (url) => {
+      try {
+        await navigator.clipboard.writeText(url)
+        setShareNote('✓ Link copied')
+      } catch {
+        window.prompt('Customer status link (copy it):', url)
+        setShareNote('🔗 Share status')
+      }
+      setTimeout(() => setShareNote(''), 3000)
+    },
+    onError: (err) => setError(errorMessage(err)),
+  })
+
   const saveEdit = useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
       const realStops = editStops.filter((s) => s.facility || s.address || s.time || s.reference)
@@ -283,6 +300,11 @@ export default function LoadDetail() {
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-600 dark:text-amber-300">
                 📄 Awaiting paperwork
               </span>
+            )}
+            {!editForm && (
+              <Button variant="secondary" disabled={share.isPending} onClick={() => share.mutate()}>
+                {share.isPending ? '…' : shareNote || '🔗 Share status'}
+              </Button>
             )}
             {editable && !editForm && (
               <Button variant="secondary" onClick={startEdit}>

@@ -55,6 +55,10 @@ verify_jwt = false
 # public download door: resolves a share token to a short-lived signed URL
 verify_jwt = false
 
+[functions.load-share]
+# public status door: token → one load's read-only status + post-delivery thumbs
+verify_jwt = false
+
 [functions.trux-tts]
 # premium voice: proxies ElevenLabs TTS; caller verified in-function via getCaller
 verify_jwt = false

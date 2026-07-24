@@ -1971,6 +1971,48 @@ export type Database = {
           },
         ]
       }
+      load_feedback: {
+        Row: {
+          comment: string
+          created_at: string
+          id: number
+          load_id: number
+          rating: string
+          share_id: number
+        }
+        Insert: {
+          comment?: string
+          created_at?: string
+          id?: number
+          load_id: number
+          rating: string
+          share_id: number
+        }
+        Update: {
+          comment?: string
+          created_at?: string
+          id?: number
+          load_id?: number
+          rating?: string
+          share_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "load_feedback_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "loads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "load_feedback_share_id_fkey"
+            columns: ["share_id"]
+            isOneToOne: true
+            referencedRelation: "load_share_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       load_line_items: {
         Row: {
           amount: number
@@ -2002,6 +2044,51 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "load_line_items_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "loads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      load_share_links: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: number
+          load_id: number
+          revoked: boolean
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          expires_at?: string
+          id?: number
+          load_id: number
+          revoked?: boolean
+          token: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: number
+          load_id?: number
+          revoked?: boolean
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "load_share_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "load_share_links_load_id_fkey"
             columns: ["load_id"]
             isOneToOne: false
             referencedRelation: "loads"
@@ -4394,6 +4481,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_load_share: { Args: { p_load_id: number }; Returns: string }
       create_work_order_draft: { Args: { p: Json }; Returns: number }
       credit_memo_summary: { Args: { p_months?: number }; Returns: Json }
       current_odometer: { Args: { p_truck_id: number }; Returns: number }

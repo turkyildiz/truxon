@@ -15,6 +15,7 @@ const Landing = lazy(() => import('./pages/Landing'))
 const Privacy = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Privacy })))
 const Terms = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Terms })))
 const Login = lazy(() => import('./pages/Login'))
+const Share = lazy(() => import('./pages/Share'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Trux = lazy(() => import('./pages/Trux'))
 const FleetMap = lazy(() => import('./pages/FleetMap'))
@@ -77,6 +78,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/share/:token" element={<Share />} />
             <Route
               element={
                 <Protected>
