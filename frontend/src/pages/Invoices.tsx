@@ -132,6 +132,35 @@ export default function Invoices() {
   const [pageError, setPageError] = useState('')
   const [payFor, setPayFor] = useState<Invoice | null>(null)
   const [emailFor, setEmailFor] = useState<Invoice | null>(null)
+  // R9 #155: bulk actions on the receivables list. Batch = mark-sent drafts
+  // and batch PDFs; batch EMAIL stays per-invoice on purpose (recipients are
+  // chosen per send — no blind mass mail).
+  const [bulkSel, setBulkSel] = useState<Set<number>>(new Set())
+  const [bulkNote, setBulkNote] = useState('')
+  const toggleBulk = (id: number) =>
+    setBulkSel((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const bulkMarkSent = useMutation({
+    mutationFn: async (ids: number[]) => {
+      let done = 0
+      for (const id of ids) { await setInvoiceStatus(id, 'sent'); done++ }
+      return done
+    },
+    onSuccess: (done) => {
+      setBulkNote(`✓ ${done} draft${done === 1 ? '' : 's'} marked sent`)
+      setBulkSel(new Set())
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+      qc.invalidateQueries({ queryKey: ['acct-summary'] })
+    },
+    onError: (err) => setBulkNote(errorMessage(err)),
+  })
+  const bulkPdf = useMutation({
+    mutationFn: async (ids: number[]) => {
+      for (const id of ids) await downloadInvoicePdf(id)
+      return ids.length
+    },
+    onSuccess: (n) => setBulkNote(`✓ ${n} PDF${n === 1 ? '' : 's'} downloaded`),
+    onError: (err) => setBulkNote(errorMessage(err)),
+  })
 
   const invoicesQ = useQuery({ queryKey: ['invoices'], queryFn: listInvoices })
   const invoices = invoicesQ.data ?? []
@@ -337,6 +366,29 @@ export default function Invoices() {
               className="ml-auto w-52 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm"
             />
           </div>
+          {bulkSel.size > 0 && (
+            <div className="mb-2 flex flex-wrap items-center gap-3 rounded-lg border border-brand/30 bg-brand/5 px-3 py-2 text-sm">
+              <span className="font-medium">{bulkSel.size} selected</span>
+              {(() => {
+                const selDrafts = filtered.filter((i) => bulkSel.has(i.id) && i.status === 'draft' && i.source !== 'qbo').map((i) => i.id)
+                return (
+                  <button type="button" disabled={bulkMarkSent.isPending || selDrafts.length === 0}
+                    onClick={() => bulkMarkSent.mutate(selDrafts)}
+                    className="font-medium text-blue-600 hover:underline disabled:opacity-40">
+                    Mark {selDrafts.length} draft{selDrafts.length === 1 ? '' : 's'} sent
+                  </button>
+                )
+              })()}
+              <button type="button" disabled={bulkPdf.isPending}
+                onClick={() => bulkPdf.mutate([...bulkSel])}
+                className="font-medium text-brand hover:underline disabled:opacity-40">
+                {bulkPdf.isPending ? 'Downloading…' : 'Download PDFs'}
+              </button>
+              <button type="button" onClick={() => { setBulkSel(new Set()); setBulkNote('') }} className="text-muted hover:text-body">Clear</button>
+              {bulkNote && <span className="text-xs text-muted">{bulkNote}</span>}
+            </div>
+          )}
+          {bulkSel.size === 0 && bulkNote && <p className="mb-2 text-xs text-muted">{bulkNote}</p>}
           {invoicesQ.isLoading ? (
             <p className="py-8 text-center text-muted">Loading…</p>
           ) : invoicesQ.isError ? (
@@ -347,6 +399,7 @@ export default function Invoices() {
             <>
               <Table
                 headers={[
+                  '',
                   { label: 'Invoice #', key: 'number' },
                   { label: 'Customer', key: 'customer' },
                   { label: 'Date', key: 'invoice_date' },
@@ -360,6 +413,12 @@ export default function Invoices() {
               >
                 {sorted.map((inv) => (
                   <tr key={inv.id} className="hover:bg-surface-2">
+                    <td className="px-3 py-3">
+                      {inv.source !== 'qbo' && (
+                        <input type="checkbox" checked={bulkSel.has(inv.id)} onChange={() => toggleBulk(inv.id)}
+                          aria-label={`Select ${inv.invoice_number}`} />
+                      )}
+                    </td>
                     <td className="px-3 py-3 font-medium text-brand">
                       {inv.source === 'qbo' ? `#${inv.qbo_doc_number}` : inv.invoice_number}
                       {inv.source === 'qbo' && (

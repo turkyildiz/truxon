@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Badge, Button, Card, compareValues, formatDateTime, Input, LoadError, money, Select, type SortState, Table, toggleSort } from '../components/ui'
-import { listCustomers, listDrivers, listLoads, listMissingPods, loadEtaRisk } from '../data'
+import { changeLoadStatus, listCustomers, listDrivers, listLoads, listMissingPods, loadEtaRisk, updateLoad } from '../data'
+import { errorMessage } from '../supabase'
 import { LOAD_STATUSES, type Load } from '../types'
 
 const ALL_STATUSES = [...LOAD_STATUSES, 'cancelled' as const]
@@ -38,7 +39,22 @@ function MissingPodsBanner() {
 
 export default function Loads() {
   const navigate = useNavigate()
+  const qc = useQueryClient()
   const [q, setQ] = useState('')
+  // R9 #159: inline edits on the list — status advance + driver swap without
+  // opening the detail page. Errors surface under the row that caused them.
+  const [rowErr, setRowErr] = useState<Record<number, string>>({})
+  const advance = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: Load['status'] }) => changeLoadStatus(id, status),
+    onSuccess: (_d, v) => { setRowErr((p) => ({ ...p, [v.id]: '' })); qc.invalidateQueries({ queryKey: ['loads'] }) },
+    onError: (err, v) => setRowErr((p) => ({ ...p, [v.id]: errorMessage(err) })),
+  })
+  const swapDriver = useMutation({
+    mutationFn: ({ id, driverId }: { id: number; driverId: string }) =>
+      updateLoad(id, { driver_id: driverId ? Number(driverId) : null }),
+    onSuccess: (_d, v) => { setRowErr((p) => ({ ...p, [v.id]: '' })); qc.invalidateQueries({ queryKey: ['loads'] }) },
+    onError: (err, v) => setRowErr((p) => ({ ...p, [v.id]: errorMessage(err) })),
+  })
   // Status toggles (crew feedback): one switch per status, multi-select;
   // the landing view opens with In Transit on. All off = show everything.
   const [statuses, setStatuses] = useState<Set<string>>(() => new Set(['in_transit']))
@@ -200,7 +216,22 @@ export default function Loads() {
                     <div className="max-w-45 truncate">{load.delivery_address || '—'}</div>
                     <div className="text-xs text-muted">{formatDateTime(load.delivery_time)}</div>
                   </td>
-                  <td className="px-3 py-3">{load.driver_name ?? '—'}</td>
+                  <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                    {['pending', 'assigned'].includes(load.status) ? (
+                      <select
+                        className="max-w-36 rounded border border-line bg-transparent px-1 py-0.5 text-sm"
+                        value={load.driver_id ?? ''}
+                        disabled={swapDriver.isPending}
+                        onChange={(e) => swapDriver.mutate({ id: load.id, driverId: e.target.value })}
+                        title="Swap driver without opening the load"
+                      >
+                        <option value="">—</option>
+                        {drivers.filter((d) => d.status === 'active' || d.id === load.driver_id).map((d) => (
+                          <option key={d.id} value={d.id}>{d.full_name}</option>
+                        ))}
+                      </select>
+                    ) : (load.driver_name ?? '—')}
+                  </td>
                   <td className="px-3 py-3">{money(load.rate)}</td>
                   <td className="px-3 py-3">{load.rate_per_mile != null ? `$${load.rate_per_mile.toFixed(2)}` : '—'}</td>
                   <td className="px-3 py-3">
@@ -225,6 +256,21 @@ export default function Loads() {
                           📄 Awaiting paperwork
                         </span>
                       )}
+                      {(() => {
+                        const idx = LOAD_STATUSES.indexOf(load.status)
+                        if (idx < 0 || idx >= LOAD_STATUSES.indexOf('completed')) return null
+                        const next = LOAD_STATUSES[idx + 1]
+                        return (
+                          <button
+                            type="button"
+                            disabled={advance.isPending}
+                            onClick={(e) => { e.stopPropagation(); advance.mutate({ id: load.id, status: next }) }}
+                            className="rounded border border-line px-1.5 py-0.5 text-xs text-muted hover:text-body"
+                            title={`Advance to ${next.replace('_', ' ')} without opening the load`}
+                          >→ {next.replace('_', ' ')}</button>
+                        )
+                      })()}
+                      {rowErr[load.id] && <span className="max-w-44 text-xs text-red-600">{rowErr[load.id]}</span>}
                     </div>
                   </td>
                   <td className="px-3 py-3">
