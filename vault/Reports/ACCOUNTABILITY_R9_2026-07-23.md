@@ -107,4 +107,9 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **#102 Misfiled-doc detector** — NAS 3B re-reads LABELED docs weekly (Sun 05:10 scheduler cron, run-audit.sh): opinions banked in `doc_label_audits` (propose-only; unsure = 'Other' and never disputes a human), disagreements fire sentinel `doc_misfiled` ops-warns that auto-resolve on relabel. Sentinel lineage head → `20260723150007`.
 - **#103 OCR quality** — `doc_ocr_quality_report()`: garbled/thin/no_text verdicts from indexed text (plain heuristic, no LLM), re-scan worklist worst-first, image-only docs routed to the vision queue not the re-scan list. Suite: **945 pgTAP / 165 files.** All prod-pushed + live-verified; first live audit run fired on the NAS.
 
+- **#109 index-freshness sentinel** — docs waiting 3h+ with a 26h-silent indexer fires ops-warn (the CRON_SECRET-lockout class of failure, caught in hours not days); lineage head `20260723150009`.
+- **#108 more-like-this** — `similar_documents(id)` pgvector RPC + expander on DocSearch results (real catch: this pgvector build has no `avg(vector)` — first-chunk representative; `<=>` needs `extensions` on the search_path).
+- **#111/#112 bulk zip + storage dashboard** — Download-all-as-zip on every entity's Documents card (fflate, foldered by type); `storage_usage_report()` + 🗄️ Reports card (by type/entity, 6-month intake, largest files).
+- **SECTION H COMPLETE (101–112).** Suite: **952 pgTAP / 166 files**, all green from clean resets; everything prod-pushed and live-verified.
+
 *(Run continues; closeout will finalize the count.)*
