@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, Field, Input, LoadError, PageHeader, Select } from '../components/ui'
-import { searchDocuments, downloadDocumentById, downloadTeamDriveFileById, type DocSearchMatch } from '../data'
+import { searchDocuments, downloadDocumentById, downloadTeamDriveFileById, similarDocuments, type DocSearchMatch, type SimilarDoc } from '../data'
 
 const ENTITY_LABEL: Record<string, string> = {
   customer: 'Customer', load: 'Load', truck: 'Truck', trailer: 'Trailer', driver: 'Driver',
@@ -24,6 +24,15 @@ export default function DocSearch() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const [downloading, setDownloading] = useState<number | null>(null)
+  const [similar, setSimilar] = useState<{ key: number; items: SimilarDoc[] | 'loading' } | null>(null)
+
+  async function moreLikeThis(m: DocSearchMatch, key: number) {
+    if (m.document_id == null) return
+    if (similar?.key === key) { setSimilar(null); return }  // toggle off
+    setSimilar({ key, items: 'loading' })
+    try { setSimilar({ key, items: await similarDocuments(m.document_id) }) }
+    catch (err) { setSimilar(null); setError(err) }
+  }
 
   async function run(e: React.FormEvent) {
     e.preventDefault()
@@ -118,8 +127,32 @@ export default function DocSearch() {
                     <Button variant="secondary" onClick={() => open(m, i)} disabled={downloading === i}>
                       {downloading === i ? 'Opening…' : 'Open'}
                     </Button>
+                    {m.document_id != null && (
+                      <Button variant="secondary" onClick={() => moreLikeThis(m, i)}>
+                        {similar?.key === i ? (similar.items === 'loading' ? 'Finding…' : 'Hide similar') : 'More like this'}
+                      </Button>
+                    )}
                   </div>
                 </div>
+                {similar?.key === i && similar.items !== 'loading' && (
+                  <div className="mt-3 border-t border-border pt-2">
+                    {similar.items.length === 0 ? (
+                      <p className="text-xs text-muted">No similar documents indexed yet.</p>
+                    ) : similar.items.map((s) => (
+                      <button
+                        key={s.document_id}
+                        onClick={() => downloadDocumentById(s.document_id).catch((err) => setError(err))}
+                        className="flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-sm hover:bg-slate-500/10"
+                      >
+                        <span className="min-w-0 truncate">{s.filename}
+                          {s.doc_type && <span className="ml-2 text-xs text-muted">{s.doc_type}</span>}
+                          <span className="ml-2 text-xs text-muted">{s.entity}</span>
+                        </span>
+                        <span className="shrink-0 text-xs text-muted">{Math.round(s.similarity * 100)}%</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </Card>
             ))}
           </div>

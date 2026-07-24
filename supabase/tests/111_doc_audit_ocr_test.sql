@@ -2,7 +2,7 @@
 -- auto-resolves on relabel) and the OCR-quality verdicts.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(8);
+select plan(10);
 
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-0000000000a1'::uuid, 'audit-admin@test.local');
 update public.profiles set role = 'admin' where id = '00000000-0000-4000-8000-0000000000a1';
@@ -19,7 +19,8 @@ from public.loads l,
      (values ('POD','misfiled.pdf'), ('BOL','unsure.pdf'), ('POD','garbled.pdf')) x(t, f)
 where l.notes='audit-load';
 
-create temp table _z as select ('['||array_to_string(array_fill(0, array[768]),',')||']')::vector(768) v;
+-- unit vector, not zero — cosine distance is undefined on zero vectors
+create temp table _z as select ('[1,'||array_to_string(array_fill(0, array[767]),',')||']')::vector(768) v;
 insert into public.document_embeddings (document_id, entity_type, entity_id, chunk_index, content, embedding)
 select d.id, 'load', d.entity_id, 0,
        case d.filename
@@ -67,7 +68,19 @@ select is(
     where (x->>'document_id')::bigint = (select id from public.documents where filename='unsure.pdf')),
   0::bigint, 'image-only docs go to the vision queue, not the re-scan list');
 
--- 8. role gate
+-- 8/9. more-like-this (#108): identical embeddings rank as ~1.0 similar;
+-- the source doc itself is excluded
+select is(
+  (select x->>'filename' from jsonb_array_elements(
+     public.similar_documents((select id from public.documents where filename='misfiled.pdf'), 5)) x limit 1),
+  'garbled.pdf', 'identical-embedding doc ranks first for more-like-this');
+select is(
+  (select count(*) from jsonb_array_elements(
+     public.similar_documents((select id from public.documents where filename='misfiled.pdf'), 5)) x
+    where x->>'filename' = 'misfiled.pdf'),
+  0::bigint, 'a doc is never similar to itself');
+
+-- 10. role gate
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-0000000000a2'::uuid, 'audit-driver@test.local');
 update public.profiles set role = 'driver' where id = '00000000-0000-4000-8000-0000000000a2';
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000000a2"}', true);

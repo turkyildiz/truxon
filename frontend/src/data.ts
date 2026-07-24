@@ -1115,6 +1115,20 @@ export async function searchDocuments(
   }
 }
 
+/** R9 #108: "more like this" — instant pgvector ranking, no NAS round-trip. */
+export interface SimilarDoc {
+  document_id: number
+  filename: string
+  doc_type: string | null
+  entity: string
+  similarity: number
+}
+export async function similarDocuments(documentId: number, limit = 8): Promise<SimilarDoc[]> {
+  const { data, error } = await supabase.rpc('similar_documents', { p_document_id: documentId, p_limit: limit })
+  if (error) throw new Error(error.message)
+  return (data as SimilarDoc[] | null) ?? []
+}
+
 /** Download a Team Drive file by its drive_files id (search results carry ids). */
 export async function downloadTeamDriveFileById(driveFileId: number): Promise<void> {
   const { data: f, error } = await supabase
