@@ -139,4 +139,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 
 - **#127/#133 customer share links + NPS-lite** — 🔗 Share-status on LoadDetail mints one idempotent, revocable, 90-day token per load; public `/share/<token>` page (load-share edge fn, drive-share bounded-capability pattern, IP rate-limited 30/min) shows status/route/appointments, coarse "near \<city\>" only while rolling, and a POD-on-file line; thumbs 👍/👎 + comment opens only after delivery, exactly once per link, banked in `load_feedback`. Live-verified: bogus token → 404, anon RPC → 42501. Suite: **997 pgTAP / 172 files.** `e306d01`.
 
+- **#134/#137 customer one-pagers** — 📋 QBR card on CustomerDetail (this quarter vs last: loads, revenue, $/mi, cancels, real payment speed from invoice→paid, top lanes — ungeocoded lanes print as `?→?`, never invented) + 🕐 detention-policy card (their docks' GPS-measured dwell: avg/median, % past 2h free, detention hours and $ owed at $50/h, slowest facilities named; unmeasured stops counted). **Suite crosses 1,000: 1006 pgTAP / 173 files.** `3ad3c3c`.
+
 *(Run continues; closeout will finalize the count.)*
