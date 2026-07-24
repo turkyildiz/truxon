@@ -30,3 +30,4 @@
 - [Denim factoring](denim-factoring.md) — LIVE; fees ride subtype not type (fixed); denim_jobs mirror + reconciliation; factoring costs 1.99% eff / ~5.3% APR vs 139d book pay; 116 write-off proposals propose-only
 - [Offsite NAS](offsite-nas.md) — INDIANCREEK, 2nd Synology at a different site; on the tailnet via a Docker Tailscale container (100.99.180.17); waiting only on owner to authorize the rsync key, then Claude wires nightly encrypted replication
 - [Security posture](security-posture.md) — CRON_SECRET architecture (rotate via secrets set + watchdog setter), my_role raises for inactive, money-path locks; S-08/09/11 CLOSED + verified 2026-07-21 (withCors 100% coverage); residual gap = OTA manifest signing (mitigated by Android same-key install requirement)
+- [Frontend build check](frontend-build-check.md) — verify frontend with `npm run build` (tsc -b), never `tsc --noEmit` (no-op against the solution tsconfig; caused a 9h Vercel outage)
