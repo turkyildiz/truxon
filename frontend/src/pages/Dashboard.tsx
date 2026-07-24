@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, Bar, BarChart, ResponsiveContainer } from 'recharts'
 import { useAuth } from '../auth'
+import { CHART, ChartGrid, ChartTooltip, ChartXAxis, ChartYAxis, LegendChip } from '../components/charts'
 import { Badge, Button, Card, cityState, formatDate, formatDateTime, LoadError, money, StatCard } from '../components/ui'
 import { cashflowForecast, collectionsQueue, customerKeepFire, dashboardSummary, slowPayRisk } from '../data'
 import { weekTitle } from '../lib/week'
@@ -62,15 +63,6 @@ function PeriodSelect({ value, onChange }: { value: 'weekly' | 'monthly'; onChan
       <option value="weekly">Weekly</option>
       <option value="monthly">Monthly</option>
     </select>
-  )
-}
-
-function LegendChip({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1.5 text-xs font-medium text-muted">
-      <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />
-      {label}
-    </span>
   )
 }
 
@@ -288,15 +280,15 @@ export default function Dashboard() {
           <AreaChart data={trend}>
             <defs>
               <linearGradient id="gradRevenue" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.55} />
-                <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.05} />
+                <stop offset="0%" stopColor={CHART.revenue} stopOpacity={0.55} />
+                <stop offset="100%" stopColor={CHART.revenue} stopOpacity={0.05} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} />
-            <YAxis tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-            <Tooltip formatter={(v) => money(Number(v))} labelFormatter={weekTooltipLabel} />
-            <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#2563eb" strokeWidth={2.5} fill="url(#gradRevenue)" />
+            <ChartGrid />
+            <ChartXAxis dataKey="label" />
+            <ChartYAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+            <ChartTooltip formatter={(v) => money(Number(v))} labelFormatter={weekTooltipLabel} />
+            <Area type="monotone" dataKey="revenue" name="Revenue" stroke={CHART.revenue} strokeWidth={2.5} fill="url(#gradRevenue)" />
           </AreaChart>
         </ResponsiveContainer>
       </Card>
@@ -306,8 +298,8 @@ export default function Dashboard() {
         title="Miles Trend"
         actions={
           <div className="flex items-center gap-4">
-            <LegendChip color="#10b981" label="Total miles" />
-            <LegendChip color="#f59e0b" label="Empty miles" />
+            <LegendChip color={CHART.positive} label="Total miles" />
+            <LegendChip color={CHART.warn} label="Empty miles" />
             <PeriodSelect value={period} onChange={setPeriod} />
           </div>
         }
@@ -316,55 +308,55 @@ export default function Dashboard() {
           <AreaChart data={trend}>
             <defs>
               <linearGradient id="gradMiles" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity={0.5} />
-                <stop offset="100%" stopColor="#10b981" stopOpacity={0.05} />
+                <stop offset="0%" stopColor={CHART.positive} stopOpacity={0.5} />
+                <stop offset="100%" stopColor={CHART.positive} stopOpacity={0.05} />
               </linearGradient>
               <linearGradient id="gradEmpty" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.5} />
-                <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.05} />
+                <stop offset="0%" stopColor={CHART.warn} stopOpacity={0.5} />
+                <stop offset="100%" stopColor={CHART.warn} stopOpacity={0.05} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} />
-            <YAxis tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} tickFormatter={(v) => Number(v).toLocaleString()} />
-            <Tooltip formatter={(v) => Number(v).toLocaleString()} labelFormatter={weekTooltipLabel} />
-            <Area type="monotone" dataKey="miles" name="Total miles" stroke="#059669" strokeWidth={2.5} fill="url(#gradMiles)" />
-            <Area type="monotone" dataKey="empty_miles" name="Empty miles" stroke="#d97706" strokeWidth={2.5} fill="url(#gradEmpty)" />
+            <ChartGrid />
+            <ChartXAxis dataKey="label" />
+            <ChartYAxis tickFormatter={(v) => Number(v).toLocaleString()} />
+            <ChartTooltip formatter={(v) => Number(v).toLocaleString()} labelFormatter={weekTooltipLabel} />
+            <Area type="monotone" dataKey="miles" name="Total miles" stroke={CHART.positive} strokeWidth={2.5} fill="url(#gradMiles)" />
+            <Area type="monotone" dataKey="empty_miles" name="Empty miles" stroke={CHART.warn} strokeWidth={2.5} fill="url(#gradEmpty)" />
           </AreaChart>
         </ResponsiveContainer>
       </Card>
 
       {/* Bottom bar panels */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card title="Top Customers (90 days)" actions={<LegendChip color="#10b981" label="Revenue" />}>
+        <Card title="Top Customers (90 days)" actions={<LegendChip color={CHART.positive} label="Revenue" />}>
           {data.top_customers.length === 0 ? (
             <p className="py-16 text-center text-sm text-muted">No completed loads in the last 90 days.</p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data.top_customers.map((c) => ({ ...c, short: shortName(c.name) }))}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="short" tick={{ fontSize: 11, fill: "var(--muted)" }} tickLine={false} axisLine={false} interval={0} />
-                <YAxis tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v) => money(Number(v))} labelFormatter={(_, p) => p?.[0]?.payload?.name ?? ''} />
-                <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={42} />
+                <ChartGrid />
+                <ChartXAxis dataKey="short" tick={{ fontSize: 11, fill: 'var(--muted)' }} interval={0} />
+                <ChartYAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                <ChartTooltip formatter={(v) => money(Number(v))} labelFormatter={(_, p) => p?.[0]?.payload?.name ?? ''} />
+                <Bar dataKey="revenue" name="Revenue" fill={CHART.positive} radius={[6, 6, 0, 0]} maxBarSize={42} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </Card>
-        <Card title="Driver Performance (30 days)" actions={<LegendChip color="#f59e0b" label="Miles" />}>
+        <Card title="Driver Performance (30 days)" actions={<LegendChip color={CHART.warn} label="Miles" />}>
           {data.driver_perf.length === 0 ? (
             <p className="py-16 text-center text-sm text-muted">No completed loads in the last 30 days.</p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data.driver_perf.map((d) => ({ ...d, short: shortName(d.name) }))}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="short" tick={{ fontSize: 11, fill: "var(--muted)" }} tickLine={false} axisLine={false} interval={0} />
-                <YAxis tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} tickFormatter={(v) => Number(v).toLocaleString()} />
-                <Tooltip
+                <ChartGrid />
+                <ChartXAxis dataKey="short" tick={{ fontSize: 11, fill: 'var(--muted)' }} interval={0} />
+                <ChartYAxis tickFormatter={(v) => Number(v).toLocaleString()} />
+                <ChartTooltip
                   formatter={(v, name) => (name === 'Miles' ? Number(v).toLocaleString() : money(Number(v)))}
                   labelFormatter={(_, p) => p?.[0]?.payload?.name ?? ''}
                 />
-                <Bar dataKey="miles" name="Miles" fill="#f59e0b" radius={[6, 6, 0, 0]} maxBarSize={42} />
+                <Bar dataKey="miles" name="Miles" fill={CHART.warn} radius={[6, 6, 0, 0]} maxBarSize={42} />
               </BarChart>
             </ResponsiveContainer>
           )}

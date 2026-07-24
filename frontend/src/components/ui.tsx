@@ -152,12 +152,12 @@ export function Modal({ title, open, onClose, children }: { title: string; open:
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby="modal-title"
         className="w-full max-w-2xl rounded-2xl border border-line bg-surface p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-body">{title}</h2>
+          <h2 id="modal-title" className="text-lg font-semibold text-body">{title}</h2>
           <button onClick={onClose} aria-label="Close" className="rounded-lg p-1 text-2xl leading-none text-muted hover:text-body">
             ×
           </button>
@@ -267,10 +267,11 @@ export function Table({
                     <button
                       onClick={() => onSort(key)}
                       className={`inline-flex items-center gap-1 uppercase tracking-wide hover:text-body ${active ? 'text-body' : ''}`}
-                      title="Sort"
+                      title={`Sort by ${label}`}
+                      aria-label={`Sort by ${label}${active ? ` (currently ${sort!.dir === 'asc' ? 'ascending' : 'descending'})` : ''}`}
                     >
                       {label}
-                      <span className={active ? '' : 'opacity-30'}>
+                      <span aria-hidden="true" className={active ? '' : 'opacity-30'}>
                         {active ? (sort!.dir === 'asc' ? '▲' : '▼') : '↕'}
                       </span>
                     </button>

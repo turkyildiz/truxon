@@ -258,7 +258,7 @@ export default function Loads() {
         )}
         <span className="mx-1 h-5 w-px self-center bg-line" />
         <div className="relative">
-          <button type="button" className="text-xs font-medium text-muted hover:text-body" onClick={() => setColsOpen((v) => !v)}>
+          <button type="button" className="text-xs font-medium text-muted hover:text-body" onClick={() => setColsOpen((v) => !v)} aria-expanded={colsOpen} aria-haspopup="true">
             ⚙ Columns
           </button>
           {colsOpen && (

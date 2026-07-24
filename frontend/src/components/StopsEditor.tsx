@@ -97,11 +97,11 @@ export default function StopsEditor({ stops, onChange, onRouteBlur }: Props) {
                     {ofType.length > 1 && (
                       <span className="flex items-center gap-2">
                         {n > 0 && (
-                          <button type="button" onClick={() => move(i, ofType[n - 1].i)} title="Move up"
+                          <button type="button" onClick={() => move(i, ofType[n - 1].i)} title="Move up" aria-label={`Move ${g.label.toLowerCase()} ${n + 1} up`}
                             className="text-xs font-medium text-muted hover:text-body">↑</button>
                         )}
                         {n < ofType.length - 1 && (
-                          <button type="button" onClick={() => move(i, ofType[n + 1].i)} title="Move down"
+                          <button type="button" onClick={() => move(i, ofType[n + 1].i)} title="Move down" aria-label={`Move ${g.label.toLowerCase()} ${n + 1} down`}
                             className="text-xs font-medium text-muted hover:text-body">↓</button>
                         )}
                         <button type="button" onClick={() => remove(i)} className="text-xs font-medium text-red-600 hover:underline">

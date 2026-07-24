@@ -473,7 +473,7 @@ export default function Drive({ drive }: { drive: DriveName }) {
             >
               Delete
             </Button>
-            <Button variant="secondary" onClick={clearSel}>✕</Button>
+            <Button variant="secondary" onClick={clearSel} aria-label="Clear selection">✕</Button>
           </div>
         </div>
       )}

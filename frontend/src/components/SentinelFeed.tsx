@@ -36,7 +36,7 @@ function DetailModal({ id, onClose }: { id: number; onClose: () => void }) {
             <h3 className="mt-1 text-base font-semibold text-body">{d?.title ?? 'Loading…'}</h3>
             {d?.detail && <p className="text-sm text-muted">{d.detail}</p>}
           </div>
-          <button onClick={onClose} className="shrink-0 rounded-lg border border-line px-2 py-1 text-sm text-muted hover:text-body">✕</button>
+          <button onClick={onClose} aria-label="Dismiss" title="Dismiss" className="shrink-0 rounded-lg border border-line px-2 py-1 text-sm text-muted hover:text-body">✕</button>
         </div>
 
         {d?.why && (

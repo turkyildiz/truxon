@@ -7,7 +7,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Fragment, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, Bar, BarChart, ResponsiveContainer } from 'recharts'
+import { CHART, ChartGrid, ChartTooltip, ChartXAxis, ChartYAxis } from '../components/charts'
 import { Badge, Button, Card, compareValues, Field, formatDate, LoadError, Modal, money, Select, type SortState, Table, toggleSort } from '../components/ui'
 import {
   acctAging, acctMarginMonthly, acctRevenueByCustomer, acctRevenueMonthly, acctSummary, acctUnbilledLoads,
@@ -576,12 +577,12 @@ function OverviewCharts() {
       <h3 className="mb-2 text-sm font-semibold text-body">Billed vs collected — last 12 months</h3>
       <ResponsiveContainer width="100%" height={240}>
         <AreaChart data={rows}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-          <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-          <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-          <Tooltip formatter={(v) => money(Number(v))} />
-          <Area type="monotone" dataKey="billed" name="Billed" stroke="#2563eb" fill="#2563eb22" />
-          <Area type="monotone" dataKey="collected" name="Collected" stroke="#16a34a" fill="#16a34a22" />
+          <ChartGrid />
+          <ChartXAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--muted)' }} />
+          <ChartYAxis tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
+          <ChartTooltip formatter={(v) => money(Number(v))} />
+          <Area type="monotone" dataKey="billed" name="Billed" stroke={CHART.revenue} fill={`${CHART.revenue}22`} />
+          <Area type="monotone" dataKey="collected" name="Collected" stroke={CHART.positive} fill={`${CHART.positive}22`} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -614,12 +615,12 @@ function ForecastTab() {
           <>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={chart}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--muted)' }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 12, fill: 'var(--muted)' }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v) => money(Math.abs(Number(v)))} />
-                <Bar dataKey="In" fill="#16a34a" radius={[4, 4, 0, 0]} maxBarSize={28} />
-                <Bar dataKey="Out" fill="#dc2626" radius={[0, 0, 4, 4]} maxBarSize={28} />
+                <ChartGrid />
+                <ChartXAxis dataKey="label" />
+                <ChartYAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                <ChartTooltip formatter={(v) => money(Math.abs(Number(v)))} />
+                <Bar dataKey="In" fill={CHART.positive} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                <Bar dataKey="Out" fill={CHART.negative} radius={[0, 0, 4, 4]} maxBarSize={28} />
               </BarChart>
             </ResponsiveContainer>
             <Table headers={['Week', 'Expected in', 'Expected out', 'Net', 'Running']}>
@@ -1324,12 +1325,12 @@ function GlSection() {
         <h4 className="mb-2 text-sm font-semibold text-body">Revenue vs net income (all costs)</h4>
         <ResponsiveContainer width="100%" height={220}>
           <AreaChart data={pnl}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-            <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-            <Tooltip formatter={(v) => money(Number(v))} />
-            <Area type="monotone" dataKey="income" name="Revenue" stroke="#2563eb" fill="#2563eb22" />
-            <Area type="monotone" dataKey="net_income" name="Net income" stroke="#16a34a" fill="#16a34a22" />
+            <ChartGrid />
+            <ChartXAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--muted)' }} />
+            <ChartYAxis tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
+            <ChartTooltip formatter={(v) => money(Number(v))} />
+            <Area type="monotone" dataKey="income" name="Revenue" stroke={CHART.revenue} fill={`${CHART.revenue}22`} />
+            <Area type="monotone" dataKey="net_income" name="Net income" stroke={CHART.positive} fill={`${CHART.positive}22`} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -1501,12 +1502,12 @@ function ReportsTab() {
           <h3 className="mb-2 text-sm font-semibold text-body">Revenue vs direct-cost margin (fuel + tolls + maintenance)</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={margins}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-              <Tooltip formatter={(v) => money(Number(v))} />
-              <Bar dataKey="revenue" name="Revenue" fill="#2563eb" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="margin" name="Margin" fill="#16a34a" radius={[4, 4, 0, 0]} />
+              <ChartGrid />
+              <ChartXAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--muted)' }} />
+              <ChartYAxis tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
+              <ChartTooltip formatter={(v) => money(Number(v))} />
+              <Bar dataKey="revenue" name="Revenue" fill={CHART.revenue} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="margin" name="Margin" fill={CHART.positive} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
