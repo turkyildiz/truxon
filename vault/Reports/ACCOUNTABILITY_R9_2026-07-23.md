@@ -178,4 +178,7 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 ### Section D (ELD analytics v2)
 - **#47/#48/#59 route deviation + GPS-confirmed POD chase** — `route_deviation_report()` sums the GPS breadcrumb path (great-circle hops) as *driven* miles against *booked* miles, flags loads materially over, and prices the out-of-route gap at GL all-in $/mi (loads without breadcrumb coverage are excluded, never counted as zero-deviation — the honest gap). `gps_confirmed_missing_pod()` (#59) surfaces delivered loads whose truck GPS sat within 0.75 mi of the consignee around the appointment but have **no POD filed** — the delivery physically happened, so it's the highest-confidence signature to chase. 🛰️ + 📍 Reports cards. Suite: **1088 pgTAP / 185 files**, anon 42501 verified. `6455a66`.
 
+### Section E (Northstar)
+- **#68/#69 churn early-warning + lane rate trend** — `customer_churn_watch()` catches the step *before* the gone-silent churn sentinel fires: customers **still booking** but whose recent volume (loads-per-30d, recent-60 vs prior-120 window) dropped materially vs their own baseline, so you can call while they're still talking. Distinct from #135 (already-lost) and the sentinel (gone quiet). `lane_rate_trend()` compares recent-90d $/mi vs the prior 9-month book per lane, splitting **falling** (lost pricing power or a softening market) from **rising**. 📉 + 📊 Reports cards. Suite: **1095 pgTAP / 186 files**, anon 42501 verified. `37372c0`.
+
 *(Run continues; closeout will finalize the count.)*
