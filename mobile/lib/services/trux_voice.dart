@@ -315,6 +315,54 @@ class TruxVoiceController extends ChangeNotifier {
   // is on, so each speak() awaits — we drive completion here, not via a handler.
   static const int _ttsMaxChunk = 450;
 
+  // The reply is written for the screen ($2,190, 94%, **bold**), but on-device
+  // TTS mangles that — the `$` + thousands-commas make it spell digits or garble
+  // big money. Normalize to spoken words before speaking (screen text is left
+  // untouched). e.g. "$120,000" -> "120000 dollars" -> "one hundred twenty
+  // thousand dollars"; "$1,234.56" -> "1234 dollars and 56 cents"; "$1.2M" ->
+  // "1.2 million dollars".
+  @visibleForTesting
+  static String forSpeech(String text) {
+    var t = text.replaceAll(RegExp(r'[*_#`]+'), ''); // drop markdown symbols
+    // $1.2 million / $120K / $3B  ->  words + "dollars"
+    t = t.replaceAllMapped(
+      RegExp(r'\$\s?(\d+(?:\.\d+)?)\s?(k|m|b|thousand|million|billion)\b',
+          caseSensitive: false),
+      (m) {
+        const scale = {
+          'k': 'thousand', 'm': 'million', 'b': 'billion',
+          'thousand': 'thousand', 'million': 'million', 'billion': 'billion',
+        };
+        return '${m[1]} ${scale[m[2]!.toLowerCase()]} dollars';
+      },
+    );
+    // $2,190 / $120,000 / $1,234.56 / $5  ->  "N dollars [and C cents]"
+    t = t.replaceAllMapped(
+      RegExp(r'\$\s?(\d{1,3}(?:,\d{3})*|\d+)(\.\d+)?'),
+      (m) {
+        final whole = int.tryParse(m[1]!.replaceAll(',', '')) ?? 0;
+        var s = '$whole ${whole == 1 ? 'dollar' : 'dollars'}';
+        final dec = m[2]; // ".56" or ".2" (with dot) or null
+        if (dec != null) {
+          final digits = dec.substring(1);
+          if (digits.length == 2 && int.parse(digits) > 0) {
+            s += ' and ${int.parse(digits)} cents';
+          } else if (int.tryParse(digits) != null && int.parse(digits) > 0) {
+            s = '$whole point ${digits.split('').join(' ')} dollars';
+          }
+        }
+        return s;
+      },
+    );
+    // 94% / 6.5%  ->  "94 percent"
+    t = t.replaceAllMapped(RegExp(r'(\d[\d.]*)\s?%'), (m) => '${m[1]} percent');
+    // remaining bare thousands-commas (miles, counts): 120,000 -> 120000 so the
+    // TTS reads a whole cardinal instead of pausing or spelling digits.
+    t = t.replaceAllMapped(
+        RegExp(r'\d{1,3}(?:,\d{3})+'), (m) => m[0]!.replaceAll(',', ''));
+    return t.replaceAll(RegExp(r'[ \t]+'), ' ').trim();
+  }
+
   @visibleForTesting
   static List<String> ttsChunks(String text) => _ttsChunks(text);
 
@@ -359,7 +407,8 @@ class TruxVoiceController extends ChangeNotifier {
       return;
     }
     try {
-      for (final chunk in _ttsChunks(text)) {
+      // The on-screen turn keeps the original ($2,190); TTS gets the spoken form.
+      for (final chunk in _ttsChunks(forSpeech(text))) {
         if (state != VoiceState.speaking) break; // stopped/cancelled mid-reply
         await _tts.speak(chunk);
       }
