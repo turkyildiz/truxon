@@ -204,4 +204,9 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 
 - **#34 customer statement email draft (propose-only)** — completes the #33/#34 pair. `customer_statement_email_draft()` turns the statement into a ready-to-send email (recipient from the customer email on file or a missing-recipient flag, subject naming the customer + month, body with opening/billed/closing balances and the invoice lines). **Nothing sends** — it's the draft, not the send button. ✉️ Email-draft button on the StatementCard with a copy-body action. Confirmed Section C's #30 (denim reconciliation), #40 (equipment-gap-adjusted OR), #41 (break-even) all pre-built — #34 was the genuine gap. Suite: **1139 pgTAP / 195 files**, anon 42501 verified. `ced4ec1`.
 
+### GO-LIVE READINESS (Jul 24, pivoted from block-sweep to Aug-1 readiness list)
+- **Tier-1 #3 offsite-mirror gap CLOSED** — new `offsite_mirror_stale` critical sentinel fires when backups are live but the offsite leg is missing/stale; closes the exact silent-failure class from the 07-23 drill. `b163812`.
+- **Tier-1 #4 E2E money-path test SHIPPED** — one load through create→assign→roll→deliver→complete→invoice→send→pay→paid, 10 assertions through the real guarded RPCs. `9520d66`. Suite: **1153 pgTAP / 197 files.**
+- **Owner-side done:** INDIANCREEK prune (Tier-1 #2) ✓.
+
 *(Run continues; closeout will finalize the count.)*
