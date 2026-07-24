@@ -119,4 +119,8 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **#119 Recurring scheduler** — pg_cron 06:10 daily `spawn_recurring_loads()`: due templates draft honest `pending` + awaiting-paperwork loads (notes-tagged "Auto-drafted…confirm with the broker", stops copied, load numbers real, cadence advances weekly/biweekly/monthly). Nothing rolls without a human.
 - **Suite: 959 pgTAP / 167 files.** Prod pushed.
 
+- **#125/#126 close-out** — the earlier `cancellation_analytics()` / `deadhead_patterns()` RPCs got their missing UI: 🚫 Cancellations card (per-customer cancel rate + "revenue walked", honestly labeled a ceiling since TONU isn't netted) and 🔄 Deadhead-patterns card (stranding states, worst repositioning pairs) on Reports. Devbox kit gained the `.env.local` regen step (same-commit rule).
+- **#115/#116 assignment auto-suggest** — `suggest_assignment(lat,lon,when,lane)` ranks active drivers: free-first, then deadhead from ELD position (24h fresh) or last delivery (7d), lane history (365d), HOS hours; each row priced at GL all-in $/mi so a far-away driver is a **visible repositioning bill** (amber ≥$100), not a surprise. No-position drivers say "position unknown" — never a fake 0. Dispatch 🎯 Suggest-driver panel geocodes the pickup (cache-first) and one click fills driver+truck. Anon gate verified live (42501).
+- **Suite: 967 pgTAP / 168 files** — all green from clean reset. Prod pushed, committed (`4ee6d61`, `1ab54c7`).
+
 *(Run continues; closeout will finalize the count.)*
