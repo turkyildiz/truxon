@@ -75,4 +75,6 @@ jobs:
         with:
           deno-version: v2.x
       - name: Run deno tests
-        run: deno test --quiet supabase/functions/_shared/
+        # --allow-env: door-helper tests set/read env (e.g. CRON_SECRET) to
+        # exercise requireCron; test code is trusted, so granting env is safe.
+        run: deno test --quiet --allow-env supabase/functions/_shared/
