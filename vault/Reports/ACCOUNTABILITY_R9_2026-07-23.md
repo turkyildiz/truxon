@@ -207,6 +207,8 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 ### GO-LIVE READINESS (Jul 24, pivoted from block-sweep to Aug-1 readiness list)
 - **Tier-1 #3 offsite-mirror gap CLOSED** — new `offsite_mirror_stale` critical sentinel fires when backups are live but the offsite leg is missing/stale; closes the exact silent-failure class from the 07-23 drill. `b163812`.
 - **Tier-1 #4 E2E money-path test SHIPPED** — one load through create→assign→roll→deliver→complete→invoice→send→pay→paid, 10 assertions through the real guarded RPCs. `9520d66`. Suite: **1153 pgTAP / 197 files.**
-- **Owner-side done:** INDIANCREEK prune (Tier-1 #2) ✓.
+- **Owner-side done:** INDIANCREEK prune (Tier-1 #2) ✓ · v15 OTA published + verified live (Tier-1 #1) ✓ · DKIM smoke-test email received (Tier-1 #5, pending header eyeball) ✓.
+- **🔴 ALL 5 TIER-1 GO-LIVE BLOCKERS CLEARED (Jul 24):** OTA publish, INDIANCREEK prune, offsite-mirror alarm, E2E money-path test, DKIM deliverability.
+- **INCIDENT resolved same day:** the production Vercel build had been failing for ~9h (error-email flood) — root cause was mine: `tsc --noEmit` against the references-only solution tsconfig is a NO-OP, so ~15 "tsc-ok" checks this session verified nothing while the real `tsc -b && vite build` (what Vercel runs) was broken by (a) a `Connecting to db 5432` line the Supabase CLI leaked into `database.types.ts` and (b) 9 accumulated type errors. Fixed in `6049c03`; live site stayed up on the last-good build throughout (no customer impact); Vercel redeployed clean (bundle hash flipped, age 0). **STANDING FIX: verify frontend with `npm run build`, never `tsc --noEmit`.**
 
 *(Run continues; closeout will finalize the count.)*
