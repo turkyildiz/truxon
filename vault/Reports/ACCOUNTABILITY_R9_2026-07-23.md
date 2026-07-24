@@ -111,5 +111,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **#108 more-like-this** — `similar_documents(id)` pgvector RPC + expander on DocSearch results (real catch: this pgvector build has no `avg(vector)` — first-chunk representative; `<=>` needs `extensions` on the search_path).
 - **#111/#112 bulk zip + storage dashboard** — Download-all-as-zip on every entity's Documents card (fflate, foldered by type); `storage_usage_report()` + 🗄️ Reports card (by type/entity, 6-month intake, largest files).
 - **SECTION H COMPLETE (101–112).** Suite: **952 pgTAP / 166 files**, all green from clean resets; everything prod-pushed and live-verified.
+- **First live misfile audit (prod, NAS 3B):** 138 labeled docs re-read → 135 agree (97.8%), **3 real disagreements** banked for sentinel review: docs #122 + #176 (filed Rate Confirmation, read BOL) and #185 (filed POD, reads Rate Confirmation — POD coverage gates invoicing, so this one's worth the click).
 
 *(Run continues; closeout will finalize the count.)*
