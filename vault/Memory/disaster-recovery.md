@@ -5,10 +5,12 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: 7541d708-7353-4f10-878c-db1e3485f192
-  modified: 2026-07-24T14:48:52.209Z
+  modified: 2026-07-24T14:56:34.965Z
 ---
 
 DR map, audited 2026-07-22 ("what happens if this computer dies?").
+
+**OFFSITE (INDIANCREEK) RESTORE DRILL PASSED 2026-07-24:** proved the geographic-DR copy is not just replicated but *restorable*. From aida-nas: pulled the newest offsite dump straight from INDIANCREEK (`db_20260724_020000.dump.gpg`, 88,742,243 B, byte-identical to source), decrypted with `BACKUP_PASSPHRASE` (fd 3, sourced on-NAS, never left it), restored into a throwaway postgres:17-alpine and asserted **13 profiles / 984 loads / 232 customers / 2500 documents / 10889 storage objects — PASS**. Confirms the 07-23 offsite-rsync fix is holding (today's 02:00 dump present offsite). Drill = `deploy/backup/scripts/restore_test.sh` on aida-nas fed a dump pulled from INDIANCREEK; nested ssh needs `-n` or it eats the driving heredoc's stdin. Minor cleanup: `.gnupg` homedir on aida-nas logs "unsafe ownership" (harmless for symmetric decrypt; restore passed).
 
 **LIVE DR + cyber-recovery DRILL 2026-07-23 — results:** (1) **DB restore drill PASSED** — newest encrypted dump (`db_20260723`) decrypted with `BACKUP_PASSPHRASE` + restored into a throwaway Postgres, asserting real rows (11 profiles / 984 loads / 232 customers / 2498 documents / 10861 storage objects; the ~150 pg_restore errors are expected role/extension noise). (2) **Signing-key DR PROVEN** — decrypted all three copies (dev box, NAS, Supabase `dr-vault`) → keystore sha256 `4541d893…` **byte-identical across all three**, each bundle has `.jks` + `key.properties`. SPOF genuinely closed. (3) **Security posture strong** — `security_audit_verify` hash-chain intact (11/11), `security_console` `guard_armed:true / lockdown:false`, all ransomware guards armed on every crown-jewel table (DDL-drop, per-table truncate, bulk-delete/update), profiles last-admin protection now covers DELETE too. NOTE: verified guards read-only (never live-fired on prod — the OOB dblink alarm survives rollback and pages). (4) **Found + FIXED the one real gap:** offsite INDIANCREEK rsync was broken — see [[offsite-nas]] (pinned sibling rsync image). Remaining follow-up: the `offsite_fresh` watchdog check didn't fire during the outage (monitoring gap).
 
