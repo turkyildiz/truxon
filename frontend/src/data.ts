@@ -2719,6 +2719,56 @@ export async function lostCustomers(staleDays = 45): Promise<{ lost: LostCustome
   return (data as unknown as { lost: LostCustomerRow[]; note: string }) ?? null
 }
 
+/** R9 #129: quote queue + pricing feedback. */
+export interface QuoteRow {
+  id: number
+  contact_name: string
+  company: string
+  email: string
+  phone: string
+  origin_city: string
+  origin_state: string
+  origin_zip: string
+  dest_city: string
+  dest_state: string
+  dest_zip: string
+  equipment: string
+  pickup_date: string | null
+  notes: string
+  status: 'new' | 'quoted' | 'won' | 'lost' | 'spam'
+  quoted_rate: number | null
+  lost_reason: string
+  created_at: string
+}
+export async function listQuoteQueue(): Promise<QuoteRow[]> {
+  const { data, error } = await supabase
+    .from('quote_requests')
+    .select('*')
+    .in('status', ['new', 'quoted'])
+    .order('created_at', { ascending: false })
+    .limit(25)
+  if (error) throw new Error(error.message)
+  return (data as unknown as QuoteRow[]) ?? []
+}
+export async function updateQuote(id: number, patch: Partial<Pick<QuoteRow, 'status' | 'quoted_rate' | 'lost_reason'>> & { quoted_at?: string }): Promise<void> {
+  const { error } = await supabase.from('quote_requests').update(patch).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+export interface QuotePricing {
+  days: number
+  decided: number
+  no_rate_recorded: number
+  no_lane_history: number
+  won: { n: number; avg_premium_pct: number | null }
+  lost: { n: number; avg_premium_pct: number | null; top_reasons: { reason: string; n: number }[] }
+  lanes: { lane: string; won: number; lost: number; avg_quoted: number; our_lane_avg: number }[]
+  note: string
+}
+export async function quotePricingReport(days = 180): Promise<QuotePricing | null> {
+  const data = unwrap(await supabase.rpc('quote_pricing_report', { p_days: days }))
+  return (data as unknown as QuotePricing) ?? null
+}
+
 export interface WriteoffProposal {
   id: number
   status: 'proposed' | 'approved'

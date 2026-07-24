@@ -2726,12 +2726,15 @@ export type Database = {
           email: string
           equipment: string
           id: number
+          lost_reason: string
           notes: string
           origin_city: string
           origin_state: string
           origin_zip: string
           phone: string
           pickup_date: string | null
+          quoted_at: string | null
+          quoted_rate: number | null
           source_observation_id: number | null
           status: string
         }
@@ -2745,12 +2748,15 @@ export type Database = {
           email?: string
           equipment?: string
           id?: never
+          lost_reason?: string
           notes?: string
           origin_city?: string
           origin_state?: string
           origin_zip?: string
           phone?: string
           pickup_date?: string | null
+          quoted_at?: string | null
+          quoted_rate?: number | null
           source_observation_id?: number | null
           status?: string
         }
@@ -2764,12 +2770,15 @@ export type Database = {
           email?: string
           equipment?: string
           id?: never
+          lost_reason?: string
           notes?: string
           origin_city?: string
           origin_state?: string
           origin_zip?: string
           phone?: string
           pickup_date?: string | null
+          quoted_at?: string | null
+          quoted_rate?: number | null
           source_observation_id?: number | null
           status?: string
         }
@@ -5096,6 +5105,7 @@ export type Database = {
       }
       qbo_writeoff_list: { Args: never; Returns: Json }
       qbo_writeoff_seed: { Args: never; Returns: number }
+      quote_pricing_report: { Args: { p_days?: number }; Returns: Json }
       ratecon_recon_report: { Args: { p_days?: number }; Returns: Json }
       ratecon_turnaround_report: { Args: { p_days?: number }; Returns: Json }
       record_invoice_payment: {

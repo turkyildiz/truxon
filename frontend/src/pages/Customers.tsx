@@ -1,13 +1,80 @@
 import { Link } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useAuth } from '../auth'
 import PdfDrop from '../components/PdfDrop'
 import ResourcePage from '../components/ResourcePage'
-import { Badge } from '../components/ui'
-import { createCustomer, customersMissingInfo, deleteCustomer, enrichCustomerFromRateCons, enrichCustomersBatch, enrichCustomersFromQbo, extractCustomerPdf, listCustomers, updateCustomer } from '../data'
+import { Badge, Button, Card, Input, money } from '../components/ui'
+import { createCustomer, customersMissingInfo, deleteCustomer, enrichCustomerFromRateCons, enrichCustomersBatch, enrichCustomersFromQbo, extractCustomerPdf, listCustomers, listQuoteQueue, updateCustomer, updateQuote, type QuoteRow } from '../data'
 import { errorMessage } from '../supabase'
 import type { Customer } from '../types'
+
+/** R9 #129: the quote queue — record what we quoted, then the outcome, so
+ * the pricing report can say why we win and lose. */
+function QuoteQueueCard() {
+  const qc = useQueryClient()
+  const q = useQuery({ queryKey: ['quote-queue'], queryFn: listQuoteQueue, retry: false, refetchInterval: 5 * 60_000 })
+  const [rates, setRates] = useState<Record<number, string>>({})
+  const [reasons, setReasons] = useState<Record<number, string>>({})
+  const mut = useMutation({
+    mutationFn: ({ id, patch }: { id: number; patch: Parameters<typeof updateQuote>[1] }) => updateQuote(id, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['quote-queue'] }),
+  })
+  const rows = q.data ?? []
+  if (q.isError || rows.length === 0) return null
+  const laneOf = (r: QuoteRow) =>
+    `${r.origin_city || r.origin_zip}, ${r.origin_state} → ${r.dest_city || r.dest_zip}, ${r.dest_state}`
+  return (
+    <Card title={`📨 Quote queue (${rows.length})`}>
+      {mut.isError && <p className="mb-2 text-xs text-red-600">{errorMessage(mut.error)}</p>}
+      <ul className="space-y-2">
+        {rows.map((r) => (
+          <li key={r.id} className="rounded border border-edge p-2 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>
+                <span className="font-medium">{r.company || r.contact_name}</span>{' '}
+                <span className="text-muted">· {laneOf(r)}{r.equipment ? ` · ${r.equipment}` : ''}{r.pickup_date ? ` · pu ${r.pickup_date}` : ''}</span>
+                {r.status === 'quoted' && r.quoted_rate != null && (
+                  <span className="ml-1 font-semibold text-brand">quoted {money(r.quoted_rate)}</span>
+                )}
+              </span>
+              <span className="flex items-center gap-2">
+                {r.status === 'new' && (
+                  <>
+                    <Input className="w-24 !py-1 text-xs" placeholder="$ rate" inputMode="decimal"
+                      value={rates[r.id] ?? ''} onChange={(e) => setRates({ ...rates, [r.id]: e.target.value })} />
+                    <Button type="button" className="!py-1 text-xs" disabled={mut.isPending || !Number(rates[r.id])}
+                      onClick={() => mut.mutate({ id: r.id, patch: { status: 'quoted', quoted_rate: Number(rates[r.id]), quoted_at: new Date().toISOString() } })}>
+                      Quoted
+                    </Button>
+                  </>
+                )}
+                {r.status === 'quoted' && (
+                  <>
+                    <Button type="button" className="!py-1 text-xs" disabled={mut.isPending}
+                      onClick={() => mut.mutate({ id: r.id, patch: { status: 'won' } })}>
+                      ✓ Won
+                    </Button>
+                    <Input className="w-32 !py-1 text-xs" placeholder="lost because…"
+                      value={reasons[r.id] ?? ''} onChange={(e) => setReasons({ ...reasons, [r.id]: e.target.value })} />
+                    <Button type="button" variant="secondary" className="!py-1 text-xs" disabled={mut.isPending}
+                      onClick={() => mut.mutate({ id: r.id, patch: { status: 'lost', lost_reason: (reasons[r.id] ?? '').trim() } })}>
+                      ✗ Lost
+                    </Button>
+                  </>
+                )}
+              </span>
+            </div>
+            {r.notes && <p className="mt-1 text-xs text-muted">{r.notes}</p>}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1 text-[11px] text-muted">
+        Record the rate when you quote it; mark the outcome when you hear back. The pricing report on Reports learns from every answer.
+      </p>
+    </Card>
+  )
+}
 
 export default function Customers() {
   const { user } = useAuth()
@@ -126,6 +193,7 @@ export default function Customers() {
           })}
         >📎 Carrier packet</button>
       </div>
+      {(user?.role === 'admin' || user?.role === 'dispatcher') && <QuoteQueueCard />}
       <PdfDrop
         title="Quick Add from Paperwork"
         hint="Drop a rate confirmation or broker setup packet here to add the customer"

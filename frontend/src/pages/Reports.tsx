@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, quotePricingReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -221,6 +221,46 @@ function LostCustomersCard() {
         ))}
       </Table>
       <p className="mt-1 text-[11px] text-muted">{r.note}. Worth a call before the lane goes to someone else.</p>
+    </Card>
+  )
+}
+
+/** R9 #129: what pricing wins and loses — premiums vs our own book. */
+function QuotePricingCard() {
+  const q = useQuery({ queryKey: ['quote-pricing'], queryFn: () => quotePricingReport(180), retry: false, staleTime: 10 * 60 * 1000 })
+  const p = q.data
+  if (q.isError || !p || p.decided === 0) return null
+  const w = p.won.avg_premium_pct
+  const l = p.lost.avg_premium_pct
+  return (
+    <Card title="💬 Quote pricing (180d)">
+      <p className="text-sm text-body">
+        {w != null && <>Won quotes averaged <span className="font-semibold">{w > 0 ? '+' : ''}{w}%</span> vs our own lane book ({p.won.n}). </>}
+        {l != null && <>Lost quotes averaged <span className="font-semibold text-rose-600 dark:text-rose-400">{l > 0 ? '+' : ''}{l}%</span> ({p.lost.n}).</>}
+        {w == null && l == null && 'No priced quotes with lane history yet — record rates in the quote queue on Customers.'}
+      </p>
+      {p.lost.top_reasons.length > 0 && (
+        <p className="mt-1 text-xs text-muted">
+          Loss reasons: {p.lost.top_reasons.map((r) => `${r.reason} (${r.n})`).join(' · ')}
+        </p>
+      )}
+      {p.lanes.length > 0 && (
+        <Table headers={['Lane', 'Won', 'Lost', 'Avg quoted', 'Our book']}>
+          {p.lanes.slice(0, 6).map((ln) => (
+            <tr key={ln.lane}>
+              <td className="px-3 py-2 font-medium">{ln.lane}</td>
+              <td className="px-3 py-2">{ln.won}</td>
+              <td className="px-3 py-2">{ln.lost}</td>
+              <td className="px-3 py-2">{money(ln.avg_quoted)}</td>
+              <td className="px-3 py-2">{money(ln.our_lane_avg)}</td>
+            </tr>
+          ))}
+        </Table>
+      )}
+      <p className="mt-1 text-[11px] text-muted">
+        {p.note}. {p.no_rate_recorded > 0 ? `${p.no_rate_recorded} decided quotes had no rate recorded. ` : ''}
+        {p.no_lane_history > 0 ? `${p.no_lane_history} priced quotes were on lanes we've never run.` : ''}
+      </p>
     </Card>
   )
 }
