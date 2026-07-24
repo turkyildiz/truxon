@@ -156,4 +156,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 
 - **#156/#157 saved views + column chooser** — Loads (the big table) pilots both: "+ Save view" names the current filter set for one-click re-apply (chips with × delete), ⚙ Columns hides/shows the six non-essential columns; both persist per browser. Load#/Status/actions never hideable. Frontend-only; suite stands 1037. `185731c`.
 
+- **#161/#162 undo toast + empty-state coaching** — UndoToast wired only where a TRUE inverse exists (load cancel ↔ uncancel, template delete ↔ restore — no fake undo on hard deletes); every ResourcePage empty list now coaches the next action (drop a rate con, forward a WO mail, add the unit), and Loads separates "filters match nothing" (one-click clear) from "no loads at all" (points at Dispatch). Frontend-only; suite stands 1037. `a6c5646`.
+
 *(Run continues; closeout will finalize the count.)*
