@@ -141,4 +141,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 
 - **#134/#137 customer one-pagers** — 📋 QBR card on CustomerDetail (this quarter vs last: loads, revenue, $/mi, cancels, real payment speed from invoice→paid, top lanes — ungeocoded lanes print as `?→?`, never invented) + 🕐 detention-policy card (their docks' GPS-measured dwell: avg/median, % past 2h free, detention hours and $ owed at $50/h, slowest facilities named; unmeasured stops counted). **Suite crosses 1,000: 1006 pgTAP / 173 files.** `3ad3c3c`.
 
+- **#130/#136 onboarding + prospects** — ✅ onboarding checklist on CustomerDetail (7 items, each stating exactly what's missing — FMCSA item reads the weekly watcher's `customer_fmcsa_checks`, never re-fetches; card disappears at 7/7) and 🌱 prospect shelf on Customers (lead → contacted → quoting → `convert_prospect()` promotes to a real customer exactly once, name-matching instead of duplicating; unvetted leads say so). Suite: **1015 pgTAP / 174 files.** `1a1af8c`.
+
 *(Run continues; closeout will finalize the count.)*
