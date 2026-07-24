@@ -2678,6 +2678,17 @@ export async function geocodeAddress(address: string): Promise<{ lat: number | n
   return { lat: geo?.lat ?? null, lon: geo?.lon ?? null, state: geo?.state ?? '' }
 }
 
+/** R9 #124 prep: search the radio transcript shelf (empty until the owner
+ * approves a recorder — nothing transcribes yet). */
+export interface RadioSearchResult {
+  total_stored: number
+  hits: { id: number; spoken_at: string; speaker: string; duration_sec: number | null; snippet: string }[]
+}
+export async function searchRadioTranscripts(query: string, days = 30): Promise<RadioSearchResult | null> {
+  const data = unwrap(await supabase.rpc('search_radio_transcripts', { p_query: query, p_days: days }))
+  return (data as unknown as RadioSearchResult) ?? null
+}
+
 export interface WriteoffProposal {
   id: number
   status: 'proposed' | 'approved'

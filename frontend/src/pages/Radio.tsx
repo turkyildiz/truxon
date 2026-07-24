@@ -1,7 +1,9 @@
+import { useMutation } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { Card } from '../components/ui'
+import { Button, Card, Input } from '../components/ui'
 import { useAuth } from '../auth'
-import { supabase } from '../supabase'
+import { searchRadioTranscripts } from '../data'
+import { errorMessage, supabase } from '../supabase'
 
 /** Dispatch side of the one-app radio: same private Realtime topic the
  * tablets use (`radio:fleet`), Opus via WebCodecs — Chrome/Edge only, which
@@ -27,6 +29,58 @@ function b64encode(data: Uint8Array): string {
 }
 function b64decode(s: string): Uint8Array {
   return Uint8Array.from(atob(s), (c) => c.charCodeAt(0))
+}
+
+/** R9 #124 prep: transcript search over the (future) radio archive. The
+ * shelf exists; the recorder does not — and this card says so plainly until
+ * the owner approves transcription. Office roles only. */
+function TranscriptSearchCard() {
+  const [q, setQ] = useState('')
+  const search = useMutation({ mutationFn: (query: string) => searchRadioTranscripts(query, 30) })
+  const r = search.data
+  return (
+    <Card title="🔎 Transcript search">
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => { e.preventDefault(); if (q.trim()) search.mutate(q.trim()) }}
+      >
+        <Input placeholder='e.g. detention, "exit 40", fuel -pilot' value={q} onChange={(e) => setQ(e.target.value)} />
+        <Button type="submit" disabled={search.isPending || !q.trim()}>
+          {search.isPending ? 'Searching…' : 'Search'}
+        </Button>
+      </form>
+      {search.isError && <p className="mt-2 text-xs text-red-600">{errorMessage(search.error)}</p>}
+      {r && r.total_stored === 0 && (
+        <p className="mt-3 text-sm text-muted">
+          Nothing on the shelf — radio transmissions are not being recorded or transcribed.
+          The search is ready for the day that&rsquo;s switched on (owner&rsquo;s call).
+        </p>
+      )}
+      {r && r.total_stored > 0 && r.hits.length === 0 && (
+        <p className="mt-3 text-sm text-muted">No matches in the last 30 days ({r.total_stored.toLocaleString()} transmissions stored).</p>
+      )}
+      {r && r.hits.length > 0 && (
+        <ul className="mt-3 space-y-2">
+          {r.hits.map((h) => (
+            <li key={h.id} className="rounded border border-edge p-2 text-sm">
+              <span className="text-xs text-muted">
+                {new Date(h.spoken_at).toLocaleString()} · {h.speaker || 'unknown'}
+                {h.duration_sec != null ? ` · ${h.duration_sec}s` : ''}
+              </span>
+              {/* ts_headline marks hits with [[ ]] — rendered as text, never HTML */}
+              <p>
+                {h.snippet.split(/(\[\[.*?\]\])/g).map((part, i) =>
+                  part.startsWith('[[')
+                    ? <mark key={i} className="rounded bg-amber-200/60 px-0.5 dark:bg-amber-500/30">{part.slice(2, -2)}</mark>
+                    : <span key={i}>{part}</span>,
+                )}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
 }
 
 export default function Radio() {
@@ -191,13 +245,18 @@ export default function Radio() {
     stopCaptureRef.current = null
   }
 
+  const office = ['admin', 'dispatcher', 'accountant'].includes(user?.role ?? '')
+
   if (!hasWebCodecs) {
     return (
-      <Card title="📻 Fleet radio">
-        <p className="py-6 text-center text-sm text-muted">
-          The radio needs Chrome or Edge (WebCodecs). Open truxon.com in Chrome to talk to the trucks.
-        </p>
-      </Card>
+      <div className="mx-auto max-w-lg space-y-4">
+        <Card title="📻 Fleet radio">
+          <p className="py-6 text-center text-sm text-muted">
+            The radio needs Chrome or Edge (WebCodecs). Open truxon.com in Chrome to talk to the trucks.
+          </p>
+        </Card>
+        {office && <TranscriptSearchCard />}
+      </div>
     )
   }
 
@@ -234,6 +293,7 @@ export default function Radio() {
           {tx ? 'ON AIR' : 'HOLD TO TALK'}
         </button>
       </Card>
+      {office && <TranscriptSearchCard />}
     </div>
   )
 }

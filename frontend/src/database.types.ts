@@ -2775,6 +2775,45 @@ export type Database = {
         }
         Relationships: []
       }
+      radio_transcripts: {
+        Row: {
+          channel: string
+          created_at: string
+          duration_sec: number | null
+          fts: unknown
+          id: number
+          lang: string
+          speaker_name: string
+          speaker_user_id: string | null
+          spoken_at: string
+          transcript: string
+        }
+        Insert: {
+          channel?: string
+          created_at?: string
+          duration_sec?: number | null
+          fts?: unknown
+          id?: number
+          lang?: string
+          speaker_name?: string
+          speaker_user_id?: string | null
+          spoken_at: string
+          transcript: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          duration_sec?: number | null
+          fts?: unknown
+          id?: number
+          lang?: string
+          speaker_name?: string
+          speaker_user_id?: string | null
+          spoken_at?: string
+          transcript?: string
+        }
+        Relationships: []
+      }
       rate_limit_events: {
         Row: {
           action: string
@@ -5128,6 +5167,10 @@ export type Database = {
           p_insurance_pct?: number
           p_revenue_pct?: number
         }
+        Returns: Json
+      }
+      search_radio_transcripts: {
+        Args: { p_days?: number; p_limit?: number; p_query: string }
         Returns: Json
       }
       security_audit_recent: { Args: { p_limit?: number }; Returns: Json }
