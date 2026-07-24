@@ -152,4 +152,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 
 - **#160 who-changed-what** — field edits now leave a real trail: one compact diff line per human update (`rate: 1100.00 → 1200.00; miles: 300 → 350`) across loads/customers/drivers/trucks/trailers/maintenance, rendered in the activity feed every entity page already has. Robots (QBO mirror, geocoder — no session) stay silent by design so the human trail isn't buried; supersedes the names-only loads trigger from 07-16. Suite: **1037 pgTAP / 178 files.** `09858e5`.
 
+- **#159/#155 list-level actions** — Loads rows now advance status one step inline (same guarded RPC as the detail page — a driverless load still refuses to go `assigned`; errors show under the row) and swap drivers from the list while pending/assigned. Invoices receivables gained checkboxes + a bulk bar: batch mark-sent for drafts, batch PDF download. Batch *email* deliberately omitted — recipients are chosen per send, no blind mass mail. QBO-synced rows excluded. Frontend-only (DB untouched, suite stands at 1037). `c40d74a`.
+
 *(Run continues; closeout will finalize the count.)*
