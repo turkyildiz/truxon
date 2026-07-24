@@ -271,7 +271,10 @@ async function syncCustomers(s: SupabaseClient, at: { token: string; realm: stri
   return { matched, filledTotal, touched, filledCustomers }
 }
 
-async function pull(s: SupabaseClient): Promise<Response> {
+// fromDate (admin-only, via body.from) forces a full re-page of every invoice
+// since that date instead of the incremental CDC — used to backfill history
+// older than BACKFILL_FROM into the mirror so ref-reconcile can link it.
+async function pull(s: SupabaseClient, fromDate?: string): Promise<Response> {
   const at = await accessToken(s)
   if (!at) {
     await s.from('qbo_sync_state').update({ last_error: 'not connected (or refresh failed)', last_pull_at: new Date().toISOString() }).eq('id', 1)
@@ -284,11 +287,13 @@ async function pull(s: SupabaseClient): Promise<Response> {
   const voided: string[] = []
 
   try {
-    if (!st?.backfilled) {
-      // First pull: page through every invoice since BACKFILL_FROM.
+    if (fromDate || !st?.backfilled) {
+      // First pull (or an admin re-mirror with body.from): page through every
+      // invoice since the effective start date.
+      const startDate = fromDate ?? BACKFILL_FROM
       let startPos = 1
-      for (let page = 0; page < 20; page++) {
-        const q = `select * from Invoice where TxnDate >= '${BACKFILL_FROM}' orderby Id startposition ${startPos} maxresults 500`
+      for (let page = 0; page < 30; page++) {
+        const q = `select * from Invoice where TxnDate >= '${startDate}' orderby Id startposition ${startPos} maxresults 500`
         const out = await qboGet(at.token, `/v3/company/${at.realm}/query?query=${encodeURIComponent(q)}&minorversion=75`)
         // deno-lint-ignore no-explicit-any
         const batch = ((out.QueryResponse as any)?.Invoice ?? []) as any[]
@@ -489,7 +494,11 @@ Deno.serve(withCors(async (req) => {
       if (caller instanceof Response) return caller
       if (caller.role !== 'admin') return json({ error: 'Admin only' }, 403)
     }
-    return await pull(s)
+    // A full re-mirror from an explicit date is admin-only; the cron path always
+    // does the normal incremental CDC.
+    const from = (!isCron && typeof body.from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.from))
+      ? body.from : undefined
+    return await pull(s, from)
   }
 
   if (body.mode === 'pnl') {

@@ -28,8 +28,13 @@ const { email, password } = await getCreds()
 const { error: loginErr } = await sb.auth.signInWithPassword({ email, password })
 if (loginErr) { console.error('login failed:', loginErr.message); process.exit(1) }
 
-console.log('triggering a full QBO pull (mirror every invoice + self-heal)… this fetches ~2k invoices, ~30-60s\n')
-const { data, error } = await sb.functions.invoke('qbo-sync', { body: { mode: 'pull' } })
+// Optional --from=YYYY-MM-DD forces a full re-mirror of every invoice since that
+// date (to backfill history older than the sync's default window); otherwise a
+// normal incremental pull.
+const fromArg = (process.argv.find((a) => a.startsWith('--from=')) || '').split('=')[1]
+const body = fromArg ? { mode: 'pull', from: fromArg } : { mode: 'pull' }
+console.log(`triggering a QBO pull${fromArg ? ` (full re-mirror since ${fromArg})` : ''} + self-heal… this can take 30-90s\n`)
+const { data, error } = await sb.functions.invoke('qbo-sync', { body })
 if (error) {
   // functions.invoke surfaces non-2xx as an error with a context body
   let body = ''
