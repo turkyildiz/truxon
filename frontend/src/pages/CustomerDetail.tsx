@@ -1,7 +1,56 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Card, formatDate, LoadError, money, Table } from '../components/ui'
-import { collectionsQueue, customerDetentionProfile, customerExposure, customerKeepFire, customerOnboarding, customerProfile, customerQbr } from '../data'
+import { Badge, Button, Card, formatDate, LoadError, money, Table } from '../components/ui'
+import { collectionsQueue, customerDetentionProfile, customerExposure, customerKeepFire, customerOnboarding, customerProfile, customerQbr, customerStatement } from '../data'
+import { errorMessage } from '../supabase'
+
+/** R9 #33: printable statement of account for a month. */
+function StatementCard({ customerId }: { customerId: number }) {
+  const now = new Date()
+  const firstOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const [start, setStart] = useState(firstOfMonth)
+  const [end, setEnd] = useState(now.toISOString().slice(0, 10))
+  const stmt = useMutation({ mutationFn: () => customerStatement(customerId, start, end) })
+  const s = stmt.data
+  return (
+    <Card title="🧾 Statement of account">
+      <div className="flex flex-wrap items-center gap-2 print:hidden">
+        <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="rounded border border-edge bg-transparent px-2 py-1 text-sm" />
+        <span className="text-muted">–</span>
+        <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="rounded border border-edge bg-transparent px-2 py-1 text-sm" />
+        <Button type="button" disabled={stmt.isPending} onClick={() => stmt.mutate()}>{stmt.isPending ? 'Building…' : 'Generate'}</Button>
+        {s && <Button type="button" variant="secondary" onClick={() => window.print()}>Print</Button>}
+      </div>
+      {stmt.isError && <p className="mt-2 text-xs text-red-600">{errorMessage(stmt.error)}</p>}
+      {s && (
+        <div className="mt-3">
+          <p className="text-sm text-body">
+            <span className="font-medium">{s.customer}</span> · {s.period.start} to {s.period.end} ·
+            opening <span className="font-semibold">{money(s.opening_balance)}</span>,
+            billed <span className="font-semibold">{money(s.billed_in_period)}</span>,
+            closing <span className="font-semibold text-brand">{money(s.closing_balance)}</span>
+          </p>
+          {s.lines.length > 0 ? (
+            <Table headers={['Invoice', 'Date', 'Due', 'Total', 'Status', 'Balance']}>
+              {s.lines.map((l) => (
+                <tr key={l.invoice}>
+                  <td className="px-3 py-2 font-medium">{l.invoice}</td>
+                  <td className="px-3 py-2">{l.invoice_date}</td>
+                  <td className="px-3 py-2">{l.due_date ?? '—'}</td>
+                  <td className="px-3 py-2">{money(l.total)}</td>
+                  <td className="px-3 py-2"><Badge status={l.status} /></td>
+                  <td className={`px-3 py-2 ${l.balance > 0 ? 'font-semibold' : 'text-muted'}`}>{money(l.balance)}</td>
+                </tr>
+              ))}
+            </Table>
+          ) : <p className="mt-2 text-sm text-muted">No invoices in this period.</p>}
+          <p className="mt-1 text-[11px] text-muted">{s.note}</p>
+        </div>
+      )}
+    </Card>
+  )
+}
 
 const hm = (min: number | null | undefined) =>
   min == null ? '—' : `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`
@@ -272,6 +321,7 @@ export default function CustomerDetail() {
             </Card>
           )}
           <OnboardingCard customerId={Number(id)} />
+          <StatementCard customerId={Number(id)} />
           <QbrCard customerId={Number(id)} />
           <DetentionProfileCard customerId={Number(id)} />
         </div>

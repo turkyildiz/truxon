@@ -2947,6 +2947,21 @@ export async function truckBreakevenAnalysis(): Promise<TruckBreakeven | null> {
   return (data as unknown as TruckBreakeven) ?? null
 }
 
+/** R9 #33: a per-customer statement of account for a date window. */
+export interface CustomerStatement {
+  customer: string
+  period: { start: string; end: string }
+  opening_balance: number
+  lines: { invoice: string; invoice_date: string; due_date: string | null; total: number; status: string; balance: number }[]
+  billed_in_period: number
+  closing_balance: number
+  note: string
+}
+export async function customerStatement(customerId: number, start: string, end: string): Promise<CustomerStatement | null> {
+  const data = unwrap(await supabase.rpc('customer_statement', { p_customer_id: customerId, p_start: start, p_end: end }))
+  return (data as unknown as CustomerStatement) ?? null
+}
+
 /** R9 #68: customers still booking but slowing vs their own baseline. */
 export interface ChurnWatch {
   watch: { customer: string; baseline_per_30d: number; recent_per_30d: number; drop_pct: number; trailing_revenue: number }[]
