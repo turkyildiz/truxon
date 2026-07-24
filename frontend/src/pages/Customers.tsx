@@ -5,7 +5,7 @@ import { useAuth } from '../auth'
 import PdfDrop from '../components/PdfDrop'
 import ResourcePage from '../components/ResourcePage'
 import { Badge, Button, Card, Input, money } from '../components/ui'
-import { addProspect, convertProspect, createCustomer, customersMissingInfo, deleteCustomer, enrichCustomerFromRateCons, enrichCustomersBatch, enrichCustomersFromQbo, extractCustomerPdf, listCustomers, listProspects, listQuoteQueue, updateCustomer, updateProspect, updateQuote, type Prospect, type QuoteRow } from '../data'
+import { addProspect, convertProspect, createCustomer, customersMissingInfo, deleteCustomer, enrichCustomerFromRateCons, enrichCustomersBatch, enrichCustomersFromQbo, extractCustomerPdf, listCustomers, listProspects, listQuoteQueue, updateCustomer, updateProspect, updateQuote, draftQuoteResponse, type Prospect, type QuoteDraft, type QuoteRow } from '../data'
 import { useNavigate } from 'react-router-dom'
 import { errorMessage } from '../supabase'
 import type { Customer } from '../types'
@@ -84,9 +84,19 @@ function QuoteQueueCard() {
   const q = useQuery({ queryKey: ['quote-queue'], queryFn: listQuoteQueue, retry: false, refetchInterval: 5 * 60_000 })
   const [rates, setRates] = useState<Record<number, string>>({})
   const [reasons, setReasons] = useState<Record<number, string>>({})
+  const [drafts, setDrafts] = useState<Record<number, QuoteDraft>>({})
   const mut = useMutation({
     mutationFn: ({ id, patch }: { id: number; patch: Parameters<typeof updateQuote>[1] }) => updateQuote(id, patch),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['quote-queue'] }),
+  })
+  // R9 #128: propose-only reply draft from our lane book; prefills the rate.
+  const draft = useMutation({
+    mutationFn: (id: number) => draftQuoteResponse(id),
+    onSuccess: (d) => {
+      if (!d) return
+      setDrafts((prev) => ({ ...prev, [d.quote_id]: d }))
+      if (d.suggested_rate != null) setRates((prev) => ({ ...prev, [d.quote_id]: String(d.suggested_rate) }))
+    },
   })
   const rows = q.data ?? []
   if (q.isError || rows.length === 0) return null
@@ -109,6 +119,10 @@ function QuoteQueueCard() {
               <span className="flex items-center gap-2">
                 {r.status === 'new' && (
                   <>
+                    <Button type="button" variant="secondary" className="!py-1 text-xs" disabled={draft.isPending}
+                      onClick={() => draft.mutate(r.id)}>
+                      💡 Draft
+                    </Button>
                     <Input className="w-24 !py-1 text-xs" placeholder="$ rate" inputMode="decimal"
                       value={rates[r.id] ?? ''} onChange={(e) => setRates({ ...rates, [r.id]: e.target.value })} />
                     <Button type="button" className="!py-1 text-xs" disabled={mut.isPending || !Number(rates[r.id])}
@@ -134,6 +148,24 @@ function QuoteQueueCard() {
               </span>
             </div>
             {r.notes && <p className="mt-1 text-xs text-muted">{r.notes}</p>}
+            {drafts[r.id] && (
+              <div className="mt-2 rounded bg-surface-2 p-2 text-xs">
+                {drafts[r.id].no_history ? (
+                  <p className="text-muted">{drafts[r.id].note}</p>
+                ) : (
+                  <>
+                    <p className="mb-1 text-muted">
+                      Suggested <span className="font-semibold text-body">{money(drafts[r.id].suggested_rate ?? 0)}</span> — {drafts[r.id].note}
+                      <button type="button" className="ml-2 font-medium text-brand hover:underline"
+                        onClick={() => void navigator.clipboard.writeText(drafts[r.id].draft_text ?? '')}>
+                        Copy reply
+                      </button>
+                    </p>
+                    <pre className="whitespace-pre-wrap font-sans text-body">{drafts[r.id].draft_text}</pre>
+                  </>
+                )}
+              </div>
+            )}
           </li>
         ))}
       </ul>

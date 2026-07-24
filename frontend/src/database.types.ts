@@ -4666,6 +4666,7 @@ export type Database = {
       doc_retention_report: { Args: { p_days?: number }; Returns: Json }
       dot_audit_pack: { Args: never; Returns: Json }
       draft_dunning_notices: { Args: never; Returns: number }
+      draft_quote_response: { Args: { p_quote_id: number }; Returns: Json }
       drive_create_share: {
         Args: { p_expires_at?: string; p_file_id: number }
         Returns: string

@@ -2858,6 +2858,22 @@ export async function convertProspect(id: number): Promise<number> {
   return unwrap(await supabase.rpc('convert_prospect', { p_id: id })) as unknown as number
 }
 
+/** R9 #128: propose-only quote reply draft from our own lane book. */
+export interface QuoteDraft {
+  quote_id: number
+  lane: string | null
+  basis: { loads_90d: number; avg_90d: number | null; loads_365d: number; avg_365d: number | null; rpm_365d: number | null }
+  pricing_lesson: { won_avg_premium_pct: number | null; lost_avg_premium_pct: number | null }
+  suggested_rate: number | null
+  draft_text: string | null
+  no_history: boolean
+  note: string
+}
+export async function draftQuoteResponse(quoteId: number): Promise<QuoteDraft | null> {
+  const data = unwrap(await supabase.rpc('draft_quote_response', { p_quote_id: quoteId }))
+  return (data as unknown as QuoteDraft) ?? null
+}
+
 export interface WriteoffProposal {
   id: number
   status: 'proposed' | 'approved'
