@@ -4557,6 +4557,7 @@ export type Database = {
         }
         Returns: Json
       }
+      customer_enrichment_gaps: { Args: never; Returns: Json }
       customer_exposure: { Args: { p_customer_id: number }; Returns: Json }
       customer_keep_fire: {
         Args: { p_days?: number }

@@ -2874,6 +2874,20 @@ export async function draftQuoteResponse(quoteId: number): Promise<QuoteDraft | 
   return (data as unknown as QuoteDraft) ?? null
 }
 
+/** R9 #138: enrichment residue — what's still blank and why. */
+export interface EnrichmentGaps {
+  customers_active: number
+  fully_filled: number
+  blank_fields: Record<string, number>
+  worklist: { customer_id: number; customer: string; blanks: number; sources_left: string[]; dead_end: boolean }[]
+  dead_ends: number
+  note: string
+}
+export async function customerEnrichmentGaps(): Promise<EnrichmentGaps | null> {
+  const data = unwrap(await supabase.rpc('customer_enrichment_gaps'))
+  return (data as unknown as EnrichmentGaps) ?? null
+}
+
 export interface WriteoffProposal {
   id: number
   status: 'proposed' | 'approved'

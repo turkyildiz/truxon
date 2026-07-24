@@ -5,10 +5,39 @@ import { useAuth } from '../auth'
 import PdfDrop from '../components/PdfDrop'
 import ResourcePage from '../components/ResourcePage'
 import { Badge, Button, Card, Input, money } from '../components/ui'
-import { addProspect, convertProspect, createCustomer, customersMissingInfo, deleteCustomer, enrichCustomerFromRateCons, enrichCustomersBatch, enrichCustomersFromQbo, extractCustomerPdf, listCustomers, listProspects, listQuoteQueue, updateCustomer, updateProspect, updateQuote, draftQuoteResponse, type Prospect, type QuoteDraft, type QuoteRow } from '../data'
+import { addProspect, convertProspect, createCustomer, customerEnrichmentGaps, customersMissingInfo, deleteCustomer, enrichCustomerFromRateCons, enrichCustomersBatch, enrichCustomersFromQbo, extractCustomerPdf, listCustomers, listProspects, listQuoteQueue, updateCustomer, updateProspect, updateQuote, draftQuoteResponse, type Prospect, type QuoteDraft, type QuoteRow } from '../data'
 import { useNavigate } from 'react-router-dom'
 import { errorMessage } from '../supabase'
 import type { Customer } from '../types'
+
+/** R9 #138: the enrichment residue — after every miner has run, what's still
+ * blank, what source could still fill it, and who needs a phone call. */
+function EnrichmentGapsCard() {
+  const q = useQuery({ queryKey: ['enrichment-gaps'], queryFn: customerEnrichmentGaps, retry: false, staleTime: 10 * 60 * 1000 })
+  const g = q.data
+  if (q.isError || !g || g.fully_filled === g.customers_active) return null
+  const deadEnds = g.worklist.filter((w) => w.dead_end)
+  return (
+    <Card title={`🧩 Contact gaps — ${g.customers_active - g.fully_filled} of ${g.customers_active} incomplete`}>
+      <p className="text-sm text-body">
+        Still blank: {Object.entries(g.blank_fields).filter(([, n]) => n > 0).map(([f, n]) => `${f.replace('_', ' ')} ×${n}`).join(' · ') || 'nothing'}.
+        {g.dead_ends > 0 && (
+          <span className="ml-1 font-semibold text-amber-600 dark:text-amber-400">
+            {g.dead_ends} dead end{g.dead_ends === 1 ? '' : 's'} — no docs, mail, or QuickBooks to mine; those need a phone call.
+          </span>
+        )}
+      </p>
+      {deadEnds.length > 0 && (
+        <p className="mt-1 text-xs text-muted">
+          Call list: {deadEnds.slice(0, 6).map((w) => (
+            <Link key={w.customer_id} className="mr-2 text-brand hover:underline" to={`/customers/${w.customer_id}`}>{w.customer}</Link>
+          ))}
+        </p>
+      )}
+      <p className="mt-1 text-[11px] text-muted">{g.note}</p>
+    </Card>
+  )
+}
 
 /** R9 #136: the prospect shelf — leads with an MC number and a next step.
  * Convert promotes one into a real customer row (idempotent). */
@@ -295,6 +324,7 @@ export default function Customers() {
       </div>
       {(user?.role === 'admin' || user?.role === 'dispatcher') && <QuoteQueueCard />}
       {(user?.role === 'admin' || user?.role === 'dispatcher') && <ProspectsCard />}
+      {user?.role === 'admin' && <EnrichmentGapsCard />}
       <PdfDrop
         title="Quick Add from Paperwork"
         hint="Drop a rate confirmation or broker setup packet here to add the customer"
