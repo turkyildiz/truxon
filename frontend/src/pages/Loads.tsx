@@ -8,6 +8,31 @@ import { LOAD_STATUSES, type Load } from '../types'
 
 const ALL_STATUSES = [...LOAD_STATUSES, 'cancelled' as const]
 
+// R9 #156/#157: saved views + column chooser, persisted per browser.
+const VIEWS_KEY = 'truxon.views.loads'
+const COLS_KEY = 'truxon.cols.loads'
+interface SavedView {
+  name: string
+  q: string
+  statuses: string[]
+  awaitingOnly: boolean
+  customerId: string
+  driverId: string
+  dateFrom: string
+  dateTo: string
+}
+const HIDEABLE: { key: string; label: string }[] = [
+  { key: 'customer', label: 'Customer' },
+  { key: 'pickup', label: 'Pickup' },
+  { key: 'delivery', label: 'Delivery' },
+  { key: 'driver', label: 'Driver' },
+  { key: 'rate', label: 'Rate' },
+  { key: 'rpm', label: '$/mi' },
+]
+function readJson<T>(key: string, fallback: T): T {
+  try { return JSON.parse(localStorage.getItem(key) ?? '') as T } catch { return fallback }
+}
+
 /** Delivered/billed loads with no POD on file — money that can stall. */
 function MissingPodsBanner() {
   const [open, setOpen] = useState(false)
@@ -73,6 +98,36 @@ export default function Loads() {
   const [driverId, setDriverId] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+
+  // R9 #156: saved views — name the current filter set, apply it in one click.
+  const [views, setViews] = useState<SavedView[]>(() => readJson<SavedView[]>(VIEWS_KEY, []))
+  const [savingView, setSavingView] = useState(false)
+  const [viewName, setViewName] = useState('')
+  const persistViews = (next: SavedView[]) => { setViews(next); localStorage.setItem(VIEWS_KEY, JSON.stringify(next)) }
+  const saveCurrentView = () => {
+    const name = viewName.trim()
+    if (!name) return
+    const v: SavedView = { name, q, statuses: [...statuses], awaitingOnly, customerId, driverId, dateFrom, dateTo }
+    persistViews([...views.filter((x) => x.name !== name), v])
+    setSavingView(false)
+    setViewName('')
+  }
+  const applyView = (v: SavedView) => {
+    setQ(v.q); setStatuses(new Set(v.statuses)); setAwaitingOnly(v.awaitingOnly)
+    setCustomerId(v.customerId); setDriverId(v.driverId); setDateFrom(v.dateFrom); setDateTo(v.dateTo)
+  }
+
+  // R9 #157: column chooser — hidden columns persist per browser.
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => new Set(readJson<string[]>(COLS_KEY, [])))
+  const [colsOpen, setColsOpen] = useState(false)
+  const toggleCol = (key: string) => {
+    const next = new Set(hiddenCols)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    setHiddenCols(next)
+    localStorage.setItem(COLS_KEY, JSON.stringify([...next]))
+  }
+  const show = (key: string) => !hiddenCols.has(key)
 
   // Include inactive customers — old loads still need to be filterable by them.
   const { data: customers = [] } = useQuery({ queryKey: ['customers-all', ''], queryFn: () => listCustomers(undefined, { includeInactive: true }) })
@@ -176,6 +231,47 @@ export default function Loads() {
           <Input type="date" title="Pickup to" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="!w-40" />
         </div>
       </div>
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+        {views.map((v) => (
+          <span key={v.name} className="inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-1">
+            <button type="button" className="font-medium text-brand hover:underline" title="Apply this saved view"
+              onClick={() => applyView(v)}>
+              {v.name}
+            </button>
+            <button type="button" className="text-muted hover:text-red-600" title="Delete saved view"
+              onClick={() => persistViews(views.filter((x) => x.name !== v.name))}>
+              ×
+            </button>
+          </span>
+        ))}
+        {savingView ? (
+          <form className="inline-flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); saveCurrentView() }}>
+            <Input autoFocus placeholder="View name" value={viewName} onChange={(e) => setViewName(e.target.value)} className="!w-36 !py-1 text-xs" />
+            <Button type="submit" className="!py-1 text-xs" disabled={!viewName.trim()}>Save</Button>
+            <button type="button" className="text-xs text-muted hover:text-body" onClick={() => setSavingView(false)}>cancel</button>
+          </form>
+        ) : (
+          <button type="button" className="text-xs font-medium text-muted hover:text-body" title="Save the current filters as a one-click view"
+            onClick={() => setSavingView(true)}>
+            + Save view
+          </button>
+        )}
+        <span className="mx-1 h-5 w-px self-center bg-line" />
+        <div className="relative">
+          <button type="button" className="text-xs font-medium text-muted hover:text-body" onClick={() => setColsOpen((v) => !v)}>
+            ⚙ Columns
+          </button>
+          {colsOpen && (
+            <div className="absolute z-20 mt-1 w-40 rounded-lg border border-line bg-surface p-2 shadow-lg">
+              {HIDEABLE.map((c) => (
+                <label key={c.key} className="flex cursor-pointer items-center gap-2 py-0.5 text-sm">
+                  <input type="checkbox" checked={show(c.key)} onChange={() => toggleCol(c.key)} /> {c.label}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       {isLoading ? (
         <p className="py-8 text-center text-muted">Loading…</p>
@@ -187,12 +283,12 @@ export default function Loads() {
         <Table
           headers={[
             { label: 'Load #', key: 'load_number' },
-            { label: 'Customer', key: 'customer' },
-            { label: 'Pickup', key: 'pickup' },
-            { label: 'Delivery', key: 'delivery' },
-            { label: 'Driver', key: 'driver' },
-            { label: 'Rate', key: 'rate' },
-            { label: 'RPM', key: 'rpm' },
+            ...(show('customer') ? [{ label: 'Customer', key: 'customer' }] : []),
+            ...(show('pickup') ? [{ label: 'Pickup', key: 'pickup' }] : []),
+            ...(show('delivery') ? [{ label: 'Delivery', key: 'delivery' }] : []),
+            ...(show('driver') ? [{ label: 'Driver', key: 'driver' }] : []),
+            ...(show('rate') ? [{ label: 'Rate', key: 'rate' }] : []),
+            ...(show('rpm') ? [{ label: 'RPM', key: 'rpm' }] : []),
             { label: 'Status', key: 'status' },
             '',
           ]}
@@ -207,16 +303,20 @@ export default function Loads() {
                     </Link>
                     {load.reference_number && <div className="text-xs font-normal text-muted">{load.reference_number}</div>}
                   </td>
-                  <td className="px-3 py-3">{load.customer_name}</td>
-                  <td className="px-3 py-3">
-                    <div className="max-w-45 truncate">{load.pickup_address || '—'}</div>
-                    <div className="text-xs text-muted">{formatDateTime(load.pickup_time)}</div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="max-w-45 truncate">{load.delivery_address || '—'}</div>
-                    <div className="text-xs text-muted">{formatDateTime(load.delivery_time)}</div>
-                  </td>
-                  <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                  {show('customer') && <td className="px-3 py-3">{load.customer_name}</td>}
+                  {show('pickup') && (
+                    <td className="px-3 py-3">
+                      <div className="max-w-45 truncate">{load.pickup_address || '—'}</div>
+                      <div className="text-xs text-muted">{formatDateTime(load.pickup_time)}</div>
+                    </td>
+                  )}
+                  {show('delivery') && (
+                    <td className="px-3 py-3">
+                      <div className="max-w-45 truncate">{load.delivery_address || '—'}</div>
+                      <div className="text-xs text-muted">{formatDateTime(load.delivery_time)}</div>
+                    </td>
+                  )}
+                  {show('driver') && <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                     {['pending', 'assigned'].includes(load.status) ? (
                       <select
                         className="max-w-36 rounded border border-line bg-transparent px-1 py-0.5 text-sm"
@@ -231,9 +331,9 @@ export default function Loads() {
                         ))}
                       </select>
                     ) : (load.driver_name ?? '—')}
-                  </td>
-                  <td className="px-3 py-3">{money(load.rate)}</td>
-                  <td className="px-3 py-3">{load.rate_per_mile != null ? `$${load.rate_per_mile.toFixed(2)}` : '—'}</td>
+                  </td>}
+                  {show('rate') && <td className="px-3 py-3">{money(load.rate)}</td>}
+                  {show('rpm') && <td className="px-3 py-3">{load.rate_per_mile != null ? `$${load.rate_per_mile.toFixed(2)}` : '—'}</td>}
                   <td className="px-3 py-3">
                     <div className="flex flex-col items-start gap-1">
                       <Badge status={load.status} />
