@@ -150,4 +150,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 ### Section L (web UX)
 - **#153 omnibox documents** — global search now finds paperwork: filename/doc-type match, newest first, label names the owning load, and clicking lands on the owning entity's page (drivers/trucks were already searchable — the gap was docs). Deep content search stays on /docsearch. Suite: **1032 pgTAP / 177 files.** `a15694e`.
 
+- **#160 who-changed-what** — field edits now leave a real trail: one compact diff line per human update (`rate: 1100.00 → 1200.00; miles: 300 → 350`) across loads/customers/drivers/trucks/trailers/maintenance, rendered in the activity feed every entity page already has. Robots (QBO mirror, geocoder — no session) stay silent by design so the human trail isn't buried; supersedes the names-only loads trigger from 07-16. Suite: **1037 pgTAP / 178 files.** `09858e5`.
+
 *(Run continues; closeout will finalize the count.)*
