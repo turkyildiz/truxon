@@ -36,3 +36,8 @@ deploy/drive-import/.stage/
 deploy/drive-import/manifest.json
 mobile/android/build/
 deploy/tolls/__pycache__/
+
+# OTA / signing private keys — MUST never be committed
+*-ota-signing.pem
+*.pem
+truxon-ota-signing.pem

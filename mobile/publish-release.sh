@@ -51,8 +51,28 @@ APK="build/app/outputs/flutter-apk/TruxCompanion.apk"
 # refuses any APK that doesn't match (or a manifest without the field).
 APKURL="https://github.com/${REPO}/releases/latest/download/TruxCompanion.apk"
 SHA256=$(sha256sum "$APK" | cut -d' ' -f1)
+
+# 3a) SIGN the manifest (Ed25519). The app embeds our public key and refuses a
+# manifest that isn't validly signed — so a compromised release host can't forge
+# a downgrade or redirect the APK, the gap sha256-in-the-same-manifest can't
+# close. The private key never lives in the repo: point TRUX_OTA_SIGNING_KEY at
+# the PEM you export from the vault at release time (then shred it). The signed
+# payload is the security-critical fields, newline-joined, IDENTICAL to the
+# app's canonicalManifestPayload(): versionCode, versionName, apkUrl, sha256,
+# rolloutPct.
+: "${TRUX_OTA_SIGNING_KEY:?set TRUX_OTA_SIGNING_KEY to your ed25519 PEM path (export from KeePassXC at release, shred after). See RELEASES.md.}"
+[ -f "$TRUX_OTA_SIGNING_KEY" ] || { echo "signing key not found: $TRUX_OTA_SIGNING_KEY"; exit 1; }
+PAYLOAD_FILE="$(mktemp)"
+SIG_FILE="$(mktemp)"
+trap 'rm -f "$PAYLOAD_FILE" "$SIG_FILE"' EXIT
+printf '%s\n%s\n%s\n%s\n%s' "$newcode" "$name" "$APKURL" "$SHA256" "$ROLLOUT" > "$PAYLOAD_FILE"
+openssl pkeyutl -sign -inkey "$TRUX_OTA_SIGNING_KEY" -rawin -in "$PAYLOAD_FILE" -out "$SIG_FILE"
+SIG=$(base64 -w0 < "$SIG_FILE")
+[ "$(wc -c < "$SIG_FILE")" = "64" ] || { echo "unexpected signature length — is the key ed25519?"; exit 1; }
+echo "==> manifest signed (ed25519, 64-byte sig)"
+
 cat > /tmp/latest.json <<JSON
-{ "versionCode": ${newcode}, "versionName": "${name}", "apkUrl": "${APKURL}", "sha256": "${SHA256}", "rolloutPct": ${ROLLOUT}, "notes": "${NOTES//\"/\\\"}" }
+{ "versionCode": ${newcode}, "versionName": "${name}", "apkUrl": "${APKURL}", "sha256": "${SHA256}", "rolloutPct": ${ROLLOUT}, "sig": "${SIG}", "notes": "${NOTES//\"/\\\"}" }
 JSON
 
 # 4) publish the GitHub release with both assets

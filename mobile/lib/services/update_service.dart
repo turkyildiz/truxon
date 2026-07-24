@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:ed25519_edwards/ed25519_edwards.dart' as ed;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
@@ -51,6 +53,38 @@ bool isAllowedApkUrl(String apkUrl) {
       uri.host.endsWith('.githubusercontent.com');
 }
 
+/// The exact bytes the publish script signs — the security-critical manifest
+/// fields, newline-joined in a fixed order. Both signer (publish-release.sh)
+/// and verifier MUST build this string identically or every signature fails.
+/// `notes` is deliberately excluded (cosmetic); everything that decides WHICH
+/// build installs from WHERE is covered: version, url, checksum, rollout.
+String canonicalManifestPayload(Map<String, dynamic> manifest) {
+  final code = (manifest['versionCode'] as num?)?.toInt() ?? 0;
+  final name = (manifest['versionName'] as String?) ?? '';
+  final url = (manifest['apkUrl'] as String?) ?? '';
+  final sha = ((manifest['sha256'] as String?) ?? '').trim();
+  final pct = (manifest['rolloutPct'] as num?)?.toInt() ?? 100;
+  return '$code\n$name\n$url\n$sha\n$pct';
+}
+
+/// Verify the manifest's Ed25519 `sig` (base64, 64 bytes) over
+/// [canonicalManifestPayload] using [publicKeyB64] (base64, raw 32-byte key).
+/// Returns false for a missing, malformed, or invalid signature — never throws,
+/// so a hostile manifest can only ever DENY an update, not crash the check.
+bool verifyManifestSignature(Map<String, dynamic> manifest, String publicKeyB64) {
+  try {
+    final sigB64 = (manifest['sig'] as String?)?.trim() ?? '';
+    if (sigB64.isEmpty) return false;
+    final sig = base64.decode(sigB64);
+    final pub = base64.decode(publicKeyB64.trim());
+    if (sig.length != 64 || pub.length != 32) return false;
+    final msg = utf8.encode(canonicalManifestPayload(manifest));
+    return ed.verify(ed.PublicKey(pub), Uint8List.fromList(msg), Uint8List.fromList(sig));
+  } catch (_) {
+    return false; // any parse/verify error is a refusal, not a crash
+  }
+}
+
 /// Pure decision half of the update check, split out of
 /// [UpdateService.checkAndPrompt] so it's unit-testable. Returns the parsed
 /// manifest fields alongside the decision (sha256 normalized to lowercase hex).
@@ -60,9 +94,14 @@ bool isAllowedApkUrl(String apkUrl) {
 /// bucket < pct → offered. Absent/invalid pct means 100 (everyone), so old
 /// manifests keep full reach; a device outside the wave just sees
 /// notApplicable and picks the build up when the wave widens.
+///
+/// Manifest signing: when [signingPublicKeyB64] is non-empty, a valid Ed25519
+/// signature over the canonical payload is MANDATORY — an unsigned or forged
+/// manifest returns `unverifiable`, exactly like a bad checksum. This is the
+/// out-of-band trust the sha256 can't provide (sha rides the same manifest).
 ({UpdateDecision decision, int latestCode, String apkUrl, String sha256Hex})
     evaluateUpdateManifest(Map<String, dynamic> manifest, int currentCode,
-        {int rolloutBucket = 0}) {
+        {int rolloutBucket = 0, String signingPublicKeyB64 = ''}) {
   final latestCode = (manifest['versionCode'] as num?)?.toInt() ?? 0;
   final apkUrl = (manifest['apkUrl'] as String?) ?? '';
   final sha256Hex = ((manifest['sha256'] as String?) ?? '').trim().toLowerCase();
@@ -76,6 +115,11 @@ bool isAllowedApkUrl(String apkUrl) {
   } else if (sha256Hex.isEmpty || !isAllowedApkUrl(apkUrl)) {
     // No checksum, or the APK would come from a host we don't release on →
     // we can't trust the download, so don't offer it.
+    decision = UpdateDecision.unverifiable;
+  } else if (signingPublicKeyB64.isNotEmpty &&
+      !verifyManifestSignature(manifest, signingPublicKeyB64)) {
+    // A signing key is configured but the manifest isn't validly signed —
+    // refuse. This is the door a compromised release host cannot walk through.
     decision = UpdateDecision.unverifiable;
   } else {
     decision = UpdateDecision.install;
@@ -118,7 +162,8 @@ class UpdateService {
       if (res.statusCode != 200) return;
       final j = jsonDecode(res.body) as Map<String, dynamic>;
       final m = evaluateUpdateManifest(j, currentCode,
-          rolloutBucket: await _rolloutBucket());
+          rolloutBucket: await _rolloutBucket(),
+          signingPublicKeyB64: AppConfig.otaSigningPublicKey);
       if (m.decision == UpdateDecision.notApplicable) return;
       if (m.decision == UpdateDecision.unverifiable) {
         if (context.mounted) await _showVerifyFailed(context);

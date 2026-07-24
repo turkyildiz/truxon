@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:truxon_companion/services/update_service.dart';
@@ -127,6 +129,84 @@ void main() {
           UpdateDecision.install);
       expect(evaluateUpdateManifest(staged(400), 3, rolloutBucket: 99).decision,
           UpdateDecision.install);
+    });
+  });
+
+  group('manifest signing (Ed25519)', () {
+    // Test vectors from a throwaway ed25519 key signing the canonical payload
+    // for {code:4, name:1.0.2, url, sha, pct:100} — NOT the production key.
+    const testPubKey = 'rmUqPgkHeraprhPkwM3YrW7r1gRFGef/UM7xTV41y2c=';
+    const testSig =
+        'HrDdPVa57c5K1vHqsQ8uorjI2LD0V730fRii823xUR24LyBzNNtcokAazbtWEMy6laVid8p4ilvaCOHu0/LNDQ==';
+
+    Map<String, dynamic> signed({
+      int code = 4,
+      String name = '1.0.2',
+      String url = 'https://github.com/x/app.apk',
+      String sha256 = sha,
+      int pct = 100,
+      Object? sig = testSig,
+    }) =>
+        {
+          'versionCode': code,
+          'versionName': name,
+          'apkUrl': url,
+          'sha256': sha256,
+          'rolloutPct': pct,
+          'sig': ?sig,
+        };
+
+    test('valid signature with a key configured → install', () {
+      final m = evaluateUpdateManifest(signed(), 3, signingPublicKeyB64: testPubKey);
+      expect(m.decision, UpdateDecision.install);
+    });
+
+    test('missing signature with a key configured → unverifiable', () {
+      final m = evaluateUpdateManifest(signed(sig: null), 3, signingPublicKeyB64: testPubKey);
+      expect(m.decision, UpdateDecision.unverifiable);
+    });
+
+    test('a tampered versionName invalidates the signature → unverifiable', () {
+      final m = evaluateUpdateManifest(signed(name: '9.9.9'), 3, signingPublicKeyB64: testPubKey);
+      expect(m.decision, UpdateDecision.unverifiable);
+    });
+
+    test('a forged newer versionCode with the old signature → unverifiable', () {
+      // the classic attack: bump the code to force a re-install of an old APK.
+      final m = evaluateUpdateManifest(signed(code: 5), 3, signingPublicKeyB64: testPubKey);
+      expect(m.decision, UpdateDecision.unverifiable);
+    });
+
+    test('a redirected apkUrl invalidates the signature → unverifiable', () {
+      // url is on the allowlist (github) but not the one that was signed.
+      final m = evaluateUpdateManifest(
+          signed(url: 'https://github.com/evil/app.apk'), 3,
+          signingPublicKeyB64: testPubKey);
+      expect(m.decision, UpdateDecision.unverifiable);
+    });
+
+    test('the wrong public key rejects a genuine signature → unverifiable', () {
+      final wrongKey = base64.encode(List<int>.filled(32, 7));
+      final m = evaluateUpdateManifest(signed(), 3, signingPublicKeyB64: wrongKey);
+      expect(m.decision, UpdateDecision.unverifiable);
+    });
+
+    test('no signing key configured → signature not required (backward compat)', () {
+      final m = evaluateUpdateManifest(signed(sig: null), 3);
+      expect(m.decision, UpdateDecision.install);
+    });
+
+    test('verifyManifestSignature: valid true; malformed/short sig false, never throws', () {
+      expect(verifyManifestSignature(signed(), testPubKey), isTrue);
+      expect(verifyManifestSignature(signed(sig: 'not valid base64 !!'), testPubKey), isFalse);
+      expect(verifyManifestSignature(signed(sig: base64.encode(List<int>.filled(10, 0))), testPubKey),
+          isFalse);
+      expect(verifyManifestSignature(signed(sig: null), testPubKey), isFalse);
+    });
+
+    test('canonicalManifestPayload is the exact newline-joined field order', () {
+      expect(canonicalManifestPayload(signed()),
+          '4\n1.0.2\nhttps://github.com/x/app.apk\n$sha\n100');
     });
   });
 }

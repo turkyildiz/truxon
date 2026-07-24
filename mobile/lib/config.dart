@@ -47,4 +47,17 @@ class AppConfig {
     // release's asset — no branch to push, no token anywhere in the app.
     defaultValue: 'https://github.com/turkyildiz/truxon-releases/releases/latest/download/latest.json',
   );
+
+  // OTA manifest signing (Ed25519, RFC 8032). The publish script signs the
+  // canonical manifest fields with the owner's OFFLINE private key; the app
+  // verifies that signature with this embedded PUBLIC key before trusting any
+  // manifest field. This is what a compromised release host cannot forge — it
+  // seals the gap the sha256 alone can't (sha comes from the same manifest).
+  // When non-empty, a valid signature is MANDATORY: an unsigned or forged
+  // manifest is refused. Empty disables the check (pre-key / dev builds).
+  // Raw 32-byte public key, base64. Override per-build with --dart-define.
+  static const otaSigningPublicKey = String.fromEnvironment(
+    'OTA_PUBKEY',
+    defaultValue: '7wgHZViaf7zP/9LgWNq9SK3pnigFQlIo4PjNcPPs11Q=',
+  );
 }

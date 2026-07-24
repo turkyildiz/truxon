@@ -7,13 +7,20 @@ no Play Store, no thumb drive. Here's how it's wired and how to ship an update.
 - The app reads `latest.json` from the **public** repo
   `github.com/turkyildiz/truxon-releases` at the stable path
   `releases/latest/download/latest.json` (always the newest release).
-- `latest.json` = `{ versionCode, versionName, apkUrl, sha256, notes }`.
+- `latest.json` = `{ versionCode, versionName, apkUrl, sha256, rolloutPct, sig, notes }`.
 - If `versionCode` > the installed build number, the app downloads `apkUrl` and
   launches Android's installer. The driver taps **Update now → Install**.
 - `sha256` is the hex SHA-256 of the APK (publish-release.sh fills it in). The
   app hashes the download and refuses to install on any mismatch — or if the
   field is missing — so a tampered or corrupted APK never reaches the
   installer.
+- `sig` is an **Ed25519 signature** over the security-critical fields
+  (versionCode, versionName, apkUrl, sha256, rolloutPct), made with the owner's
+  **offline** private key. The app carries the matching public key and refuses
+  any manifest that isn't validly signed. This seals the gap sha256 alone can't:
+  the checksum rides the same manifest, so a compromised release host could swap
+  both — but it can't forge the signature. Downgrades and apkUrl redirects are
+  signed against too.
 - Only the APK + latest.json live in the public repo. Your source stays private.
 
 ## One-time setup (owner, ~3 min)
@@ -30,14 +37,32 @@ no Play Store, no thumb drive. Here's how it's wired and how to ship an update.
 
 That's it. The app is already pointed at this repo.
 
-## Shipping an update (every time)
-From `mobile/`:
+## One-time setup: the OTA signing key (owner)
+The app refuses any update manifest that isn't signed by your key, so you hold an
+Ed25519 signing key. It was generated with:
 ```bash
-./publish-release.sh "Fixed X, added Y"
+openssl genpkey -algorithm ed25519 -out truxon-ota-signing.pem   # PRIVATE — store in KeePassXC
+openssl pkey -in truxon-ota-signing.pem -pubout -outform DER | tail -c 32 | base64 -w0
 ```
-It bumps the build number, builds the release APK, and publishes a GitHub
-release with the APK + latest.json. Within a launch or two, every tablet offers
-the update.
+The **public** key (32-byte, base64) is embedded in the app at
+`lib/config.dart` → `AppConfig.otaSigningPublicKey`. The **private** key lives
+only in your KeePassXC vault — never in the repo, never on a build box at rest.
+To rotate it: generate a new pair, update the public key in `config.dart`, ship
+that build to every tablet FIRST (old installs verify the old key), then start
+signing with the new private key once they've updated.
+
+## Shipping an update (every time)
+From `mobile/`, with the signing key exported from the vault to a temp path:
+```bash
+export TRUX_OTA_SIGNING_KEY=/dev/shm/truxon-ota-signing.pem   # export from KeePassXC
+./publish-release.sh "Fixed X, added Y"
+shred -u /dev/shm/truxon-ota-signing.pem                       # remove the plaintext key
+```
+It bumps the build number, builds the release APK, **signs the manifest**, and
+publishes a GitHub release with the APK + signed latest.json. Within a launch or
+two, every tablet offers the update. The script aborts if `TRUX_OTA_SIGNING_KEY`
+is unset — an unsigned manifest would be refused by every installed app, so it
+refuses to publish one. Using `/dev/shm` keeps the plaintext key in RAM only.
 
 Override the update source at build time if the repo name changes:
 `--dart-define=UPDATE_URL=https://github.com/<owner>/<repo>/releases/latest/download/latest.json`

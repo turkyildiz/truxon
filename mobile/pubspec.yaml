@@ -71,6 +71,8 @@ dependencies:
   path_provider: ^2.1.5
   open_filex: ^4.5.0
   crypto: ^3.0.6
+  # OTA manifest signature verification (Ed25519 / RFC 8032, pure Dart, sync).
+  ed25519_edwards: ^0.3.1
   record: ^7.1.1
   opus_dart: ^3.0.1
   opus_flutter: ^3.0.3
