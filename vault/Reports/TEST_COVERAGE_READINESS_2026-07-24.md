@@ -65,7 +65,13 @@ These can't be finished solo and are batched for one short joint session:
 None is a hard launch blocker (the resilience already survived a 9-hour Vercel
 deploy outage with zero customer impact), so they're safe to schedule.
 
-## Edge-function tests — scoped, blocked on two small prod/CI changes
+## Edge-function tests — UNLOCKED + DONE 2026-07-24 (both blockers cleared)
+The two blockers below were resolved without touching the shared `auth.ts` runtime:
+- **CRON-secret door** (`requireCron`/`timingSafeEqualStr`) — tested (`auth.test.ts`, 3 tests). Blocker #1 (env at import) was solved by adding `--allow-env` to the CI deno step (test code is trusted); no source change to `auth.ts` needed.
+- **AI-agent per-role authz** (`toolsForRole`) — tested (`truxcore.test.ts`, 6 tests: driver locked out of dispatch/finance/roster, accountant no writes, only admin gets system internals, unknown role fails closed). Blocker #2 (truxcore didn't type-check) was solved by ONE type alias — `Sb = SupabaseClient<any,any,any>` (erased at runtime, agent behaviour unchanged) — instead of the feared refactor.
+- Deno `_shared` gate: **23 → 32 tests green** under the exact CI command. Commits `575bef4` (CRON gate), `70a68ed` (agent authz).
+
+### (Original scoping notes, for history)
 Investigated adding `_shared/*.test.ts` coverage for the two highest-value pure
 boundaries — `requireCron`/`timingSafeEqualStr` (the CRON secret door) and
 `toolsForRole` (the AI agent's per-role tool authorization). Wrote both, they
