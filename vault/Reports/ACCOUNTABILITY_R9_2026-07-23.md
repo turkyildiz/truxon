@@ -113,4 +113,10 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **SECTION H COMPLETE (101–112).** Suite: **952 pgTAP / 166 files**, all green from clean resets; everything prod-pushed and live-verified.
 - **First live misfile audit (prod, NAS 3B):** 138 labeled docs re-read → 135 agree (97.8%), **3 real disagreements** banked for sentinel review: docs #122 + #176 (filed Rate Confirmation, read BOL) and #185 (filed POD, reads Rate Confirmation — POD coverage gates invoicing, so this one's worth the click).
 
+### Section I (dispatch/ops) — day 2 evening
+- **#114 ETA badges** — in-transit load rows carry ⏱ On track / Tight / HOS short / ETA-past-appt chips (the #52/53 feed, per-row; tooltip shows the estimate math and calls it an estimate).
+- **#118 Load templates** — "⧉ Repeat lanes" chips on Dispatch: one click applies customer/lane/rate/stops; save-current-form-as-template with one input.
+- **#119 Recurring scheduler** — pg_cron 06:10 daily `spawn_recurring_loads()`: due templates draft honest `pending` + awaiting-paperwork loads (notes-tagged "Auto-drafted…confirm with the broker", stops copied, load numbers real, cadence advances weekly/biweekly/monthly). Nothing rolls without a human.
+- **Suite: 959 pgTAP / 167 files.** Prod pushed.
+
 *(Run continues; closeout will finalize the count.)*
