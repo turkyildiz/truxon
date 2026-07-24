@@ -2894,6 +2894,37 @@ export async function customerEnrichmentGaps(): Promise<EnrichmentGaps | null> {
   return (data as unknown as EnrichmentGaps) ?? null
 }
 
+/** R9 #65: how accurate our revenue forecasts turned out (matured weeks). */
+export interface ForecastMape {
+  weeks_scored: number
+  mape_pct: number | null
+  mean_bias: number | null
+  weeks: { target_week: string; predicted: number; actual: number; error_pct: number }[]
+  note: string
+}
+export async function forecastMapeReport(): Promise<ForecastMape | null> {
+  const data = unwrap(await supabase.rpc('forecast_mape_report', {}))
+  return (data as unknown as ForecastMape) ?? null
+}
+
+/** R9 #73: what retiring one truck does to the fleet. */
+export interface TruckRetirement {
+  unit: string
+  retiring_truck: { weekly_loads: number; weekly_miles: number; weekly_revenue: number; monthly_fixed_saved: number }
+  redistribution: { remaining_trucks: number; survivor_avg_weekly_miles: number | null; fleet_headroom_weekly_miles: number; absorbable: boolean; revenue_at_risk: number }
+  verdict: string
+  note: string
+}
+export async function truckRetirementScenario(truckId: number): Promise<TruckRetirement | null> {
+  const data = unwrap(await supabase.rpc('truck_retirement_scenario', { p_truck_id: truckId }))
+  return (data as unknown as TruckRetirement) ?? null
+}
+export async function listActiveTrucksBasic(): Promise<{ id: number; unit_number: string }[]> {
+  const { data, error } = await supabase.from('trucks').select('id, unit_number').neq('status', 'retired').order('unit_number')
+  if (error) throw new Error(error.message)
+  return (data as unknown as { id: number; unit_number: string }[]) ?? []
+}
+
 /** R9 #71: drivers on a long ongoing consecutive-work-day streak. */
 export interface FatigueWatch {
   flagged: { driver: string; consecutive_days: number; streak_start: string; last_active: string }[]

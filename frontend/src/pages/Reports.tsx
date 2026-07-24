@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { createSavedReport, customerChurnWatch, deleteSavedReport, driverFatigueWatch, truckBreakevenAnalysis, gpsConfirmedMissingPod, laneRateTrend, listSavedReports, reportMetricCatalog, routeDeviationReport, cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, downloadBankerPackage, downloadInsuranceDataRoom, downloadTaxPackage, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { createSavedReport, customerChurnWatch, deleteSavedReport, driverFatigueWatch, forecastMapeReport, listActiveTrucksBasic, truckBreakevenAnalysis, truckRetirementScenario, gpsConfirmedMissingPod, laneRateTrend, listSavedReports, reportMetricCatalog, routeDeviationReport, cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, downloadBankerPackage, downloadInsuranceDataRoom, downloadTaxPackage, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import { errorMessage } from '../supabase'
 import type { WeeklyRow } from '../types'
 
@@ -389,6 +389,74 @@ function ExecPackagesCard() {
       <p className="mt-1 text-[11px] text-muted">
         Worksheets, not filed returns or audited statements — each file names its own gaps.
       </p>
+    </Card>
+  )
+}
+
+/** R9 #65: how accurate our revenue forecasts turned out. Hidden until
+ * snapshots mature (accrues over the weeks). */
+function ForecastMapeCard() {
+  const q = useQuery({ queryKey: ['forecast-mape'], queryFn: forecastMapeReport, retry: false, staleTime: 10 * 60 * 1000 })
+  const d = q.data
+  if (q.isError || !d || d.weeks_scored === 0) return null
+  return (
+    <Card title="🎯 Forecast accuracy">
+      <p className="text-sm text-body">
+        Revenue forecasts scored over {d.weeks_scored} matured week{d.weeks_scored === 1 ? '' : 's'}:{' '}
+        <span className={`font-semibold ${(d.mape_pct ?? 0) > 20 ? 'text-amber-600 dark:text-amber-400' : ''}`}>{d.mape_pct}% MAPE</span>
+        {d.mean_bias != null && <>, {d.mean_bias > 0 ? 'running high' : 'running low'} by {money(Math.abs(d.mean_bias))}/wk on average.</>}
+      </p>
+      {d.weeks.length > 0 && (
+        <Table headers={['Week', 'Predicted', 'Actual', 'Error']}>
+          {d.weeks.slice(0, 8).map((w) => (
+            <tr key={w.target_week}>
+              <td className="px-3 py-2 font-medium">{w.target_week}</td>
+              <td className="px-3 py-2">{money(w.predicted)}</td>
+              <td className="px-3 py-2">{money(w.actual)}</td>
+              <td className={`px-3 py-2 ${w.error_pct > 20 ? 'font-semibold text-amber-600 dark:text-amber-400' : ''}`}>{w.error_pct}%</td>
+            </tr>
+          ))}
+        </Table>
+      )}
+      <p className="mt-1 text-[11px] text-muted">{d.note}</p>
+    </Card>
+  )
+}
+
+/** R9 #73: retire-a-truck what-if — pick a unit, see if the fleet absorbs it. */
+function TruckRetirementCard() {
+  const trucksQ = useQuery({ queryKey: ['trucks-basic'], queryFn: listActiveTrucksBasic, retry: false })
+  const [truckId, setTruckId] = useState<number | null>(null)
+  const scenario = useMutation({ mutationFn: (id: number) => truckRetirementScenario(id) })
+  const trucks = trucksQ.data ?? []
+  if (trucksQ.isError || trucks.length === 0) return null
+  const s = scenario.data
+  return (
+    <Card title="🅿️ Retire-a-truck what-if">
+      <div className="flex flex-wrap items-center gap-2">
+        <select className="rounded border border-edge bg-transparent px-2 py-1 text-sm"
+          value={truckId ?? ''} onChange={(e) => { const id = Number(e.target.value) || null; setTruckId(id); if (id) scenario.mutate(id) }}>
+          <option value="">Pick a truck…</option>
+          {trucks.map((t) => <option key={t.id} value={t.id}>{t.unit_number}</option>)}
+        </select>
+        {scenario.isPending && <span className="text-xs text-muted">Modeling…</span>}
+      </div>
+      {s && (
+        <div className="mt-2 text-sm">
+          <p className="text-body">
+            {s.unit} runs <span className="font-semibold">{Number(s.retiring_truck.weekly_miles).toLocaleString()} mi/wk</span> ({money(s.retiring_truck.weekly_revenue)}/wk);
+            retiring saves <span className="font-semibold">{money(s.retiring_truck.monthly_fixed_saved)}/mo</span> fixed.
+          </p>
+          <p className="mt-1 text-body">
+            {s.redistribution.remaining_trucks} trucks left with ~{Number(s.redistribution.fleet_headroom_weekly_miles).toLocaleString()} mi/wk headroom —{' '}
+            <span className={s.redistribution.absorbable ? 'font-semibold text-emerald-600 dark:text-emerald-400' : 'font-semibold text-rose-600 dark:text-rose-400'}>
+              {s.redistribution.absorbable ? 'freight absorbable' : `${money(s.redistribution.revenue_at_risk)}/wk at risk`}
+            </span>.
+          </p>
+          <p className="mt-1 text-sm font-semibold text-brand">{s.verdict}</p>
+          <p className="mt-1 text-[11px] text-muted">{s.note}</p>
+        </div>
+      )}
     </Card>
   )
 }
@@ -985,6 +1053,8 @@ export default function Reports() {
           <LaneRateTrendCard />
           <FatigueCard />
           <TruckBreakevenCard />
+          <TruckRetirementCard />
+          <ForecastMapeCard />
           <NpsCard />
         </>
       )}
