@@ -129,10 +129,13 @@ Deno.serve(withCors(async (req) => {
       // Report questions legitimately need several tool rounds; the in-app
       // spinner can wait, the gateway allows 150s idle.
       deadlineMs: 100_000,
-      // Ask-Forest over the fleet radio: the reply is spoken aloud to every
-      // truck, so it must sound like a radio call, not a report.
+      // Voice channels: the reply is spoken aloud, so it must sound like talk,
+      // not a report. `radio` = fleet PTT to every truck; `spoken` = one person
+      // on their tablet (a touch more room, but still brief and conversational).
       channelNote: body.radio === true
         ? 'RADIO MODE: your reply will be READ ALOUD over the fleet push-to-talk radio to all drivers. Answer in 1-3 short spoken sentences, plain conversational words — no markdown, no tables, no lists, round the numbers.'
+        : body.spoken === true
+        ? 'SPOKEN MODE: your reply is read aloud to one person on a tablet — no screen-reading of tables. Answer in a few short, natural spoken sentences, plain conversational words, no markdown, no lists, round the numbers. Lead with the answer; if there is a lot of detail, give the headline and the one or two figures that matter and offer to pull the rest up on screen — do not recite a long list aloud.'
         : undefined,
     })
     return json({

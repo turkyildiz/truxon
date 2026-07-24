@@ -358,6 +358,7 @@ class CompanionApi {
     String? confirmToken,
     String? rejectToken,
     bool radio = false,
+    bool spoken = false,
   }) async {
     final res = await _sb.functions.invoke('trux-agent', body: {
       'session_id': ?sessionId,
@@ -365,6 +366,7 @@ class CompanionApi {
       'confirm_token': ?confirmToken,
       'reject_token': ?rejectToken,
       if (radio) 'radio': true,
+      if (spoken) 'spoken': true,
     });
     final data = res.data;
     if (data is Map) return Map<String, dynamic>.from(data);

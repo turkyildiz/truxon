@@ -247,7 +247,9 @@ class TruxVoiceController extends ChangeNotifier {
     state = VoiceState.thinking;
     notifyListeners();
     try {
-      final res = await _api.truxSend(sessionId: _sessionId, message: text);
+      // spoken mode: Forest answers in a few natural sentences meant to be heard,
+      // not a screen-read report — concise, no lists, offers detail on screen.
+      final res = await _api.truxSend(sessionId: _sessionId, message: text, spoken: true);
       _sessionId = (res['session_id'] as String?) ?? _sessionId;
       final reply = (res['reply'] as String?)?.trim();
       final proposals = ((res['proposals'] as List?) ?? [])
