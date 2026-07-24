@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { createSavedReport, customerChurnWatch, deleteSavedReport, gpsConfirmedMissingPod, laneRateTrend, listSavedReports, reportMetricCatalog, routeDeviationReport, cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, downloadBankerPackage, downloadInsuranceDataRoom, downloadTaxPackage, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { createSavedReport, customerChurnWatch, deleteSavedReport, driverFatigueWatch, truckBreakevenAnalysis, gpsConfirmedMissingPod, laneRateTrend, listSavedReports, reportMetricCatalog, routeDeviationReport, cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, downloadBankerPackage, downloadInsuranceDataRoom, downloadTaxPackage, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import { errorMessage } from '../supabase'
 import type { WeeklyRow } from '../types'
 
@@ -389,6 +389,52 @@ function ExecPackagesCard() {
       <p className="mt-1 text-[11px] text-muted">
         Worksheets, not filed returns or audited statements — each file names its own gaps.
       </p>
+    </Card>
+  )
+}
+
+/** R9 #71: drivers on a long ongoing consecutive-work-day streak. */
+function FatigueCard() {
+  const q = useQuery({ queryKey: ['fatigue-watch'], queryFn: driverFatigueWatch, retry: false, staleTime: 10 * 60 * 1000 })
+  const d = q.data
+  if (q.isError || !d || d.flagged.length === 0) return null
+  return (
+    <Card title={`😴 Driver fatigue watch (${d.flagged.length})`}>
+      <p className="mb-2 text-sm text-muted">Long unbroken runs of work-days — worth a reset before it becomes a safety event.</p>
+      <Table headers={['Driver', 'Consecutive days', 'Since', 'Last active']}>
+        {d.flagged.map((r) => (
+          <tr key={r.driver}>
+            <td className="px-3 py-2 font-medium">{r.driver}</td>
+            <td className="px-3 py-2 font-semibold text-amber-600 dark:text-amber-400">{r.consecutive_days}</td>
+            <td className="px-3 py-2">{r.streak_start}</td>
+            <td className="px-3 py-2 text-muted">{r.last_active}</td>
+          </tr>
+        ))}
+      </Table>
+      <p className="mt-1 text-[11px] text-muted">{d.note}</p>
+    </Card>
+  )
+}
+
+/** R9 #74: the 13th-truck decision from real economics. */
+function TruckBreakevenCard() {
+  const q = useQuery({ queryKey: ['truck-breakeven'], queryFn: truckBreakevenAnalysis, retry: false, staleTime: 10 * 60 * 1000 })
+  const d = q.data
+  if (q.isError || !d) return null
+  const nt = d.new_truck
+  const verdictTone = nt.verdict.startsWith('clear') ? 'text-emerald-600 dark:text-emerald-400'
+    : nt.verdict.startsWith('tight') ? 'text-amber-600 dark:text-amber-400'
+    : 'text-rose-600 dark:text-rose-400'
+  return (
+    <Card title="🚚 Add-a-truck breakeven">
+      <p className="text-sm text-body">
+        A new truck must turn <span className="font-semibold">{nt.breakeven_loaded_miles_per_week != null ? `${Number(nt.breakeven_loaded_miles_per_week).toLocaleString()} loaded mi/wk` : '—'}</span> to cover its own fixed cost
+        ({money(d.economics.weekly_fixed_cost_per_truck)}/wk) at {money(d.economics.contribution_margin_per_mile)}/mi contribution margin.
+        The current fleet averages <span className="font-semibold">{nt.fleet_avg_loaded_miles_per_week != null ? `${Number(nt.fleet_avg_loaded_miles_per_week).toLocaleString()} mi/wk` : '—'}</span> per truck
+        {nt.headroom_pct != null && <> (<span className={nt.headroom_pct >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>{nt.headroom_pct > 0 ? '+' : ''}{nt.headroom_pct}%</span> vs breakeven)</>}.
+      </p>
+      <p className={`mt-1 text-sm font-semibold ${verdictTone}`}>{nt.verdict}</p>
+      <p className="mt-1 text-[11px] text-muted">{d.note}</p>
     </Card>
   )
 }
@@ -937,6 +983,8 @@ export default function Reports() {
           <GpsPodCard />
           <ChurnWatchCard />
           <LaneRateTrendCard />
+          <FatigueCard />
+          <TruckBreakevenCard />
           <NpsCard />
         </>
       )}

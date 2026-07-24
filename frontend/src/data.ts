@@ -2894,6 +2894,28 @@ export async function customerEnrichmentGaps(): Promise<EnrichmentGaps | null> {
   return (data as unknown as EnrichmentGaps) ?? null
 }
 
+/** R9 #71: drivers on a long ongoing consecutive-work-day streak. */
+export interface FatigueWatch {
+  flagged: { driver: string; consecutive_days: number; streak_start: string; last_active: string }[]
+  note: string
+}
+export async function driverFatigueWatch(): Promise<FatigueWatch | null> {
+  const data = unwrap(await supabase.rpc('driver_fatigue_watch', {}))
+  return (data as unknown as FatigueWatch) ?? null
+}
+
+/** R9 #74: the 13th-truck breakeven from real fleet economics. */
+export interface TruckBreakeven {
+  current_trucks: number
+  economics: { avg_rpm: number; variable_per_mile: number; contribution_margin_per_mile: number; weekly_fixed_cost_per_truck: number }
+  new_truck: { breakeven_loaded_miles_per_week: number | null; fleet_avg_loaded_miles_per_week: number | null; headroom_pct: number | null; verdict: string }
+  note: string
+}
+export async function truckBreakevenAnalysis(): Promise<TruckBreakeven | null> {
+  const data = unwrap(await supabase.rpc('truck_breakeven_analysis', {}))
+  return (data as unknown as TruckBreakeven) ?? null
+}
+
 /** R9 #68: customers still booking but slowing vs their own baseline. */
 export interface ChurnWatch {
   watch: { customer: string; baseline_per_30d: number; recent_per_30d: number; drop_pct: number; trailing_revenue: number }[]
