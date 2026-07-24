@@ -89,6 +89,23 @@ async function qboGet(token: string, path: string): Promise<Record<string, unkno
   return await res.json()
 }
 
+// LOAD <ref> tokens off the invoice line descriptions — the key that ties a
+// QBO invoice back to a Truxon load by reference_number (e.g. "LOAD 2004797",
+// "LOAD 3922-0081-1025", "LOAD S4159285"). Deduped; refs stay raw (the DB
+// normalises for matching).
+// deno-lint-ignore no-explicit-any
+function loadRefs(inv: any): string[] {
+  const lines: any[] = Array.isArray(inv.Line) ? inv.Line : []
+  const out = new Set<string>()
+  const re = /LOAD\s+([A-Za-z0-9][A-Za-z0-9-]*)/gi
+  for (const ln of lines) {
+    const d = String(ln?.Description ?? '')
+    let m: RegExpExecArray | null
+    while ((m = re.exec(d)) !== null) out.add(m[1])
+  }
+  return [...out]
+}
+
 // deno-lint-ignore no-explicit-any
 function mapInvoice(inv: any): Record<string, unknown> {
   return {
@@ -101,6 +118,7 @@ function mapInvoice(inv: any): Record<string, unknown> {
     total: Number(inv.TotalAmt ?? 0),
     balance: Number(inv.Balance ?? 0),
     voided: Number(inv.TotalAmt ?? 0) === 0 && /voided/i.test(String(inv.PrivateNote ?? '')),
+    load_refs: loadRefs(inv),
   }
 }
 
@@ -315,6 +333,21 @@ async function pull(s: SupabaseClient): Promise<Response> {
       voidedN = (vn as number) ?? 0
     }
     const result: Record<string, unknown> = { ...(upserted as Record<string, unknown>), voided: voidedN, fetched: rows.length }
+
+    // Self-heal billing state: link any completed load now matched to a live QBO
+    // invoice (by the LOAD <ref> we just mirrored) → invoice_id + billed. Keeps
+    // the "unbilled" list honest on every sync; best-effort so a hiccup here
+    // never fails the invoice mirror.
+    try {
+      const { data: recon, error: rErr } = await s.rpc('acct_reconcile_qbo_billing', { p_dry_run: false })
+      if (rErr) result.reconcile_error = rErr.message.slice(0, 200)
+      else if (recon && typeof recon === 'object') {
+        result.reconcile_linked = (recon as Record<string, unknown>).linked
+        result.reconcile_still_unbilled = (recon as Record<string, unknown>).still_unbilled
+      }
+    } catch (e) {
+      result.reconcile_error = String(e).slice(0, 200)
+    }
 
     if (cmRows.length) {
       const { data: cmN, error: cmErr } = await s.rpc('qbo_upsert_credit_memos', { p_rows: cmRows })
