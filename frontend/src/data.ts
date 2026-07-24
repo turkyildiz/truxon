@@ -2894,6 +2894,32 @@ export async function customerEnrichmentGaps(): Promise<EnrichmentGaps | null> {
   return (data as unknown as EnrichmentGaps) ?? null
 }
 
+/** R9 #47/#48: out-of-route miles priced from the GPS trail vs booked. */
+export interface RouteDeviation {
+  days: number
+  all_in_rpm: number
+  loads_measured: number
+  flagged: number
+  total_out_of_route_miles: number
+  total_out_of_route_cost: number
+  worst: { load_number: string; customer: string; booked_miles: number; driven_miles: number; out_of_route_miles: number; out_of_route_pct: number; cost: number }[]
+  note: string
+}
+export async function routeDeviationReport(days = 30): Promise<RouteDeviation | null> {
+  const data = unwrap(await supabase.rpc('route_deviation_report', { p_days: days }))
+  return (data as unknown as RouteDeviation) ?? null
+}
+
+/** R9 #59: deliveries GPS put at the consignee but with no POD on file. */
+export interface GpsConfirmedPod {
+  confirmed_missing_pod: { load_number: string; customer: string; delivered: string; address: string; closest_mi: number }[]
+  note: string
+}
+export async function gpsConfirmedMissingPod(days = 21): Promise<GpsConfirmedPod | null> {
+  const data = unwrap(await supabase.rpc('gps_confirmed_missing_pod', { p_days: days }))
+  return (data as unknown as GpsConfirmedPod) ?? null
+}
+
 /** R9 #165: real-user web performance (admin-only). */
 export interface WebPerf {
   days: number

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { createSavedReport, deleteSavedReport, listSavedReports, reportMetricCatalog, cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, downloadBankerPackage, downloadInsuranceDataRoom, downloadTaxPackage, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { createSavedReport, deleteSavedReport, gpsConfirmedMissingPod, listSavedReports, reportMetricCatalog, routeDeviationReport, cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, downloadBankerPackage, downloadInsuranceDataRoom, downloadTaxPackage, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import { errorMessage } from '../supabase'
 import type { WeeklyRow } from '../types'
 
@@ -389,6 +389,60 @@ function ExecPackagesCard() {
       <p className="mt-1 text-[11px] text-muted">
         Worksheets, not filed returns or audited statements — each file names its own gaps.
       </p>
+    </Card>
+  )
+}
+
+/** R9 #47/#48: out-of-route miles the fleet actually drove, priced. Hidden
+ * when nothing crossed the deviation threshold. */
+function RouteDeviationCard() {
+  const q = useQuery({ queryKey: ['route-deviation'], queryFn: () => routeDeviationReport(30), retry: false, staleTime: 10 * 60 * 1000 })
+  const d = q.data
+  if (q.isError || !d || d.flagged === 0) return null
+  return (
+    <Card title="🛰️ Route deviation (30d)">
+      <p className="text-sm text-body">
+        <span className="font-semibold">{d.flagged}</span> of {d.loads_measured} GPS-tracked loads drove materially over their booked miles —{' '}
+        <span className="font-semibold">{Number(d.total_out_of_route_miles).toLocaleString()} out-of-route miles</span>,{' '}
+        <span className="font-semibold text-rose-600 dark:text-rose-400">{money(d.total_out_of_route_cost)}</span> at the all-in rate.
+      </p>
+      {d.worst.length > 0 && (
+        <Table headers={['Load', 'Customer', 'Booked', 'Driven', 'Over', 'Cost']}>
+          {d.worst.slice(0, 8).map((r) => (
+            <tr key={r.load_number}>
+              <td className="px-3 py-2 font-medium">{r.load_number}</td>
+              <td className="px-3 py-2">{r.customer}</td>
+              <td className="px-3 py-2">{Number(r.booked_miles).toLocaleString()}</td>
+              <td className="px-3 py-2">{Number(r.driven_miles).toLocaleString()}</td>
+              <td className="px-3 py-2 font-semibold text-amber-600 dark:text-amber-400">+{r.out_of_route_pct}%</td>
+              <td className="px-3 py-2">{money(r.cost)}</td>
+            </tr>
+          ))}
+        </Table>
+      )}
+      <p className="mt-1 text-[11px] text-muted">{d.note}</p>
+    </Card>
+  )
+}
+
+/** R9 #59: deliveries GPS confirms at the dock but with no POD — chase these. */
+function GpsPodCard() {
+  const q = useQuery({ queryKey: ['gps-pod'], queryFn: () => gpsConfirmedMissingPod(21), retry: false, staleTime: 10 * 60 * 1000 })
+  const d = q.data
+  if (q.isError || !d || d.confirmed_missing_pod.length === 0) return null
+  return (
+    <Card title={`📍 GPS-confirmed, POD missing (${d.confirmed_missing_pod.length})`}>
+      <p className="mb-2 text-sm text-muted">The truck's GPS put it at the consignee — the delivery happened. These just need the signature chased.</p>
+      <Table headers={['Load', 'Customer', 'Delivered', 'Nearest GPS']}>
+        {d.confirmed_missing_pod.slice(0, 10).map((r) => (
+          <tr key={r.load_number}>
+            <td className="px-3 py-2 font-medium">{r.load_number}</td>
+            <td className="px-3 py-2">{r.customer}</td>
+            <td className="px-3 py-2">{new Date(r.delivered).toLocaleDateString()}</td>
+            <td className="px-3 py-2 text-muted">{r.closest_mi} mi from dock</td>
+          </tr>
+        ))}
+      </Table>
     </Card>
   )
 }
@@ -819,6 +873,8 @@ export default function Reports() {
           <LostCustomersCard />
           <CancellationCard />
           <DeadheadCard />
+          <RouteDeviationCard />
+          <GpsPodCard />
           <NpsCard />
         </>
       )}
