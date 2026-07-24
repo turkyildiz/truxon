@@ -129,4 +129,10 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 
 - **#124 PREP (radio transcript search)** — the shelf and the search, NOT the recorder: `radio_transcripts` (service_role-write-only — authenticated INSERT is refused by test, so nothing can fill it until the owner approves transcription), websearch FTS RPC with injection-safe `[[ ]]` snippet markers, office-only 🔎 card on the Radio page that states plainly "nothing is recorded or transcribed." **SECTION I COMPLETE (113–126).** Suite: **973 pgTAP / 169 files.** `c97ae86`.
 
+### Section J (customer/revenue)
+- **#132 rate-con turnaround** — `ratecon_turnaround_report()`: paper-first median/worst hours; extracted-at-booking, booked-before-paper (phone bookings) and no-paper-at-all buckets each reported separately — the negative-delta bucket is never dressed up as speed.
+- **#135 lost-customer post-mortem** — `lost_customer_report()`: "lost" earned honestly (quiet > threshold AND 2× the customer's own booking cadence), ranked by trailing revenue; ⏱ + 🕳 Reports cards.
+- **Own-goal caught & fixed:** the #125/#126 cards were defined but never mounted in Reports' render — now they are. (tsc can't catch an unused component; eyes did.)
+- **Suite: 982 pgTAP / 170 files.** Prod pushed, anon 42501 verified, `e9564fe`.
+
 *(Run continues; closeout will finalize the count.)*
