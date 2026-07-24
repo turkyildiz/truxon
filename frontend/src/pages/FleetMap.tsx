@@ -244,7 +244,11 @@ function MapCanvas({
 
 export default function FleetMap() {
   const [weather, setWeather] = useState(false)
-  const [showAlerts, setShowAlerts] = useState(false)
+  // R9 #123: severe-weather awareness is always on — NWS alerts are fetched
+  // unconditionally and warned trucks flagged everywhere. The toggle only
+  // controls the polygon overlay, and it auto-enables (null = auto) the
+  // moment any truck is actually inside a warning.
+  const [alertsPref, setAlertsPref] = useState<boolean | null>(null)
 
   const { data: pins = [], isLoading, error } = useQuery({
     queryKey: ['fleet-positions'],
@@ -254,16 +258,16 @@ export default function FleetMap() {
   const { data: alerts = [] } = useQuery({
     queryKey: ['nws-alerts'],
     queryFn: fetchNwsAlerts,
-    enabled: showAlerts,
     refetchInterval: 5 * 60_000,
+    retry: false,
   })
 
   const warnedIds = useMemo(() => {
     const s = new Set<number>()
-    if (!showAlerts) return s
     for (const p of pins) if (alerts.some((f) => inFeature(p.lat, p.lng, f))) s.add(p.driver_id)
     return s
-  }, [pins, alerts, showAlerts])
+  }, [pins, alerts])
+  const showAlerts = alertsPref ?? warnedIds.size > 0
 
   const freshCount = useMemo(() => pins.filter((p) => !ageLabel(p.recorded_at).stale).length, [pins])
 
@@ -282,7 +286,7 @@ export default function FleetMap() {
               <input type="checkbox" checked={weather} onChange={(e) => setWeather(e.target.checked)} /> 🌧️ Radar
             </label>
             <label className="flex cursor-pointer items-center gap-2 text-sm text-body">
-              <input type="checkbox" checked={showAlerts} onChange={(e) => setShowAlerts(e.target.checked)} /> ⚠️ Severe alerts
+              <input type="checkbox" checked={showAlerts} onChange={(e) => setAlertsPref(e.target.checked)} /> ⚠️ Severe alerts{warnedIds.size > 0 ? ` (${warnedIds.size} truck${warnedIds.size > 1 ? 's' : ''})` : ''}
             </label>
           </div>
         }
