@@ -22,10 +22,44 @@ TOKEN_TTL = 50 * 60
 AGENT_TIMEOUT = aiohttp.ClientTimeout(total=120)
 
 
+_SCALE = {
+    "k": "thousand", "m": "million", "b": "billion",
+    "thousand": "thousand", "million": "million", "billion": "billion",
+}
+
+
+def _money_scale(m: "re.Match") -> str:
+    return f"{m.group(1)} {_SCALE[m.group(2).lower()]} dollars"
+
+
+def _money(m: "re.Match") -> str:
+    whole = int(m.group(1).replace(",", ""))
+    s = f"{whole} {'dollar' if whole == 1 else 'dollars'}"
+    dec = m.group(2)  # ".56" or ".2" (with dot) or None
+    if dec:
+        digits = dec[1:]
+        if len(digits) == 2 and int(digits) > 0:
+            s += f" and {int(digits)} cents"
+        elif digits.isdigit() and int(digits) > 0:
+            s = f"{whole} point {' '.join(digits)} dollars"
+    return s
+
+
 def _speakable(text: str) -> str:
-    """The reply is fed to TTS: markdown survives the agent's radio note sometimes."""
+    """The reply is read aloud by TTS, so strip markdown AND rewrite currency /
+    percent into spoken words — the $ + thousands-commas otherwise make the
+    engine spell digits or garble big money (mirrors the app's forSpeech)."""
     text = re.sub(r"[*_#`]+", "", text)
     text = re.sub(r"^\s*[-•]\s+", "", text, flags=re.M)
+    # $1.2 million / $120K / $3B -> "X million dollars"
+    text = re.sub(r"\$\s?(\d+(?:\.\d+)?)\s?(k|m|b|thousand|million|billion)\b",
+                  _money_scale, text, flags=re.I)
+    # $2,190 / $120,000 / $1,234.56 / $5 -> "N dollars [and C cents]"
+    text = re.sub(r"\$\s?(\d{1,3}(?:,\d{3})*|\d+)(\.\d+)?", _money, text)
+    # 94% / 6.5% -> "94 percent"
+    text = re.sub(r"(\d[\d.]*)\s?%", r"\1 percent", text)
+    # bare thousands-commas (miles/counts): 120,000 -> 120000
+    text = re.sub(r"\d{1,3}(?:,\d{3})+", lambda m: m.group(0).replace(",", ""), text)
     return re.sub(r"\s*\n+\s*", " ", text).strip()
 
 
