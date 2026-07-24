@@ -2894,6 +2894,20 @@ export async function customerEnrichmentGaps(): Promise<EnrichmentGaps | null> {
   return (data as unknown as EnrichmentGaps) ?? null
 }
 
+/** R9 #165: real-user web performance (admin-only). */
+export interface WebPerf {
+  days: number
+  sessions: number
+  metrics: Record<string, { n: number; p50: number; p95: number }>
+  avg_session_min: number | null
+  slowest_pages: { path: string; n: number; lcp_p75: number }[]
+  note: string
+}
+export async function webPerfReport(days = 7): Promise<WebPerf | null> {
+  const data = unwrap(await supabase.rpc('web_perf_report', { p_days: days }))
+  return (data as unknown as WebPerf) ?? null
+}
+
 export interface WriteoffProposal {
   id: number
   status: 'proposed' | 'approved'

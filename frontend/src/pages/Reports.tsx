@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, quotePricingReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
+import { cancellationAnalytics, customerKeepFire, deadheadPatterns, dotAuditPack, quotePricingReport, webPerfReport, driverNpsSummary, driverScorecard, financeMarch, laneSummary, loadActuals, lostCustomers, rateconTurnaround, storageUsageReport, stressTest, weeklyFlash, weeklyReport, type ScenarioResult } from '../data'
 import type { WeeklyRow } from '../types'
 
 function FlashStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -261,6 +261,32 @@ function QuotePricingCard() {
         {p.note}. {p.no_rate_recorded > 0 ? `${p.no_rate_recorded} decided quotes had no rate recorded. ` : ''}
         {p.no_lane_history > 0 ? `${p.no_lane_history} priced quotes were on lanes we've never run.` : ''}
       </p>
+    </Card>
+  )
+}
+
+/** R9 #165: real-user web performance (admin-only; hides on the 42501 for
+ * everyone else, and when no samples have landed yet). */
+function WebPerfCard() {
+  const q = useQuery({ queryKey: ['web-perf'], queryFn: () => webPerfReport(7), retry: false, staleTime: 10 * 60 * 1000 })
+  const p = q.data
+  if (q.isError || !p || p.sessions === 0) return null
+  const ms = (v: number | undefined) => (v == null ? '—' : v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${v}ms`)
+  const lcp = p.metrics.lcp
+  return (
+    <Card title="⚡ Real-user performance (7d)">
+      <p className="text-sm text-body">
+        {p.sessions} session{p.sessions === 1 ? '' : 's'}
+        {p.avg_session_min != null ? `, ${p.avg_session_min} min average` : ''}.{' '}
+        {lcp && <>Largest paint <span className={`font-semibold ${(lcp.p95 ?? 0) > 2500 ? 'text-amber-600 dark:text-amber-400' : ''}`}>{ms(lcp.p50)} median / {ms(lcp.p95)} p95</span>.</>}
+        {p.metrics.ttfb && <> Server first byte {ms(p.metrics.ttfb.p50)} median.</>}
+      </p>
+      {p.slowest_pages.length > 0 && (
+        <p className="mt-1 text-xs text-muted">
+          Slowest pages (LCP p75): {p.slowest_pages.slice(0, 5).map((s) => `${s.path} ${ms(s.lcp_p75)}`).join(' · ')}
+        </p>
+      )}
+      <p className="mt-1 text-[11px] text-muted">{p.note}</p>
     </Card>
   )
 }
@@ -653,6 +679,7 @@ export default function Reports() {
           <DriverCards weekOffset={Math.max(0, Math.round((new Date(todayISO() + 'T00:00:00').getTime() - new Date(weekOf + 'T00:00:00').getTime()) / (7 * 86400000)))} />
           <DotAuditCard />
           <StorageCard />
+          <WebPerfCard />
           <LanesCard />
           <StressCard />
           <PricingDisciplineCard />

@@ -4,6 +4,7 @@ import ErrorBoundary from './ErrorBoundary'
 import PageLoader from './PageLoader'
 import { ROLE_MODULES, useAuth } from '../auth'
 import { globalSearch } from '../data'
+import { initPerf } from '../perf'
 import { errorMessage, supabase } from '../supabase'
 import { useTheme } from '../theme'
 import type { SearchResults } from '../types'
@@ -313,6 +314,8 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const { theme, toggle } = useTheme()
   const location = useLocation()
+  // R9 #165: start real-user timing once, inside the authenticated shell.
+  useEffect(() => { initPerf() }, [])
   const [menuOpen, setMenuOpen] = useState(false)
   const [pwOpen, setPwOpen] = useState(false)
   const allowed = ROLE_MODULES[user?.role ?? 'driver'] ?? []

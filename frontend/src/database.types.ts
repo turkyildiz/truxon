@@ -4153,6 +4153,36 @@ export type Database = {
           },
         ]
       }
+      web_vitals: {
+        Row: {
+          created_at: string
+          id: number
+          metric: string
+          path: string
+          session_id: string
+          user_id: string | null
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          metric: string
+          path?: string
+          session_id: string
+          user_id?: string | null
+          value: number
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          metric?: string
+          path?: string
+          session_id?: string
+          user_id?: string | null
+          value?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       api_keys: {
@@ -5654,6 +5684,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      web_perf_report: { Args: { p_days?: number }; Returns: Json }
       weekly_digest_observation: { Args: never; Returns: number }
       weekly_flash: { Args: { p_week_offset?: number }; Returns: Json }
       weekly_report: { Args: { p_week_of?: string }; Returns: Json }
