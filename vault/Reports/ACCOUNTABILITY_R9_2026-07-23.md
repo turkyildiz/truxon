@@ -123,4 +123,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **#115/#116 assignment auto-suggest** — `suggest_assignment(lat,lon,when,lane)` ranks active drivers: free-first, then deadhead from ELD position (24h fresh) or last delivery (7d), lane history (365d), HOS hours; each row priced at GL all-in $/mi so a far-away driver is a **visible repositioning bill** (amber ≥$100), not a surprise. No-position drivers say "position unknown" — never a fake 0. Dispatch 🎯 Suggest-driver panel geocodes the pickup (cache-first) and one click fills driver+truck. Anon gate verified live (42501).
 - **Suite: 967 pgTAP / 168 files** — all green from clean reset. Prod pushed, committed (`4ee6d61`, `1ab54c7`).
 
+- **#117 stop reorder** — multi-stop loads reorder by drag handle (⠿, within pickup/delivery group) or ↑/↓ buttons (cab tablet), miles recalc on every reorder. Frontend-only; `faadcbc`.
+
 *(Run continues; closeout will finalize the count.)*
