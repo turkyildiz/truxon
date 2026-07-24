@@ -135,4 +135,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 - **Own-goal caught & fixed:** the #125/#126 cards were defined but never mounted in Reports' render — now they are. (tsc can't catch an unused component; eyes did.)
 - **Suite: 982 pgTAP / 170 files.** Prod pushed, anon 42501 verified, `e9564fe`.
 
+- **#129 quote pricing feedback** — `quoted_rate`/`lost_reason` now captured on the quote queue (📨 card on Customers: record rate → Won/Lost-with-reason); `quote_pricing_report()` says the sentence win-rate never could: won vs lost premium **against our own booked lane average** (never claims market knowledge; unpriced quotes and never-run lanes reported separately, not hidden). 💬 Reports card. Suite: **989 pgTAP / 171 files**, anon 42501 verified, `1638c1e`.
+
 *(Run continues; closeout will finalize the count.)*
