@@ -143,4 +143,6 @@ Lynx warm-pin, vision tiling @200 DPI, LLM extraction ledger (prompt sha only), 
 
 - **#130/#136 onboarding + prospects** — ✅ onboarding checklist on CustomerDetail (7 items, each stating exactly what's missing — FMCSA item reads the weekly watcher's `customer_fmcsa_checks`, never re-fetches; card disappears at 7/7) and 🌱 prospect shelf on Customers (lead → contacted → quoting → `convert_prospect()` promotes to a real customer exactly once, name-matching instead of duplicating; unvetted leads say so). Suite: **1015 pgTAP / 174 files.** `1a1af8c`.
 
+- **#128 quote-response drafts (propose-only)** — 💡 Draft on the quote queue: `draft_quote_response()` prices from our own lane book (90-day book preferred, year fallback), folds in the won-quote premium when it's sane (±20%), rounds to $25, and writes the reply email; one click copies it and prefills the rate field. Unknown lanes return `no_history` and no number. **Nothing sends — the human quotes.** Suite: **1021 pgTAP / 175 files.** `4fafc72`.
+
 *(Run continues; closeout will finalize the count.)*
