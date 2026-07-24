@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
-import { Button, Card, Field, Input, money, Select, Textarea } from '../components/ui'
-import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, deleteLoadTemplate, eldFleetLive, estimateLoadMargin, extractPdf, fleetCostBasis, geocodeAddress, laneRateForRoute, listLoads, listLoadTemplates, loadEtaRisk, saveLoadLineItems, saveLoadTemplate, sentinelSummary, suggestAssignment, type EldFleetRow, type ExtractedLineItem, type ExtractedStop, type LoadTemplate } from '../data'
+import { Button, Card, Field, Input, money, Select, Textarea, UndoToast } from '../components/ui'
+import { calculateDistance, createCustomer, createLoad, customerExposure, customerRateProfile, deleteLoadTemplate, restoreLoadTemplate, eldFleetLive, estimateLoadMargin, extractPdf, fleetCostBasis, geocodeAddress, laneRateForRoute, listLoads, listLoadTemplates, loadEtaRisk, saveLoadLineItems, saveLoadTemplate, sentinelSummary, suggestAssignment, type EldFleetRow, type ExtractedLineItem, type ExtractedStop, type LoadTemplate } from '../data'
 import { errorMessage } from '../supabase'
 import { ReferenceDataBanner, useReferenceData } from '../useReferenceData'
 import FleetMap from './FleetMap'
@@ -148,6 +148,8 @@ export default function Dispatch() {
   // R9 #118/#119: repeat lanes from templates (optionally on a cadence)
   const [tplName, setTplName] = useState('')
   const [tplCadence, setTplCadence] = useState<LoadTemplate['cadence']>('none')
+  // R9 #161: template delete is soft — the undo toast restores it.
+  const [deletedTpl, setDeletedTpl] = useState<LoadTemplate | null>(null)
   const templatesQ = useQuery({ queryKey: ['load-templates'], queryFn: listLoadTemplates, staleTime: 60_000, retry: false })
 
   function applyTemplate(t: LoadTemplate) {
@@ -409,6 +411,18 @@ export default function Dispatch() {
 
   return (
     <div className="space-y-4">
+      {deletedTpl && (
+        <UndoToast
+          message={`Template "${deletedTpl.name}" removed.`}
+          onUndo={() => {
+            void restoreLoadTemplate(deletedTpl.id)
+              .then(() => qc.invalidateQueries({ queryKey: ['load-templates'] }))
+              .catch((err) => setAiNote(errorMessage(err)))
+            setDeletedTpl(null)
+          }}
+          onDismiss={() => setDeletedTpl(null)}
+        />
+      )}
       <FleetMap />
       <HandoffCard />
       <LateRiskCard />
@@ -446,7 +460,7 @@ export default function Dispatch() {
                   {t.name}{t.cadence !== 'none' && ' 🔁'}
                 </button>
                 <button type="button" title="Remove template" className="px-1 text-xs text-muted hover:text-body"
-                  onClick={() => deleteLoadTemplate(t.id).then(() => qc.invalidateQueries({ queryKey: ['load-templates'] })).catch((err) => setAiNote(errorMessage(err)))}>✕</button>
+                  onClick={() => deleteLoadTemplate(t.id).then(() => { setDeletedTpl(t); qc.invalidateQueries({ queryKey: ['load-templates'] }) }).catch((err) => setAiNote(errorMessage(err)))}>✕</button>
               </span>
             ))}
           </div>

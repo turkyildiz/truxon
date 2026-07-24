@@ -457,6 +457,7 @@ function RepairLog() {
       {note && <p className="rounded-lg bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">{note}</p>}
 
       <ResourcePage<MaintenanceRecord>
+        emptyCoach={<>No maintenance records yet. Log work here (or forward a shop sheet to trux@ with subject &ldquo;WO&rdquo; and Forest drafts it) — cost-per-mile and breakdown analytics build from these.</>}
         title="Repair Log"
         queryKey="maintenance"
         list={() => listMaintenance()}

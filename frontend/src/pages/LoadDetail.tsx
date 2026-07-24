@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import DocsNotes from '../components/DocsNotes'
 import StopsEditor, { emptyStop, type StopForm } from '../components/StopsEditor'
-import { Badge, Button, Card, Field, formatDateTime, Input, LoadError, money, Select, Textarea } from '../components/ui'
+import { Badge, Button, Card, Field, formatDateTime, Input, LoadError, money, Select, Textarea, UndoToast } from '../components/ui'
 import { addCheckCall, cancelLoad, changeLoadStatus, createLoadShare, getLoad, listCheckCalls, listStops, loadRoute, nextLoadSuggestions, replaceStops, setLoadPaperwork, uncancelLoad, updateLoad } from '../data'
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
@@ -169,10 +169,13 @@ export default function LoadDetail() {
     onError: (err) => setError(errorMessage(err)),
   })
 
+  // R9 #161: cancelling shows an undo toast — uncancel_load is the true inverse.
+  const [showUndoCancel, setShowUndoCancel] = useState(false)
   const cancel = useMutation({
     mutationFn: (reason: string) => cancelLoad(id!, reason),
     onSuccess: () => {
       setError('')
+      setShowUndoCancel(true)
       refresh()
     },
     onError: (err) => setError(errorMessage(err)),
@@ -182,6 +185,7 @@ export default function LoadDetail() {
     mutationFn: () => uncancelLoad(id!),
     onSuccess: () => {
       setError('')
+      setShowUndoCancel(false)
       refresh()
     },
     onError: (err) => setError(errorMessage(err)),
@@ -285,6 +289,13 @@ export default function LoadDetail() {
 
   return (
     <div className="space-y-4">
+      {showUndoCancel && load.status === 'cancelled' && (
+        <UndoToast
+          message={`${load.load_number} cancelled.`}
+          onUndo={() => uncancel.mutate()}
+          onDismiss={() => setShowUndoCancel(false)}
+        />
+      )}
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

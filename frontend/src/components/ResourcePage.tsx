@@ -63,6 +63,9 @@ interface Props<T extends { id: number | string }> {
   remove?: { fn: (id: T['id']) => Promise<unknown>; confirm?: (item: T) => string }
   /** Initial column sort, for pages whose columns declare sortKey/sortValue. */
   defaultSort?: SortState
+  /** R9 #162: what a brand-new user should DO when the list is empty —
+   * rendered instead of the bare "No records yet." */
+  emptyCoach?: ReactNode
 }
 
 export default function ResourcePage<T extends { id: number | string }>({
@@ -83,6 +86,7 @@ export default function ResourcePage<T extends { id: number | string }>({
   fieldOptionsLoader,
   remove,
   defaultSort,
+  emptyCoach,
 }: Props<T>) {
   const qc = useQueryClient()
   const [params] = useSearchParams()
@@ -231,7 +235,7 @@ export default function ResourcePage<T extends { id: number | string }>({
       ) : listQ.isError ? (
         <LoadError error={listQ.error} onRetry={() => listQ.refetch()} />
       ) : items.length === 0 ? (
-        <p className="py-8 text-center text-muted">No records yet.</p>
+        <div className="py-8 text-center text-muted">{q ? "No records match your search." : emptyCoach ?? "No records yet."}</div>
       ) : (
         <Table
           headers={[...columns.map((c) => (c.sortKey && c.sortValue ? { label: c.header, key: c.sortKey } : c.header)), '']}

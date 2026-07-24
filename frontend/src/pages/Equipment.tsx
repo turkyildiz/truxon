@@ -135,6 +135,7 @@ function EquipmentPage({ title, api, queryKey, entityType }: { title: string; ap
     <ResourcePage<Equipment>
       title={title}
       queryKey={queryKey}
+      emptyCoach={<>{`No ${title.toLowerCase()} yet. Add each unit here — plates, inspections and PM programs hang off these records, and the compliance alerts watch their dates.`}</>}
       list={api.list}
       create={api.create}
       update={api.update}

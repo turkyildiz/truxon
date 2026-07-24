@@ -278,7 +278,13 @@ export default function Loads() {
       ) : loadsQ.isError ? (
         <LoadError error={loadsQ.error} onRetry={() => loadsQ.refetch()} />
       ) : loads.length === 0 ? (
-        <p className="py-8 text-center text-muted">No loads match.</p>
+        <div className="py-8 text-center text-muted">
+          {q || customerId || driverId || dateFrom || dateTo || awaitingOnly || statuses.size > 0 ? (
+            <>No loads match these filters — try <button type="button" className="font-medium text-brand hover:underline" onClick={() => { setQ(''); setStatuses(new Set()); setAwaitingOnly(false); setCustomerId(''); setDriverId(''); setDateFrom(''); setDateTo('') }}>clearing them</button>.</>
+          ) : (
+            <>No loads yet. Book the first one from <Link to="/dispatch" className="font-medium text-brand hover:underline">Dispatch</Link> — drop the rate confirmation PDF there and the form fills itself.</>
+          )}
+        </div>
       ) : (
         <Table
           headers={[

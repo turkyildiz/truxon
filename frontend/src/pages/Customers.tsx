@@ -365,6 +365,7 @@ export default function Customers() {
       <ResourcePage<Customer>
         title="Customers"
         queryKey="customers-all"
+        emptyCoach={<>No customers yet. The fastest start: drop a rate confirmation into &ldquo;Quick Add from Paperwork&rdquo; above and the broker is created for you — or add one manually.</>}
         list={(q) => listCustomers(q, { includeInactive: true })}
         create={createCustomer}
         update={updateCustomer}

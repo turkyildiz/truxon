@@ -162,6 +162,7 @@ export default function Drivers() {
     <ResourcePage<Driver>
       title="Drivers"
       queryKey="drivers"
+      emptyCoach={<>No drivers yet. Add your first driver here — their CDL and medical-card dates feed the compliance alerts, and the driver app login is created from the Users page.</>}
       list={listDrivers}
       create={createDriver}
       update={updateDriver}

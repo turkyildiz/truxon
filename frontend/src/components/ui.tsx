@@ -310,6 +310,27 @@ export function compareValues(a: unknown, b: unknown): number {
 
 /** Rendered in place of a list/detail body when its query failed — a failed
  * fetch must never masquerade as an empty state or an endless spinner. */
+/** R9 #161: undo toast — shown after a destructive action that has a real
+ * inverse operation. Auto-dismisses; Undo runs the inverse. */
+export function UndoToast({ message, onUndo, onDismiss, seconds = 8 }: {
+  message: string
+  onUndo: () => void
+  onDismiss: () => void
+  seconds?: number
+}) {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, seconds * 1000)
+    return () => clearTimeout(t)
+  }, [onDismiss, seconds])
+  return (
+    <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm shadow-xl" role="status">
+      <span>{message}</span>
+      <button type="button" onClick={onUndo} className="font-semibold text-brand hover:underline">Undo</button>
+      <button type="button" onClick={onDismiss} className="text-muted hover:text-body" aria-label="Dismiss">×</button>
+    </div>
+  )
+}
+
 export function LoadError({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   return (
     <div className="py-8 text-center">

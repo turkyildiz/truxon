@@ -582,6 +582,12 @@ export async function deleteLoadTemplate(id: number): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+/** R9 #161: the inverse of deleteLoadTemplate — powers the undo toast. */
+export async function restoreLoadTemplate(id: number): Promise<void> {
+  const { error } = await supabase.from('load_templates').update({ is_active: true }).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
 const LINE_ITEM_KINDS = ['line_haul', 'fuel_surcharge', 'detention', 'lumper', 'stop_pay', 'other_accessorial'] as const
 
 /** Persist the rate-con line items captured at extraction time (R9 #104).
