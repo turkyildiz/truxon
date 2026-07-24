@@ -84,7 +84,9 @@ class TruxVoiceController extends ChangeNotifier {
       await _tts.setPitch(1.0);
       await _tts.setSpeechRate(0.48); // measured, unhurried cadence
       await _selectAmericanVoice();
-      _tts.setCompletionHandler(_onSpeakDone);
+      // Completion is driven from _speak() (it awaits each chunk, then calls
+      // _onSpeakDone once) — a per-utterance handler would fire mid-reply on the
+      // first chunk of a chunked long answer and reopen the mic too early.
       _voiceReady = true;
     } catch (e) {
       _voiceReady = false;
@@ -221,8 +223,10 @@ class TruxVoiceController extends ChangeNotifier {
       listenOptions: SpeechListenOptions(
         partialResults: true,
         cancelOnError: true,
-        listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 3),
+        // Long queries were getting cut off: 30s total capped a long dictation,
+        // and a 3s mid-thought pause finalized early. Give room to breathe.
+        listenFor: const Duration(seconds: 120),
+        pauseFor: const Duration(seconds: 5),
       ),
     );
   }
@@ -303,6 +307,48 @@ class TruxVoiceController extends ChangeNotifier {
   }
 
   // ---- speaking ----
+  // On-device TTS (Android's engine) rejects/truncates strings past ~4000 chars,
+  // so a long Forest reply was getting cut off. Speak it in sentence-sized
+  // chunks: nothing hits the cap, and audio starts sooner. awaitSpeakCompletion
+  // is on, so each speak() awaits — we drive completion here, not via a handler.
+  static const int _ttsMaxChunk = 450;
+
+  @visibleForTesting
+  static List<String> ttsChunks(String text) => _ttsChunks(text);
+
+  static List<String> _ttsChunks(String text) {
+    final t = text.trim();
+    if (t.length <= _ttsMaxChunk) return t.isEmpty ? const [] : [t];
+    final out = <String>[];
+    var buf = '';
+    void flush() {
+      if (buf.trim().isNotEmpty) out.add(buf.trim());
+      buf = '';
+    }
+    for (var s in t.split(RegExp(r'(?<=[.!?])\s+'))) {
+      s = s.trim();
+      if (s.isEmpty) continue;
+      // A single sentence longer than the cap → split it on word boundaries.
+      while (s.length > _ttsMaxChunk) {
+        flush();
+        var cut = s.lastIndexOf(' ', _ttsMaxChunk);
+        if (cut <= 0) cut = _ttsMaxChunk;
+        out.add(s.substring(0, cut).trim());
+        s = s.substring(cut).trim();
+      }
+      if (buf.isEmpty) {
+        buf = s;
+      } else if (buf.length + 1 + s.length <= _ttsMaxChunk) {
+        buf = '$buf $s';
+      } else {
+        flush();
+        buf = s;
+      }
+    }
+    flush();
+    return out;
+  }
+
   Future<void> _speak(String text) async {
     state = VoiceState.speaking;
     notifyListeners();
@@ -311,10 +357,14 @@ class TruxVoiceController extends ChangeNotifier {
       return;
     }
     try {
-      await _tts.speak(text);
+      for (final chunk in _ttsChunks(text)) {
+        if (state != VoiceState.speaking) break; // stopped/cancelled mid-reply
+        await _tts.speak(chunk);
+      }
     } catch (_) {
-      _onSpeakDone();
+      // fall through to _onSpeakDone
     }
+    _onSpeakDone();
   }
 
   void _onSpeakDone() {
