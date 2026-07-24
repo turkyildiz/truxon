@@ -2,7 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Badge, Button, Card, formatDate, LoadError, money, Table } from '../components/ui'
-import { collectionsQueue, customerDetentionProfile, customerExposure, customerKeepFire, customerOnboarding, customerProfile, customerQbr, customerStatement } from '../data'
+import { collectionsQueue, customerDetentionProfile, customerExposure, customerKeepFire, customerOnboarding, customerProfile, customerQbr, customerStatement, customerStatementEmailDraft } from '../data'
 import { errorMessage } from '../supabase'
 
 /** R9 #33: printable statement of account for a month. */
@@ -12,6 +12,7 @@ function StatementCard({ customerId }: { customerId: number }) {
   const [start, setStart] = useState(firstOfMonth)
   const [end, setEnd] = useState(now.toISOString().slice(0, 10))
   const stmt = useMutation({ mutationFn: () => customerStatement(customerId, start, end) })
+  const draft = useMutation({ mutationFn: () => customerStatementEmailDraft(customerId, start, end) })
   const s = stmt.data
   return (
     <Card title="🧾 Statement of account">
@@ -21,8 +22,20 @@ function StatementCard({ customerId }: { customerId: number }) {
         <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="rounded border border-edge bg-transparent px-2 py-1 text-sm" />
         <Button type="button" disabled={stmt.isPending} onClick={() => stmt.mutate()}>{stmt.isPending ? 'Building…' : 'Generate'}</Button>
         {s && <Button type="button" variant="secondary" onClick={() => window.print()}>Print</Button>}
+        {s && <Button type="button" variant="secondary" disabled={draft.isPending} onClick={() => draft.mutate()}>{draft.isPending ? '…' : '✉️ Email draft'}</Button>}
       </div>
       {stmt.isError && <p className="mt-2 text-xs text-red-600">{errorMessage(stmt.error)}</p>}
+      {draft.data && (
+        <div className="mt-2 rounded border border-edge bg-surface-2 p-2 text-xs print:hidden">
+          <p className="text-muted">
+            To: <span className="font-medium text-body">{draft.data.to ?? '⚠ no email on file'}</span> · Subject: {draft.data.subject}
+            <button type="button" className="ml-2 font-medium text-brand hover:underline"
+              onClick={() => void navigator.clipboard.writeText(draft.data!.body)}>Copy body</button>
+          </p>
+          <pre className="mt-1 whitespace-pre-wrap font-sans text-body">{draft.data.body}</pre>
+          <p className="mt-1 text-[11px] text-muted">{draft.data.note}</p>
+        </div>
+      )}
       {s && (
         <div className="mt-3">
           <p className="text-sm text-body">

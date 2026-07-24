@@ -2962,6 +2962,20 @@ export async function customerStatement(customerId: number, start: string, end: 
   return (data as unknown as CustomerStatement) ?? null
 }
 
+/** R9 #34: propose-only statement email draft (recipient/subject/body). */
+export interface StatementEmailDraft {
+  to: string | null
+  has_recipient: boolean
+  subject: string
+  body: string
+  closing_balance: number
+  note: string
+}
+export async function customerStatementEmailDraft(customerId: number, start: string, end: string): Promise<StatementEmailDraft | null> {
+  const data = unwrap(await supabase.rpc('customer_statement_email_draft', { p_customer_id: customerId, p_start: start, p_end: end }))
+  return (data as unknown as StatementEmailDraft) ?? null
+}
+
 /** R9 #68: customers still booking but slowing vs their own baseline. */
 export interface ChurnWatch {
   watch: { customer: string; baseline_per_30d: number; recent_per_30d: number; drop_pct: number; trailing_revenue: number }[]
