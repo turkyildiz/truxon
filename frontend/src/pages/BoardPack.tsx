@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Button, Card, LoadError, money, Table } from '../components/ui'
-import { acctAging, glBalanceRatios, glCfoSnapshot, glPnlMonthly, stressTest } from '../data'
+import { acctAging, dotAuditPack, glBalanceRatios, glCfoSnapshot, glPnlMonthly, quotePricingReport, stressTest, weeklyFlash } from '../data'
 
 function Kpi({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
@@ -21,6 +21,10 @@ export default function BoardPack() {
   const balQ = useQuery({ queryKey: ['board-bal'], queryFn: glBalanceRatios, retry: false })
   const agingQ = useQuery({ queryKey: ['board-aging'], queryFn: acctAging, retry: false })
   const stressQ = useQuery({ queryKey: ['stress-test'], queryFn: stressTest, retry: false })
+  // R9 #168: board pack refresh — the ops/safety/pricing picture beside finance.
+  const flashQ = useQuery({ queryKey: ['board-flash'], queryFn: () => weeklyFlash(0), retry: false })
+  const dotQ = useQuery({ queryKey: ['board-dot'], queryFn: dotAuditPack, retry: false })
+  const pricingQ = useQuery({ queryKey: ['board-pricing'], queryFn: () => quotePricingReport(180), retry: false })
 
   if (pnlQ.isError) return <LoadError error={pnlQ.error} onRetry={() => pnlQ.refetch()} />
   if (!pnlQ.data || !cfoQ.data) return <p className="py-8 text-center text-muted">Assembling the pack…</p>
@@ -30,9 +34,23 @@ export default function BoardPack() {
   const bal = balQ.data
   const aging = agingQ.data ?? []
   const stress = stressQ.data
+  const flash = flashQ.data
+  const dot = dotQ.data
+  const pricing = pricingQ.data
   const arTotal = aging.reduce((s, r) => s + Number(r.total ?? 0), 0)
   const arLate = aging.reduce((s, r) => s + Number(r.d61_90 ?? 0) + Number(r.d90_plus ?? 0), 0)
   const num = (v: number | null | undefined, d = 2) => (v == null ? '—' : Number(v).toFixed(d))
+  // DOT readiness as a single fraction: credential/equipment lines met out of total.
+  const dotReady = dot ? (() => {
+    const checks: [number, number][] = [
+      [dot.cdl_on_file, dot.drivers_active], [dot.medcard_on_file, dot.drivers_active],
+      [dot.dqf_complete, dot.drivers_active], [dot.annual_inspection_current, dot.trucks_active],
+      [dot.eld_reporting_7d, dot.trucks_active],
+    ]
+    const met = checks.reduce((s, [h]) => s + h, 0)
+    const want = checks.reduce((s, [, w]) => s + w, 0)
+    return want > 0 ? Math.round((met / want) * 100) : null
+  })() : null
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 print:max-w-none">
@@ -86,9 +104,42 @@ export default function BoardPack() {
         </Card>
       )}
 
+      {(flash || dot) && (
+        <Card title="Operations & safety (this week / current)">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Kpi label="Loads (wk)" value={flash?.ops.loads != null ? String(flash.ops.loads) : '—'} />
+            <Kpi label="On-time" value={flash?.ops.on_time_pct != null ? `${flash.ops.on_time_pct}%` : '—'} />
+            <Kpi label="Detention (wk)" value={flash?.ops.detention_hours != null ? `${num(flash.ops.detention_hours, 1)} h` : '—'}
+              note={flash?.ops.detention_billable != null ? `${money(flash.ops.detention_billable)} billable` : undefined} />
+            <Kpi label="Open alerts" value={flash ? String(flash.sentinel.open) : '—'}
+              note={flash && flash.sentinel.critical > 0 ? `${flash.sentinel.critical} critical` : undefined} />
+            <Kpi label="DOT readiness" value={dotReady != null ? `${dotReady}%` : '—'}
+              note={dot ? `${dot.drivers_active} drivers · ${dot.trucks_active} trucks` : undefined} />
+            <Kpi label="CDL current" value={dot ? `${dot.cdl_on_file}/${dot.drivers_active}` : '—'}
+              note={dot && dot.cdl_expired.length > 0 ? `${dot.cdl_expired.length} expired` : undefined} />
+            <Kpi label="Med cards" value={dot ? `${dot.medcard_on_file}/${dot.drivers_active}` : '—'} />
+            <Kpi label="Safety events (365d)" value={dot ? String(dot.safety_events_365d) : '—'} />
+          </div>
+        </Card>
+      )}
+
+      {pricing && pricing.decided > 0 && (
+        <Card title="Pricing discipline (quotes, 180 days)">
+          <p className="text-sm text-body">
+            {pricing.won.avg_premium_pct != null && <>Won quotes averaged <span className="font-semibold">{pricing.won.avg_premium_pct > 0 ? '+' : ''}{pricing.won.avg_premium_pct}%</span> vs our own lane book ({pricing.won.n}). </>}
+            {pricing.lost.avg_premium_pct != null && <>Lost quotes averaged <span className="font-semibold">{pricing.lost.avg_premium_pct > 0 ? '+' : ''}{pricing.lost.avg_premium_pct}%</span> ({pricing.lost.n}) — the price the market walked from.</>}
+          </p>
+          {pricing.lost.top_reasons.length > 0 && (
+            <p className="mt-1 text-xs text-muted">Loss reasons: {pricing.lost.top_reasons.map((r) => `${r.reason} (${r.n})`).join(' · ')}</p>
+          )}
+          <p className="mt-1 text-[11px] text-muted">Premium is vs our own booked lane average, not a market index we don't hold.</p>
+        </Card>
+      )}
+
       <p className="text-[11px] text-muted">
         Sources: QuickBooks GL mirror (30-min sync), balance-sheet snapshot, receivables ledger, GL-anchored
-        stress model (assumptions embedded in each scenario). Generated by Truxon.
+        stress model (assumptions embedded in each scenario), weekly ops flash, DOT credential ledger, and the
+        quote-pricing feedback loop. Generated by Truxon.
       </p>
     </div>
   )
