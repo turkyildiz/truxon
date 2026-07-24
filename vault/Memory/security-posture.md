@@ -4,10 +4,12 @@ description: "Truxon security architecture after the 2026-07-20 P0 remediation �
 metadata:
   type: project
   originSessionId: a28d9126-d517-4423-90d2-26d2f9088c49
-  modified: 2026-07-24T15:03:20.869Z
+  modified: 2026-07-24T16:37:50.174Z
 ---
 
 Two third-party security reports (Grok, in `docs/Truxon_Code_Security_Scrutiny_Report.docx` + `docs/Truxon_Full_Rescan_Security_Code_Report.docx` — the owner drops these into the repo) drove the 2026-07-20 P0 batch (migrations 20260720640001/660001, commits 3637a10+f1bf85c):
+
+**⚠ OWNER LOST THE CRON_SECRET PLAINTEXT (2026-07-24)** — it's still LIVE (edge env + `app_private.cron_config` DB copy both intact, so nothing is broken), but the owner has no copy, so it can't be used to manually hit cron endpoints or rotated cleanly until reset. It's a bcrypt-style opaque value nobody can read back. **TODO: reset it (secrets set + watchdog setter, see §rotate below) and store it in the [[secrets-vault]] this time** — same root cause as the lost Jul-21 admin passwords (values lived only on the old dev box, wiped by the machine swap). The [[secrets-vault]] now holds the file secrets (OTA key, keystore, google-services) but NOT the text secrets yet — populate CRON_SECRET / service_role / DB password / account logins via the GUI.
 
 **CRON_SECRET (S-01, was CRITICAL):** the public anon JWT is NO LONGER authorization for privileged edge doors. `requireCron(req)` in `_shared/auth.ts` checks the `x-cron-key` header against the `CRON_SECRET` edge env (fail closed) across 11 functions + db-backup. All edge cron jobs go through `app_private.cron_edge_call(fn, body)` which reads the DB-side copy from `app_private.cron_config`. **The secret is NOT in git**: edge side via `supabase secrets set CRON_SECRET=…`; DB side seeded through the watchdog's admin-JWT-gated `{set_cron_secret: …}` mode which calls the service-only `set_cron_config()` RPC. If the secret must rotate: generate, `supabase secrets set`, redeploy is NOT needed (env read per-invocation), then call the watchdog setter. **The NAS doc-rag worker will need this key when NAS access returns** (its calls are gated now).
 
