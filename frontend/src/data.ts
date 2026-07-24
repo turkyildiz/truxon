@@ -2812,6 +2812,52 @@ export async function customerDetentionProfile(customerId: number): Promise<Dete
   return (data as unknown as DetentionProfile) ?? null
 }
 
+/** R9 #130: the new-broker setup checklist, each item honest about why. */
+export interface OnboardingItem { item: string; ok: boolean; detail: string }
+export async function customerOnboarding(customerId: number): Promise<{ customer: string; items: OnboardingItem[]; done: number; total: number } | null> {
+  const data = unwrap(await supabase.rpc('customer_onboarding_report', { p_customer_id: customerId }))
+  return (data as unknown as { customer: string; items: OnboardingItem[]; done: number; total: number }) ?? null
+}
+
+/** R9 #136: the prospect shelf. */
+export interface Prospect {
+  id: number
+  company_name: string
+  contact_person: string
+  email: string
+  phone: string
+  mc_number: string
+  usdot_number: string
+  source: string
+  status: 'new' | 'contacted' | 'quoting' | 'converted' | 'dead'
+  notes: string
+  fmcsa_checked_at: string | null
+  fmcsa_ok: boolean | null
+  converted_customer_id: number | null
+  created_at: string
+}
+export async function listProspects(): Promise<Prospect[]> {
+  const { data, error } = await supabase
+    .from('prospects')
+    .select('*')
+    .in('status', ['new', 'contacted', 'quoting'])
+    .order('created_at', { ascending: false })
+    .limit(50)
+  if (error) throw new Error(error.message)
+  return (data as unknown as Prospect[]) ?? []
+}
+export async function addProspect(p: Pick<Prospect, 'company_name'> & Partial<Pick<Prospect, 'contact_person' | 'email' | 'phone' | 'mc_number' | 'usdot_number' | 'notes'>>): Promise<void> {
+  const { error } = await supabase.from('prospects').insert(p)
+  if (error) throw new Error(error.message)
+}
+export async function updateProspect(id: number, patch: Partial<Pick<Prospect, 'status' | 'notes'>>): Promise<void> {
+  const { error } = await supabase.from('prospects').update(patch).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+export async function convertProspect(id: number): Promise<number> {
+  return unwrap(await supabase.rpc('convert_prospect', { p_id: id })) as unknown as number
+}
+
 export interface WriteoffProposal {
   id: number
   status: 'proposed' | 'approved'

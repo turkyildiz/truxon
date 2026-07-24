@@ -2627,6 +2627,68 @@ export type Database = {
         }
         Relationships: []
       }
+      prospects: {
+        Row: {
+          company_name: string
+          contact_person: string
+          converted_customer_id: number | null
+          created_at: string
+          email: string
+          fmcsa_checked_at: string | null
+          fmcsa_note: string
+          fmcsa_ok: boolean | null
+          id: number
+          mc_number: string
+          notes: string
+          phone: string
+          source: string
+          status: string
+          usdot_number: string
+        }
+        Insert: {
+          company_name: string
+          contact_person?: string
+          converted_customer_id?: number | null
+          created_at?: string
+          email?: string
+          fmcsa_checked_at?: string | null
+          fmcsa_note?: string
+          fmcsa_ok?: boolean | null
+          id?: number
+          mc_number?: string
+          notes?: string
+          phone?: string
+          source?: string
+          status?: string
+          usdot_number?: string
+        }
+        Update: {
+          company_name?: string
+          contact_person?: string
+          converted_customer_id?: number | null
+          created_at?: string
+          email?: string
+          fmcsa_checked_at?: string | null
+          fmcsa_note?: string
+          fmcsa_ok?: boolean | null
+          id?: number
+          mc_number?: string
+          notes?: string
+          phone?: string
+          source?: string
+          status?: string
+          usdot_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospects_converted_customer_id_fkey"
+            columns: ["converted_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       push_devices: {
         Row: {
           id: number
@@ -4446,6 +4508,7 @@ export type Database = {
         Args: { p_error?: string; p_id: number; p_results?: Json }
         Returns: undefined
       }
+      convert_prospect: { Args: { p_id: number }; Returns: number }
       create_invoice: {
         Args: {
           p_customer_id: number
@@ -4510,6 +4573,10 @@ export type Database = {
           revenue: number
           revenue_share_pct: number
         }[]
+      }
+      customer_onboarding_report: {
+        Args: { p_customer_id: number }
+        Returns: Json
       }
       customer_pay_profile: {
         Args: never

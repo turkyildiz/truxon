@@ -1,10 +1,32 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { Card, formatDate, LoadError, money, Table } from '../components/ui'
-import { collectionsQueue, customerDetentionProfile, customerExposure, customerKeepFire, customerProfile, customerQbr } from '../data'
+import { collectionsQueue, customerDetentionProfile, customerExposure, customerKeepFire, customerOnboarding, customerProfile, customerQbr } from '../data'
 
 const hm = (min: number | null | undefined) =>
   min == null ? '—' : `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`
+
+/** R9 #130: setup checklist — hidden once everything passes (job done). */
+function OnboardingCard({ customerId }: { customerId: number }) {
+  const q = useQuery({ queryKey: ['customer-onboarding', customerId], queryFn: () => customerOnboarding(customerId), retry: false, staleTime: 5 * 60 * 1000 })
+  const r = q.data
+  if (q.isError || !r || r.done === r.total) return null
+  return (
+    <Card title={`✅ Onboarding — ${r.done}/${r.total}`}>
+      <ul className="space-y-1.5 text-sm">
+        {r.items.map((it) => (
+          <li key={it.item} className="flex items-start gap-2">
+            <span className={it.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>{it.ok ? '✓' : '✗'}</span>
+            <span>
+              <span className="font-medium">{it.item}</span>
+              <span className="ml-2 text-xs text-muted">{it.detail}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  )
+}
 
 /** R9 #134: the quarter-over-quarter one-pager for the QBR call. */
 function QbrCard({ customerId }: { customerId: number }) {
@@ -249,6 +271,7 @@ export default function CustomerDetail() {
               </p>
             </Card>
           )}
+          <OnboardingCard customerId={Number(id)} />
           <QbrCard customerId={Number(id)} />
           <DetentionProfileCard customerId={Number(id)} />
         </div>

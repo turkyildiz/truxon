@@ -5,9 +5,77 @@ import { useAuth } from '../auth'
 import PdfDrop from '../components/PdfDrop'
 import ResourcePage from '../components/ResourcePage'
 import { Badge, Button, Card, Input, money } from '../components/ui'
-import { createCustomer, customersMissingInfo, deleteCustomer, enrichCustomerFromRateCons, enrichCustomersBatch, enrichCustomersFromQbo, extractCustomerPdf, listCustomers, listQuoteQueue, updateCustomer, updateQuote, type QuoteRow } from '../data'
+import { addProspect, convertProspect, createCustomer, customersMissingInfo, deleteCustomer, enrichCustomerFromRateCons, enrichCustomersBatch, enrichCustomersFromQbo, extractCustomerPdf, listCustomers, listProspects, listQuoteQueue, updateCustomer, updateProspect, updateQuote, type Prospect, type QuoteRow } from '../data'
+import { useNavigate } from 'react-router-dom'
 import { errorMessage } from '../supabase'
 import type { Customer } from '../types'
+
+/** R9 #136: the prospect shelf — leads with an MC number and a next step.
+ * Convert promotes one into a real customer row (idempotent). */
+function ProspectsCard() {
+  const qc = useQueryClient()
+  const navigate = useNavigate()
+  const q = useQuery({ queryKey: ['prospects'], queryFn: listProspects, retry: false, staleTime: 60_000 })
+  const [form, setForm] = useState({ company_name: '', contact_person: '', email: '', mc_number: '' })
+  const [open, setOpen] = useState(false)
+  const add = useMutation({
+    mutationFn: () => addProspect(form),
+    onSuccess: () => { setForm({ company_name: '', contact_person: '', email: '', mc_number: '' }); qc.invalidateQueries({ queryKey: ['prospects'] }) },
+  })
+  const advance = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: Prospect['status'] }) => updateProspect(id, { status }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['prospects'] }),
+  })
+  const convert = useMutation({
+    mutationFn: (id: number) => convertProspect(id),
+    onSuccess: (cid) => { qc.invalidateQueries({ queryKey: ['prospects'] }); qc.invalidateQueries({ queryKey: ['customers-all'] }); navigate(`/customers/${cid}`) },
+  })
+  const rows = q.data ?? []
+  if (q.isError) return null
+  return (
+    <Card title={`🌱 Prospects${rows.length ? ` (${rows.length})` : ''}`}>
+      {rows.length === 0 && <p className="text-sm text-muted">No open leads. Add the brokers you're courting — vet status and next step live here until they convert.</p>}
+      <ul className="space-y-1.5">
+        {rows.map((p) => (
+          <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-edge p-2 text-sm">
+            <span>
+              <span className="font-medium">{p.company_name}</span>
+              <span className="ml-2 text-xs text-muted">
+                {[p.contact_person, p.email, p.mc_number && `MC ${p.mc_number}`].filter(Boolean).join(' · ')}
+                {p.fmcsa_checked_at == null && ' · unvetted'}
+              </span>
+            </span>
+            <span className="flex items-center gap-2">
+              <select
+                className="rounded border border-edge bg-transparent px-1 py-0.5 text-xs"
+                value={p.status}
+                onChange={(e) => advance.mutate({ id: p.id, status: e.target.value as Prospect['status'] })}
+              >
+                {['new', 'contacted', 'quoting', 'dead'].map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <Button type="button" className="!py-1 text-xs" disabled={convert.isPending}
+                onClick={() => convert.mutate(p.id)}>
+                → Customer
+              </Button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {open ? (
+        <form className="mt-3 flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); if (form.company_name.trim()) add.mutate() }}>
+          <Input className="w-44 !py-1 text-xs" placeholder="Company *" value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} />
+          <Input className="w-32 !py-1 text-xs" placeholder="Contact" value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} />
+          <Input className="w-40 !py-1 text-xs" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <Input className="w-28 !py-1 text-xs" placeholder="MC #" value={form.mc_number} onChange={(e) => setForm({ ...form, mc_number: e.target.value })} />
+          <Button type="submit" className="!py-1 text-xs" disabled={add.isPending || !form.company_name.trim()}>Add</Button>
+        </form>
+      ) : (
+        <button type="button" className="mt-2 text-xs font-medium text-brand hover:underline" onClick={() => setOpen(true)}>+ Add prospect</button>
+      )}
+      {(add.isError || convert.isError) && <p className="mt-1 text-xs text-red-600">{errorMessage(add.error ?? convert.error)}</p>}
+    </Card>
+  )
+}
 
 /** R9 #129: the quote queue — record what we quoted, then the outcome, so
  * the pricing report can say why we win and lose. */
@@ -194,6 +262,7 @@ export default function Customers() {
         >📎 Carrier packet</button>
       </div>
       {(user?.role === 'admin' || user?.role === 'dispatcher') && <QuoteQueueCard />}
+      {(user?.role === 'admin' || user?.role === 'dispatcher') && <ProspectsCard />}
       <PdfDrop
         title="Quick Add from Paperwork"
         hint="Drop a rate confirmation or broker setup packet here to add the customer"
