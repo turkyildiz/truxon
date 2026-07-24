@@ -226,3 +226,13 @@ Pivoted from block-sweep to closing the biggest **untested-surface** gaps before
 **Batch total: 7 test files (194–200) + 1 coverage report. Suite 1153 → 1236 pgTAP across 205 files, green from clean reset on every step. Frontend prod build re-verified green. Coverage: 63 → 44 uncovered public functions. All pushed.**
 
 *(High-value autonomous test targets are drained. Remaining work is owner-gated — see the 3 items above — or the low-risk soft-gated read RPCs for a future pass.)*
+
+### OWNER-GATED GO-LIVE ITEMS — CLOSED OUT (owner present, 2026-07-24)
+Worked the 5 owner-gated items by the numbers with the owner:
+1. **OTA manifest signing — DONE** (`ca271d5`): Ed25519 manifest signing implemented (publish-release.sh signs; app verifies embedded pubkey; refuses unsigned/forged/downgraded/redirected). 9 new Dart tests, mobile suite 108 green. Owner keygen'd; private key + release keystore + google-services.json attached to the KeePassXC vault (`deploy/secrets/vault-add-files.sh`), pushed to NAS + versions + backups; loose plaintext `.pem` shredded — key now ONLY in the encrypted vault. Disk re-scanned clean.
+2. **Restore-from-INDIANCREEK — DONE**: pulled today's offsite dump from INDIANCREEK, byte-verified, decrypted (passphrase stayed on aida-nas) + restored into a throwaway postgres → PASS (13 profiles / 984 loads / 232 customers / 2500 docs / 10889 objects). Geographic-DR copy proven restorable.
+3. **Secret-rotation drill — RESOLVED (pre-check sufficient)**: live-probed all 17 requireCron doors → every one rejects a bogus key (gate armed fleet-wide; 401/403/400 variance is cosmetic). Rotation procedure documented (`SECURITY_RUNBOOK §4`). Owner chose NOT to rotate the live secret pre-launch (no compromise; capability proven).
+4. **Edge-fn test unlock — DONE** (`575bef4` + `70a68ed`): CRON-secret door tested (requireCron/timingSafeEqualStr) via a one-line CI `--allow-env` flag (no auth.ts change); AI-agent per-role authz tested (toolsForRole) via a one-line `Sb` type alias (runtime-erased, agent unchanged). Deno `_shared` gate 23 → 32 green.
+5. **Materialized views — DEFERRED to Sunday 2026-07-26** (owner). Recommendation on record: skip until *measured* slowness at scale — premature at current volumes (~1k loads), and matviews bypass RLS (a new security surface). Revisit Sun.
+
+**Net: 4/5 owner-gated items DONE, #3 resolved, #5 deferred to Sun 07-26. Last known security gap (OTA signing) closed. Go-live readiness list otherwise complete.**
